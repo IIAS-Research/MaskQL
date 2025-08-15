@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+*.log
+
+# venv / uv
+.venv/
+.uv-cache/
+.uv/
+.uv_lock/
+
+# Tox
+.tox/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+docker-compose.override.yml
+.env
+*.pid
+*.seed
+tmp/
+logs/
+*.db
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Trino / Config runtime
+etc/
+config/*.local.yml
+config/*.secrets.yml
+config/*.bak
+secrets/

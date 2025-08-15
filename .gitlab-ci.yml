@@ -1,0 +1,48 @@
+stages:
+  - test
+  - release
+
+# Vars
+variables:
+  COMPOSE_PROJECT_NAME: "maskql-ci"
+
+tests:
+  stage: test
+  tags:
+    - unix
+    - test
+  script:
+    - cp ./compose/.env.example ./compose/.env
+    - uv run tox
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - .tox/**/log/**
+
+release:
+  stage: release
+  tags:
+    - unix
+  needs: ["tests"]
+  only: 
+    - main
+  variables:
+    GIT_STRATEGY: fetch
+    GIT_DEPTH: "0"
+  before_script:
+    - set -e 
+    - git config user.name  "MaskQL CI"
+    - git config user.email "ci@maskql.local"
+
+    
+    # Token & certificat
+    - export GITLAB_TOKEN="$push_token"
+    - export REQUESTS_CA_BUNDLE="$GITLAB_CA"
+    - export SSL_CERT_FILE="$GITLAB_CA"
+    - export GIT_SSL_CAINFO="$GITLAB_CA"
+
+    - git fetch --tags --force
+    - git checkout -B "$CI_COMMIT_BRANCH"
+  script:
+    - uvx python-semantic-release version

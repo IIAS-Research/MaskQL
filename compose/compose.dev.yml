@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: demo
+    volumes:
+      - ../tests/postgresql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  # ai:
+  #   image: python:3.11-slim
+  #   working_dir: /app
+  #   command: sh -c "pip install fastapi uvicorn && uvicorn app:app --host 0.0.0.0 --port 8000"
+  #   volumes:
+  #     - ./ai/app.py:/app/app.py:ro
+  #   ports: ["8000:8000"]
+
+  trino:
+    image: trinodb/trino:476
+    ports: ["8080:8080"]
+    environment:
+      JAVA_TOOL_OPTIONS: "-DAI_MASK_URL=http://ai:8000/mask"
+    volumes:
+      - ../trino/etc-template:/etc/trino:ro
+      # - ./plugins/ai-udf:/usr/lib/trino/plugin/ai-udf:ro
+    depends_on: [postgres] #, ai]

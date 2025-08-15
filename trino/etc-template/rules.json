@@ -1,0 +1,24 @@
+{
+  "catalogs": [
+    {
+      "catalog": "postgres",
+      "allow": "read-only"
+    }
+  ],
+  "tables": [
+    {
+      "catalog": "postgres",
+      "schema": "public",
+      "table": "client",
+      "privileges": [
+        "SELECT"
+      ],
+      "columns": [
+        {
+          "name": "name",
+          "mask": "CASE WHEN name IS NULL THEN NULL WHEN length(name) <= 2 THEN name ELSE rpad(substring(name, 1, 2), length(name), '*') END"
+        }
+      ]
+    }
+  ]
+}
