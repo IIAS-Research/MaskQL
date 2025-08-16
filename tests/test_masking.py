@@ -1,25 +1,27 @@
 import os
 import unittest
 import trino
-# from trino.auth import BasicAuthentication
+from trino.auth import BasicAuthentication
 
 
 def _connect():
-    # TODO make auth work
-    # auth = BasicAuthentication(TRINO_USER, TRINO_PASSWORD) if TRINO_PASSWORD else None
+    auth = BasicAuthentication(
+        os.getenv("MASKQL_USER", "admin"),
+        os.getenv("MASKQL_PASSWORD", "admin")
+        )
     
     return trino.dbapi.connect(
-        host=os.getenv("TRINO_HOST", "localhost"),
-        port=int(os.getenv("TRINO_PORT", "8080")),
-        user=os.getenv("TRINO_USER", "admin"),
-        catalog=os.getenv("TRINO_CATALOG", "postgres"),
-        schema=os.getenv("TRINO_SCHEMA", "public"),
-        http_scheme="http",
-        # auth=auth,
+        host=os.getenv("MASKQL_HOST", "localhost"),
+        port=int(os.getenv("MASKQL_PORT", "8443")),
+        user=os.getenv("MASKQL_USER", "admin"),
+        catalog=os.getenv("MASKQL_CATALOG", "postgres"),
+        schema=os.getenv("MASKQL_SCHEMA", "public"),
+        http_scheme="https",
+        auth=auth,
     )
 
 
-class TestTrinoMasking(unittest.TestCase):
+class TestMasking(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.conn = _connect()
@@ -28,15 +30,15 @@ class TestTrinoMasking(unittest.TestCase):
     def tearDownClass(cls):
         cls.conn.close()
 
-    def test_trino_alive(self):
-        """Check if why can execute a basic SELECT on Trino"""
+    def test_maskql_alive(self):
+        """Check if why can execute a basic SELECT"""
         with self.conn.cursor() as cur:
             cur.execute("SELECT 1")
             self.assertEqual(cur.fetchone(), [1])
 
     def test_masking_applied_on_name(self):
         """
-        Check if column name is masked by Trino
+        Check if column name is masked
             - Still be a string
             - Begin by the two first letter
             - If not equal to the real value

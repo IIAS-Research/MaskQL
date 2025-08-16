@@ -12,7 +12,7 @@ tests:
     - unix
     - test
   script:
-    - cp ./compose/.env.example ./compose/.env
+    - cp ./.env.example ./.env
     - uv run tox
   artifacts:
     when: always

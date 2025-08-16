@@ -1,3 +1,4 @@
+
 # Python
 __pycache__/
 *.py[cod]
@@ -37,7 +38,6 @@ docker-compose.override.yml
 *.seed
 tmp/
 logs/
-*.db
 
 # OS files
 .DS_Store
@@ -49,3 +49,10 @@ config/*.local.yml
 config/*.secrets.yml
 config/*.bak
 secrets/
+
+/certs/*
+!certs/.gitkeep
+
+# MaskQL
+maskql/tls/cert.pem
+maskql/tls/key.pem
