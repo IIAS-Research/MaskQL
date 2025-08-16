@@ -12,9 +12,8 @@ READ_TIMEOUT = float(os.getenv("READ_TIMEOUT", "3600"))
 MAX_CONN = int(os.getenv("MAX_CONN", "200"))
 MAX_KEEPALIVE = int(os.getenv("MAX_KEEPALIVE", "50"))
 
-# TODO -> Better Auth
-DEMO_USER = os.getenv("DEMO_USER", "admin")
-DEMO_PASS = os.getenv("DEMO_PASS", "admin")
+# TODO -> Real Auth
+DEMO_USER = [("admin", "admin"), ("test", "test")]
 
 # Forward all X-Trino-* and qqs headers
 def forward_request_headers(req: Request, user: str) -> dict:
@@ -75,8 +74,9 @@ async def _shutdown():
         _client = None
 
 async def require_auth(creds: HTTPBasicCredentials = Depends(security)) -> str:
-    if creds.username == DEMO_USER and creds.password == DEMO_PASS:
-        return creds.username
+    for user, password in DEMO_USER:
+        if creds.username == user and creds.password == password:
+            return creds.username
     raise HTTPException(status_code=401, detail="Unauthorized")
 
 @app.get("/healthz")

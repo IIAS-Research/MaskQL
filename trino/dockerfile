@@ -1,0 +1,29 @@
+# syntax=docker/dockerfile:1.6
+
+############################
+# Stage 1: Maven Build
+############################
+FROM maven:3.9-eclipse-temurin-24 AS builder
+WORKDIR /build
+
+# Plugin source code
+COPY ./plugins/maskql-acl/ ./
+
+# Build command
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -U -DskipTests clean package
+
+# Collect built JARs (exclude sources/javadoc)
+RUN mkdir -p /out && \
+    find target -maxdepth 1 -type f -name "*.jar" \
+        ! -name "*-sources.jar" ! -name "*-javadoc.jar" \
+        -exec cp -v {} /out/ \;
+
+############################
+# Stage 2: Final Trino image
+############################
+FROM trinodb/trino:476
+
+COPY ./etc-template/ /etc/trino/
+RUN mkdir -p /usr/lib/trino/plugin/maskql-acl
+COPY --from=builder /out/*.jar /usr/lib/trino/plugin/maskql-acl/

@@ -56,3 +56,6 @@ secrets/
 # MaskQL
 maskql/tls/cert.pem
 maskql/tls/key.pem
+
+# Maskql-ACL
+trino/plugins/maskql-acl/target
