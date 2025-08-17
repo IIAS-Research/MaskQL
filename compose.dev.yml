@@ -2,6 +2,10 @@ networks:
   private: {}
   public: {}
 
+
+volumes:
+  trino_data:
+
 services:
   postgres:
     image: postgres:16
@@ -17,14 +21,25 @@ services:
   trino:
     build: ./trino
     networks: [private]
+    volumes:
+      - trino_data:/data/trino
     environment:
       # JAVA_TOOL_OPTIONS: "-DAI_MASK_URL=http://ai:8000/mask"
       TRINO_SHARED_SECRET: "/wasSj8niUsV5si9fnXiRC7nfM2p2acptOh2Jfqoz6o="
     depends_on: [postgres]
+    healthcheck:
+      # Trino is ready when /v1/info return "starting": false
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/v1/info | grep -q '\"starting\":false'"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 15s
 
   maskql:
     build: ./maskql
-    depends_on: [trino]
+    depends_on:
+      trino:
+        condition: service_healthy
     networks: [private, public]
     environment:
       - TRINO_URL=http://trino:8080

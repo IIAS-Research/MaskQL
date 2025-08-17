@@ -5,18 +5,21 @@ from sqlalchemy import create_engine, pool
 import os
 import sys
 from pathlib import Path
+from sqlmodel import SQLModel
+
+target_metadata = SQLModel.metadata
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 from maskql.db import Base, POSTGRES_URL
-from maskql.models import catalog as catalog_model
+from maskql.models import catalog as _catalog
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = Base.metadata
+target_metadata = SQLModel.metadata
 
 def _sync_url_from_env() -> str:
     url = POSTGRES_URL
