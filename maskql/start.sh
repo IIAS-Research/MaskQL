@@ -7,10 +7,10 @@ PORT_HTTPS=8443
 
 if [[ -f "${TLS_CERT}" && -f "${TLS_KEY}" ]]; then
     echo "[MaskQL] Starting with TLS on :${PORT_HTTPS}"
-    exec uvicorn app:app --host "$HOST" --port "$PORT_HTTPS" \
+    exec uvicorn maskql.app:app --host "$HOST" --port "$PORT_HTTPS" \
         --loop uvloop --http h11 \
         --ssl-certfile "$TLS_CERT" --ssl-keyfile "$TLS_KEY"
 else
     echo "[MaskQL] TLS cert/key not found, starting HTTP on :${PORT_HTTP}"
-    exec uvicorn app:app --host "$HOST" --port "$PORT_HTTP" --loop uvloop --http h11
+    exec uvicorn maskql.app:app --host "$HOST" --port "$PORT_HTTP" --loop uvloop --http h11
 fi
