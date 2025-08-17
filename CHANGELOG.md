@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v0.4.0 (2025-08-17)
+
+### Features
+
+- Catalog CRUD, catalog sync with Trino
+  ([`8d2f747`](https://gitlab.domchurs.ad/eds/maskql/-/commit/8d2f7476d7db17375e0f7a47acd7905846ee3314))
+
+- Init alembic for migrations
+  ([`1f6dfe2`](https://gitlab.domchurs.ad/eds/maskql/-/commit/1f6dfe2ac37c18ad0f384488d3cfe593ce7dd6a9))
+
+### Testing
+
+- Adding seeds and Catalog API tests
+  ([`179bd9c`](https://gitlab.domchurs.ad/eds/maskql/-/commit/179bd9cb62d0f117b648f53f4ab06a6747e32beb))
+
+
 ## v0.3.0 (2025-08-17)
 
 ### Features
