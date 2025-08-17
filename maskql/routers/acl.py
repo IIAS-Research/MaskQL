@@ -60,12 +60,22 @@ async def row_filter(
 ) -> Dict:
     return {"filters": []}
 
-@router.post("/{user}/{catalog}/{table}/{column}/masks", response_model=Dict)
-async def row_filter(
+@router.post("/{user}/{catalog}/{table}/{column}/mask", response_model=Dict)
+async def mask(
     user: str = Path(..., min_length=1),
     catalog: str = Path(..., min_length=1),
     table: str = Path(..., min_length=1),
     column: str = Path(..., min_length=1),
     schema: Optional[str] = Query(None, description="Optional Schema"),
 ) -> Dict:
-    return {"masks": []}
+    if user == "test" and catalog == "test_db" and table == "client" and column == "name":
+        return {"mask": "CASE WHEN name IS NULL THEN NULL WHEN length(name) <= 2 THEN name ELSE rpad(substring(name, 1, 2), length(name), '*') END"}
+    return {"mask": column}
+
+@router.post("/{user}/{catalog}/can_access", response_model=dict)
+async def can_access_catalog(
+    user: str = Path(..., min_length=1),
+    catalog: str = Path(..., min_length=1),
+) -> dict:
+    return {"allowed": True}
+
