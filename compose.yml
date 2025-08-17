@@ -13,8 +13,6 @@ services:
     environment:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: demo
-    ports:
-      - "5432:5432"
     volumes:
       - ./tests/postgresql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
@@ -24,7 +22,6 @@ services:
     volumes:
       - trino_data:/data/trino
     environment:
-      # JAVA_TOOL_OPTIONS: "-DAI_MASK_URL=http://ai:8000/mask"
       TRINO_SHARED_SECRET: "/wasSj8niUsV5si9fnXiRC7nfM2p2acptOh2Jfqoz6o="
     depends_on: [postgres]
     healthcheck:
@@ -45,10 +42,8 @@ services:
       - TRINO_URL=http://trino:8080
       - DEMO_USER=admin
       - DEMO_PASS=admin
-      - TEST_ENV=true
     volumes:
       - ./maskql/tls:/etc/maskql/tls:ro
     ports:
-      - "8443:8443"   # HTTPS if certs exist
-      # - "8081:8081"   # fallback HTTP if no certs
+      - "8443:8443"   # HTTPS
     restart: unless-stopped

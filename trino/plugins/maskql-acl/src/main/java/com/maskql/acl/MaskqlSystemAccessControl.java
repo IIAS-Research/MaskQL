@@ -1,6 +1,5 @@
 package com.maskql.acl;
 
-import com.maskql.acl.policy.HardcodedPolicyStore;
 import com.maskql.acl.AclAPI;
 
 import io.trino.spi.connector.CatalogSchemaTableName;
@@ -27,11 +26,27 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class MaskqlSystemAccessControl implements SystemAccessControl {
 
-    private final HardcodedPolicyStore policy = new HardcodedPolicyStore();
     private final AclAPI aclApi = new AclAPI();
     private static final String BASE_URL = "http://maskql:8081";
     private static final HttpClient CLIENT = HttpClient.newHttpClient();
     private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    @Override
+    public void checkCanCreateCatalog(SystemSecurityContext context, String catalog) {
+        String user = context.getIdentity().getUser();
+        
+        if (!user.equals("maskql-admin")) {
+            throw new AccessDeniedException("Access Denied: Cannot create catalog " + catalog);
+        }
+    }
+
+    @Override
+    public void checkCanDropCatalog(SystemSecurityContext context, String catalog) {
+        String user = context.getIdentity().getUser();
+        if (!user.equals("maskql-admin")) {
+            throw new AccessDeniedException("Access Denied: Cannot drop catalog " + catalog);
+        }
+    }
 
     @Override
     public Set<String> filterCatalogs(SystemSecurityContext context, Set<String> catalogs) {

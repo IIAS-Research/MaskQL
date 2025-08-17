@@ -24,6 +24,10 @@ RUN mkdir -p /out && \
 ############################
 FROM trinodb/trino:476
 
+USER root
 COPY ./etc-template/ /etc/trino/
 RUN mkdir -p /usr/lib/trino/plugin/maskql-acl
+RUN chown -R trino:trino /etc/trino /usr/lib/trino/plugin
 COPY --from=builder /out/*.jar /usr/lib/trino/plugin/maskql-acl/
+RUN chmod -R u+rwX /etc/trino /usr/lib/trino/plugin
+USER trino
