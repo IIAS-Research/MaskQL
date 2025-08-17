@@ -5,10 +5,16 @@ HOST="${HOST:-0.0.0.0}"
 PORT_HTTP="${PORT_HTTP:-8081}"
 PORT_HTTPS="${PORT_HTTPS:-8443}"
 APP="${APP:-maskql.app:app}"
+TEST_ENV="${TEST_ENV:-false}"
+
+SEED_FLAG=""
+if [ "$TEST_ENV" = true ]; then
+    SEED_FLAG="-x seed=test"
+fi
 
 echo "[MaskQL] Migrate Database"
 cd maskql
-alembic upgrade head || exit 1
+alembic $SEED_FLAG upgrade head || exit 1
 cd ..
 
 if [[ -n "${TLS_CERT:-}" && -n "${TLS_KEY:-}" && -f "${TLS_CERT}" && -f "${TLS_KEY}" ]]; then

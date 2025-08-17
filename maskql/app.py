@@ -4,6 +4,7 @@ from maskql.routers import acl
 from maskql.routers import trino_proxy
 from maskql.routers import catalog
 import maskql.db_events
+from maskql.models.catalog import Catalog
 
 
 import logging, sys
@@ -23,4 +24,7 @@ async def healthz():
 app.include_router(acl.router)
 app.include_router(trino_proxy.router)
 app.include_router(catalog.router)
+
+# Init catalogs in Trino
+Catalog.refresh_in_trino()
 

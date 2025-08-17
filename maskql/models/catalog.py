@@ -11,7 +11,7 @@ class CatalogBase(SQLModel):
     name: str
     url: str
     sgbd: str
-    user: str
+    username: str
     password: str
     
 class Catalog(SQLModel, table=True):
@@ -22,7 +22,7 @@ class Catalog(SQLModel, table=True):
     name: str
     url: str
     sgbd: str  # ex: postgresql, mysql…
-    user: str
+    username: str
     password: str
 
     @classmethod
@@ -52,7 +52,7 @@ class Catalog(SQLModel, table=True):
             connector = c.sgbd
             parts = [
                 f'"connection-url" = \'{c.url}\'',
-                f'"connection-user" = \'{c.user}\'',
+                f'"connection-user" = \'{c.username}\'',
                 f'"connection-password" = \'{c.password}\''
             ]
             sql = f'CREATE CATALOG {c.name} USING {connector} WITH (\n  {", ".join(parts)}\n)'
@@ -70,5 +70,5 @@ class CatalogPatch(SQLModel):
     name: Optional[str] = None
     url: Optional[str] = None
     sgbd: Optional[str] = None
-    user: Optional[str] = None
+    username: Optional[str] = None
     password: Optional[str] = None

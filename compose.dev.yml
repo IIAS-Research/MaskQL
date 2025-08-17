@@ -45,6 +45,7 @@ services:
       - TRINO_URL=http://trino:8080
       - DEMO_USER=admin
       - DEMO_PASS=admin
+      - TEST_ENV=true
     volumes:
       - ./maskql/tls:/etc/maskql/tls:ro
     ports:

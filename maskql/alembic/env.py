@@ -44,6 +44,8 @@ def run_migrations_offline():
         context.run_migrations()
 
 def run_migrations_online():
+    args = context.get_x_argument(as_dictionary=True)
+    seed = args.get("seed")
     url = _sync_url_from_env()
     connectable = create_engine(url, poolclass=pool.NullPool, pool_pre_ping=True)
 
@@ -55,6 +57,10 @@ def run_migrations_online():
         )
         with context.begin_transaction():
             context.run_migrations()
+        
+        if seed == "test":
+            from maskql.alembic.seeds import seed_test_data
+            seed_test_data(connection)
 
 if context.is_offline_mode():
     run_migrations_offline()
