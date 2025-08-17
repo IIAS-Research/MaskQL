@@ -6,6 +6,11 @@ PORT_HTTP="${PORT_HTTP:-8081}"
 PORT_HTTPS="${PORT_HTTPS:-8443}"
 APP="${APP:-maskql.app:app}"
 
+echo "[MaskQL] Migrate Database"
+cd maskql
+alembic upgrade head || exit 1
+cd ..
+
 if [[ -n "${TLS_CERT:-}" && -n "${TLS_KEY:-}" && -f "${TLS_CERT}" && -f "${TLS_KEY}" ]]; then
     echo "[MaskQL] Starting HTTPS on :${PORT_HTTPS}"
     uvicorn "$APP" --host "$HOST" --port "$PORT_HTTPS" \

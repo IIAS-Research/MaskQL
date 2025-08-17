@@ -1,3 +1,6 @@
+CREATE DATABASE maskql;
+
+-- Test purpose 
 CREATE TABLE IF NOT EXISTS client (
   id serial PRIMARY KEY,
   name text NOT NULL,
