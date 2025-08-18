@@ -12,8 +12,8 @@ MASKQL_HTTPS_PORT = int(os.getenv("MASKQL_HTTPS_PORT", "8443"))
 TRINO_BACKEND_HOST = os.getenv("TRINO_BACKEND_HOST", "trino")
 TRINO_BACKEND_PORT = int(os.getenv("TRINO_BACKEND_PORT", "8080"))
 
-MASKQL_USER = os.getenv("MASKQL_USER", "admin")
-MASKQL_PASSWORD = os.getenv("MASKQL_PASSWORD", "admin")
+MASKQL_USER = os.getenv("MASKQL_USER", "demo")
+MASKQL_PASSWORD = os.getenv("MASKQL_PASSWORD", "demo")
 MASKQL_CATALOG = os.getenv("MASKQL_CATALOG", "demo")
 MASKQL_SCHEMA = os.getenv("MASKQL_SCHEMA", "public")
 

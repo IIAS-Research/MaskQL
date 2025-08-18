@@ -6,10 +6,7 @@ from trino.auth import BasicAuthentication
 
 
 def _connect():
-    auth = BasicAuthentication(
-        os.getenv("MASKQL_USER", "test"),
-        os.getenv("MASKQL_PASSWORD", "test")
-        )
+    auth = BasicAuthentication("demo", "demo")
     
     return trino.dbapi.connect(
         host=os.getenv("MASKQL_HOST", "localhost"),
