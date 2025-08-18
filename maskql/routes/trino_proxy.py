@@ -4,17 +4,17 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from typing import AsyncIterator
 
 from ..core import (
-    TRINO_URL, get_client, require_auth
+    TRINO_URL, get_client, require_gateway_auth
 )
 
 router = APIRouter(
     prefix="/v1",
     tags=["Trino"],
-    dependencies=[Depends(require_auth)],
+    dependencies=[Depends(require_gateway_auth)],
 )
 
 @router.api_route("/{path:path}", methods=["GET","POST","PUT","PATCH","DELETE","HEAD","OPTIONS"])
-async def proxy_v1(path: str, request: Request, user: str = Depends(require_auth)):
+async def proxy_v1(path: str, request: Request, user: str = Depends(require_gateway_auth)):
     c: httpx.AsyncClient = await get_client()
 
     target = f"{TRINO_URL}/v1/{path}"

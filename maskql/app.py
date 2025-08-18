@@ -1,10 +1,12 @@
 from fastapi import FastAPI
 from maskql.core import close_client
-from maskql.routers import acl
-from maskql.routers import trino_proxy
-from maskql.routers import catalog
-import maskql.db_events
-from maskql.models.catalog import Catalog
+
+from maskql.routes import acl
+from maskql.routes import trino_proxy
+from maskql.routes import catalog
+from maskql.routes import user
+
+from maskql.services.catalog_service import CatalogService
 
 
 import logging, sys
@@ -24,7 +26,8 @@ async def healthz():
 app.include_router(acl.router)
 app.include_router(trino_proxy.router)
 app.include_router(catalog.router)
+app.include_router(user.router)
 
 # Init catalogs in Trino
-Catalog.refresh_in_trino()
+CatalogService.refresh_in_trino()
 
