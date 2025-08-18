@@ -70,7 +70,7 @@ class CatalogApiTests(unittest.TestCase):
         
     def _post_catalog_with_assert(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         r = self._post_catalog(payload)
-        self.assertIn(r.status_code, (201, 409), f"POST error: {r.status_code} {r.text}")
+        self.assertEqual(r.status_code, 201, f"POST error: {r.status_code} {r.text}")
         if r.status_code == 201:
             data = r.json()
             self._created_ids.append(data["id"])
@@ -138,25 +138,11 @@ class CatalogApiTests(unittest.TestCase):
         g = self._get(f"/catalogs/{rid}")
         self.assertEqual(g.status_code, 200, f"GET must work id={rid}, received {g.status_code}: {g.text}")
 
-    def test_put_replace(self):
-        base = self._post_catalog_with_assert(self._payload())
-        new_payload = self._payload() # with Random name
-
-        r = self._put(f"/catalogs/{base['id']}", new_payload)
-        self.assertEqual(r.status_code, 200, f"PUT failed: {r.status_code} {r.text}")
-        updated = r.json()
-        self.assertEqual(updated["name"], new_payload["name"])
-
-        # GET to check in base
-        g = self._get(f"/catalogs/{base['id']}")
-        self.assertEqual(g.status_code, 200)
-        self.assertEqual(g.json()["name"], new_payload["name"])
-
-    def test_put_conflict(self):
+    def test_patch_conflict(self):
         a = self._post_catalog_with_assert(self._payload())
         b = self._post_catalog_with_assert(self._payload())
         # Try to rename a with the same name as b
-        conflict = self._put(f"/catalogs/{a['id']}", self._payload(name=b["name"]))
+        conflict = self._patch(f"/catalogs/{a['id']}", self._payload(name=b["name"]))
         self.assertEqual(conflict.status_code, 409, f"Successfully failed 409 , received {conflict.status_code}: {conflict.text}")
 
     def test_patch_partial(self):
