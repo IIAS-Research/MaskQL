@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+import asyncio
+
 from maskql.core import close_client
 
 from maskql.routes import acl
@@ -14,6 +16,14 @@ logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler(sys.stdo
 
 app = FastAPI(title="MaskQL Gateway", version="0.1")
 
+@app.on_event("startup")
+async def _startup():
+    async def _trino_init():
+        await asyncio.sleep()
+        await CatalogService.refresh_in_trino(init=True)
+
+    asyncio.create_task(_trino_init())
+    
 @app.on_event("shutdown")
 async def _shutdown():
     await close_client()
@@ -27,7 +37,4 @@ app.include_router(acl.router)
 app.include_router(trino_proxy.router)
 app.include_router(catalog.router)
 app.include_router(user.router)
-
-# Init catalogs in Trino
-CatalogService.refresh_in_trino()
 

@@ -9,7 +9,7 @@ def seed_test_data(conn):
     """))
     conn.execute(text("""
         INSERT INTO users(username, password)
-        VALUES ('demo', '$2y$12$VnjzEofIAag/jcy0D/uOj.Uxthaa4S1ccfNiWSNdywec2JOynVmXe')
+        VALUES ('demo', '$argon2id$v=19$m=65536,t=3,p=4$aU0JYQxBqJUSYkxJiVHKuQ$ubzb5ljGTqoSXxwv58VV2lgM/D1Iu/koIlk29ngwMeg')
         ON CONFLICT (id) DO NOTHING
     """))
     

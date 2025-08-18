@@ -44,7 +44,7 @@ services:
     environment:
       - TRINO_URL=http://trino:8080
       - MASKQL_ADMIN_USER=admin
-      - MASKQL_ADMIN_PASSWORD_HASH=$2y$12$w2WWdzvBAUFWaz9zPsRVBOFBtCB9zVBOnSSHc34HD3yFQES4BePLC # To generate hash use : htpasswd -nBC 12 admin | cut -d: -f2
+      - MASKQL_ADMIN_PASSWORD_HASH=admin
       - TEST_ENV=true
     volumes:
       - ./maskql/tls:/etc/maskql/tls:ro

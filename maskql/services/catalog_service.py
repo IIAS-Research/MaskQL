@@ -8,7 +8,6 @@ from maskql.models.catalog import Catalog
 from maskql.schemas.catalog import CatalogCreate, CatalogPatch
 from maskql.utils.trino import trino_sql, trino_ddl
 
-
 class CatalogService:
     @staticmethod
     async def list_all() -> Sequence[Catalog]:
@@ -60,21 +59,22 @@ class CatalogService:
             return True
 
     @staticmethod
-    async def refresh_in_trino() -> dict:
+    async def refresh_in_trino(init=False) -> dict:
+        if init:
+            # Force Trino to scan catalogs
+            try: 
+                await trino_ddl("CREATE CATALOG _noop USING tpch")
+                await trino_ddl("DROP CATALOG _noop")
+            except:
+                pass
+                
         # Get catalog from DB
         rows = await CatalogService.list_all()
-        catalogs_names = {c.name for c in rows}
-
-        # Drop old catalogs
-        res = await trino_sql("SHOW CATALOGS")
-        protected = {
-            s.strip() for s in os.getenv(
-                "TRINO_PROTECTED_CATALOGS", "system,jmx,tpch,tpcds"
-            ).split(",") if s.strip()
-        }
-
-        to_drop = sorted(catalogs_names - protected)
-        for cat in to_drop:
+        
+        protected_catalogs = {'jmx', 'memory', 'system', 'tpcds', 'tpch'}
+        
+        trino_catalogs = {row[0] for row in (await trino_sql("SHOW CATALOGS"))['rows']}
+        for cat in (trino_catalogs - protected_catalogs):
             try:
                 await trino_ddl(f"DROP CATALOG {cat}")
             except Exception:
@@ -93,4 +93,4 @@ class CatalogService:
             await trino_ddl(sql)
             created.append(c.name)
 
-        return {"dropped": to_drop, "created": created}
+        return {"dropped": trino_catalogs, "created": created}

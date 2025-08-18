@@ -9,7 +9,7 @@ class UserService:
     @staticmethod
     async def list_all() -> Sequence[User]:
         async with AsyncSessionLocal() as session:
-            result = await session.exec(select(User).order_by(User.name))
+            result = await session.exec(select(User).order_by(User.username))
             return result.all()
         
     @staticmethod
@@ -32,6 +32,16 @@ class UserService:
                 user.set_password(patch.password)
             await s.commit(); await s.refresh(user)
             return user
+        
+    @staticmethod
+    async def delete(user_id: int) -> bool:
+        async with AsyncSessionLocal() as session:
+            obj = await session.get(User, user_id)
+            if not obj:
+                return False
+            await session.delete(obj)
+            await session.commit()
+            return True
 
     @staticmethod
     async def authenticate(username: str, password: str) -> User | None:

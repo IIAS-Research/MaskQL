@@ -68,7 +68,7 @@ async def mask(
     column: str = Path(..., min_length=1),
     schema: Optional[str] = Query(None, description="Optional Schema"),
 ) -> Dict:
-    if user == "test" and catalog == "test_db" and table == "client" and column == "name":
+    if user == "demo" and catalog == "demo" and table == "client" and column == "name":
         return {"mask": "CASE WHEN name IS NULL THEN NULL WHEN length(name) <= 2 THEN name ELSE rpad(substring(name, 1, 2), length(name), '*') END"}
     return {"mask": column}
 
