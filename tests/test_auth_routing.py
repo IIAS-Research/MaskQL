@@ -46,7 +46,7 @@ class TestAuthRouting(unittest.TestCase):
         )
         self.assertEqual(r.status_code, 401, f"Must be 401 without auth, received {r.status_code}")
 
-    def test_gateway_http_with_auth_ok(self):
+    def test_gateway_https_with_auth_ok(self):
         """
             End-to-end test with auth, must work
         """

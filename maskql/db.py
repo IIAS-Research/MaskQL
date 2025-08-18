@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessi
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession 
 
+from maskql.models import User, Rule, Catalog
+
 # Base for Alembic
 Base = SQLModel
 

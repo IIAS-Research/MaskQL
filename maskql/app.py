@@ -7,6 +7,7 @@ from maskql.routes import acl
 from maskql.routes import trino_proxy
 from maskql.routes import catalog
 from maskql.routes import user
+from maskql.routes import rule
 
 from maskql.services.catalog_service import CatalogService
 
@@ -19,7 +20,7 @@ app = FastAPI(title="MaskQL Gateway", version="0.1")
 @app.on_event("startup")
 async def _startup():
     async def _trino_init():
-        await asyncio.sleep()
+        await asyncio.sleep(5)
         await CatalogService.refresh_in_trino(init=True)
 
     asyncio.create_task(_trino_init())
@@ -37,4 +38,5 @@ app.include_router(acl.router)
 app.include_router(trino_proxy.router)
 app.include_router(catalog.router)
 app.include_router(user.router)
+app.include_router(rule.router)
 
