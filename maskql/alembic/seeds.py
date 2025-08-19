@@ -15,10 +15,10 @@ def seed_test_data(conn):
         ON CONFLICT (id) DO NOTHING
     """))
     conn.execute(text("""
-        INSERT INTO rules(path, allow, effect, catalog_id, user_id)
+        INSERT INTO rules(schema, table_name, column_name, allow, effect, catalog_id, user_id)
         VALUES 
-            ('client.name', true, 'UPPER(name)', 1, 1),
-            ('client', true, 'name like \'Al%\'', 1, 1)
+            ('public', 'client', 'name', true, 'UPPER(name)', 1, 1),
+            ('public', 'client', null, true, 'name like ''Al%''', 1, 1)
         ON CONFLICT (id) DO NOTHING
     """))
     

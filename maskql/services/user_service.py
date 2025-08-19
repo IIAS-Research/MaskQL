@@ -1,8 +1,8 @@
 from sqlmodel import select
-from maskql.models.user import User
+from maskql.models import User, Rule
 from maskql.schemas.user import UserCreate, UserPatch
 from maskql.db import AsyncSessionLocal
-from typing import Sequence
+from typing import Sequence, Optional
 
 class UserService:
     
@@ -11,6 +11,16 @@ class UserService:
         async with AsyncSessionLocal() as session:
             result = await session.exec(select(User).order_by(User.username))
             return result.all()
+        
+    @staticmethod
+    async def get(user_id: int) -> Optional[User]:
+        async with AsyncSessionLocal() as session:
+            return await session.get(User, user_id)
+        
+    @staticmethod
+    async def get_by_name(username: int) -> Optional[User]:
+        async with AsyncSessionLocal() as session:
+            return (await session.exec(select(User).where(User.username == username))).one_or_none()
         
     @staticmethod
     async def create_user(data: UserCreate) -> User:
@@ -48,3 +58,6 @@ class UserService:
         async with AsyncSessionLocal() as s:
             user = (await s.exec(select(User).where(User.username == username))).first()
             return user if user and user.check_password(password) else None
+    
+    
+    

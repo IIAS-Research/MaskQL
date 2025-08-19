@@ -2,14 +2,18 @@ from typing import Optional
 from sqlmodel import SQLModel
 
 class RuleCreate(SQLModel):
-    path: Optional[str] = None
+    schema: Optional[str] = None
+    table_name: Optional[str] = None
+    column_name: Optional[str] = None
     allow: bool
     effect: Optional[str] = None
     catalog_id: int
     user_id: int
 
 class RulePatch(SQLModel):
-    path: Optional[str] = None
+    schema: Optional[str] = None
+    table_name: Optional[str] = None
+    column_name: Optional[str] = None
     allow: Optional[bool] = None
     effect: Optional[str] = None
     catalog_id: Optional[int] = None
@@ -17,7 +21,9 @@ class RulePatch(SQLModel):
 
 class RuleRead(SQLModel):
     id: int
-    path: Optional[str] = None
+    schema: Optional[str] = None
+    table_name: Optional[str] = None
+    column_name: Optional[str] = None
     allow: bool
     effect: Optional[str] = None
     catalog_id: int

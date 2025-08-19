@@ -192,6 +192,7 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         }
     }
 
+    // TODO Do we keep this ?
     @Override
     public void checkCanExecuteQuery(Identity identity, QueryId queryId) {
         return; // All User can execute query

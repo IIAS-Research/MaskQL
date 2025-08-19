@@ -3,14 +3,12 @@ from typing import Optional, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from sqlalchemy.orm import relationship as sa_relationship
 
-if TYPE_CHECKING:
-    from .catalog import Catalog
-    from .user import User
-
 class Rule(SQLModel, table=True):
     __tablename__ = "rules"
     id: Optional[int] = Field(default=None, primary_key=True)
-    path: Optional[str]
+    schema: Optional[str]
+    table_name: Optional[str]
+    column_name: Optional[str]
     allow: bool
     effect: Optional[str]
     catalog_id: int = Field(foreign_key="catalogs.id", index=True)

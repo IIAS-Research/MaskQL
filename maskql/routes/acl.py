@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Path, Query
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
+from maskql.models import User
+from maskql.services.user_service import UserService
 
 router = APIRouter(
     prefix="/acl",
@@ -22,7 +24,11 @@ async def catalogs(
     user: str = Path(..., min_length=1),
     body: CatalogsIn = ...
 ) -> List[str]:
-    return body.catalogs
+    user = await UserService.get_by_name(user)
+    if not user:
+        return []
+    else:
+        return await user.is_allowed(body.catalogs)
 
 @router.post("/{user}/{catalog}/schemas", response_model=List[str])
 async def schemas(
@@ -30,7 +36,11 @@ async def schemas(
     catalog: str = Path(..., min_length=1),
     body: SchemasIn = ...
 ) -> List[str]:
-    return body.schemas
+    user = await UserService.get_by_name(user)
+    if not user:
+        return []
+    else:
+        return await user.is_allowed(body.schemas, path=(catalog,))
 
 @router.post("/{user}/{catalog}/tables", response_model=List[str])
 async def tables(
@@ -39,28 +49,40 @@ async def tables(
     schema: Optional[str] = Query(None, description="Optional Schema"),
     body: TablesIn = ...
 ) -> List[str]:
-    return body.tables
+    user = await UserService.get_by_name(user)
+    if not user:
+        return []
+    else:
+        return await user.is_allowed(body.tables, path=(catalog, schema))
 
-@router.post("/{user}/{catalog}/{table}/is_columns_allowed", response_model=Dict)
-async def is_columns_allowed(
+@router.post("/{user}/{catalog}/{table}/columns", response_model=List[str])
+async def columns(
     user: str = Path(..., min_length=1),
     catalog: str = Path(..., min_length=1),
     table: str = Path(..., min_length=1),
     schema: Optional[str] = Query(None, description="Optional Schema"),
     body: ColumnsIn = ...
 ) -> Dict:
-    return {"allowed": True}
+    user = await UserService.get_by_name(user)
+    if not user:
+        return []
+    else:
+        return await user.is_allowed(body.columns, path=(catalog, schema, table))
 
-@router.post("/{user}/{catalog}/{table}/row_filters", response_model=Dict)
+@router.post("/{user}/{catalog}/{table}/row_filter", response_model=str)
 async def row_filter(
     user: str = Path(..., min_length=1),
     catalog: str = Path(..., min_length=1),
     table: str = Path(..., min_length=1),
     schema: Optional[str] = Query(None, description="Optional Schema"),
 ) -> Dict:
-    return {"filters": []}
+    user = await UserService.get_by_name(user)
+    if not user:
+        return []
+    else:
+        return (await user.row_filter(catalog, table, schema=schema) or "")
 
-@router.post("/{user}/{catalog}/{table}/{column}/mask", response_model=Dict)
+@router.post("/{user}/{catalog}/{table}/{column}/mask", response_model=str)
 async def mask(
     user: str = Path(..., min_length=1),
     catalog: str = Path(..., min_length=1),
@@ -68,14 +90,20 @@ async def mask(
     column: str = Path(..., min_length=1),
     schema: Optional[str] = Query(None, description="Optional Schema"),
 ) -> Dict:
-    if user == "demo" and catalog == "demo" and table == "client" and column == "name":
-        return {"mask": "CASE WHEN name IS NULL THEN NULL WHEN length(name) <= 2 THEN name ELSE rpad(substring(name, 1, 2), length(name), '*') END"}
-    return {"mask": column}
+    user = await UserService.get_by_name(user)
+    if not user:
+        return []
+    else:
+        return (await user.mask(catalog, table, column, schema=schema)) or ""
 
 @router.post("/{user}/{catalog}/can_access", response_model=dict)
 async def can_access_catalog(
     user: str = Path(..., min_length=1),
     catalog: str = Path(..., min_length=1),
 ) -> dict:
-    return {"allowed": True}
+    user = await UserService.get_by_name(user)
+    if not user:
+        return {"allowed": False}
+    else:
+        return {"allowed": catalog in (await user.is_allowed([catalog]))}
 

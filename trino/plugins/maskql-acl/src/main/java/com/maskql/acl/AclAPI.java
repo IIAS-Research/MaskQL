@@ -93,12 +93,13 @@ public class AclAPI {
     // 4) POST /acl/{user}/{catalog}/{table}/is_columns_allowed?schema=...
     // =======================
     public boolean isColumnsAllowed(String user, String catalog, String table, String schema, Collection<String> columns) throws Exception {
-        URI uri = buildUri("/acl/" + enc(user) + "/" + enc(catalog) + "/" + enc(table) + "/is_columns_allowed", schema);
+        URI uri = buildUri("/acl/" + enc(user) + "/" + enc(catalog) + "/" + enc(table) + "/columns", schema);
         HttpResponse<String> resp = postJson(uri, new ColumnsIn(columns));
         ensure2xx(resp);
-        Map<?,?> m = mapper.readValue(resp.body(), Map.class);
-        Object v = m.get("allowed");
-        return (v instanceof Boolean) ? (Boolean) v : Boolean.parseBoolean(String.valueOf(v));
+        List<String> allowed_columns = Arrays.asList(mapper.readValue(resp.body(), String[].class));
+        boolean all_allowed = new java.util.HashSet<>(columns).equals(new java.util.HashSet<>(allowed_columns));
+
+        return all_allowed;
     }
 
     // =======================
