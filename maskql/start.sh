@@ -14,7 +14,7 @@ fi
 
 echo "[MaskQL] Migrate Database"
 cd maskql
-alembic $SEED_FLAG upgrade head || exit 1
+alembic $SEED_FLAG upgrade head || true
 cd ..
 
 if [[ -n "${TLS_CERT:-}" && -n "${TLS_KEY:-}" && -f "${TLS_CERT}" && -f "${TLS_KEY}" ]]; then

@@ -31,9 +31,15 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
     private static final HttpClient CLIENT = HttpClient.newHttpClient();
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    private boolean isSuperAdmin(String user) {
+        return user.equals("maskql-admin");
+    }
+
     @Override
     public void checkCanCreateCatalog(SystemSecurityContext context, String catalog) {
         String user = context.getIdentity().getUser();
+
+        if (isSuperAdmin(user)) return; // Super admin can do everything
         
         if (!user.equals("maskql-admin")) {
             throw new AccessDeniedException("Access Denied: Cannot create catalog " + catalog);
@@ -43,14 +49,16 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
     @Override
     public void checkCanDropCatalog(SystemSecurityContext context, String catalog) {
         String user = context.getIdentity().getUser();
-        if (!user.equals("maskql-admin")) {
-            throw new AccessDeniedException("Access Denied: Cannot drop catalog " + catalog);
-        }
+        if (isSuperAdmin(user)) return;
+
+        throw new AccessDeniedException("Access Denied: Cannot drop catalog " + catalog);
     }
 
     @Override
     public Set<String> filterCatalogs(SystemSecurityContext context, Set<String> catalogs) {
         String user = context.getIdentity().getUser();
+        if (isSuperAdmin(user)) return catalogs; // Super admin can do everything
+
         try {
             List<String> allowed = aclApi.catalogs(user, catalogs);
             return new HashSet<>(allowed);
@@ -64,6 +72,8 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
     @Override
     public Set<String> filterSchemas(SystemSecurityContext context, String catalogName, Set<String> schemaNames) {
         String user = context.getIdentity().getUser();
+        if (isSuperAdmin(user)) return schemaNames; // Super admin can do everything
+        
         try {
             List<String> allowed = aclApi.schemas(user, catalogName, schemaNames);
             return new LinkedHashSet<>(allowed);
@@ -76,6 +86,8 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
     @Override
     public Set<SchemaTableName> filterTables(SystemSecurityContext context, String catalogName, Set<SchemaTableName> tableNames) {
         String user = context.getIdentity().getUser();
+        if (isSuperAdmin(user)) return tableNames; // Super admin can do everything
+
         try {
             // Group requested tables by schema because the API takes one schema per call
             Map<String, List<String>> bySchema = new LinkedHashMap<>();
@@ -107,6 +119,9 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         String schema  = table.getSchemaTableName().getSchemaName(); // may be null
         String tbl     = table.getSchemaTableName().getTableName();
 
+        if (isSuperAdmin(user)) return; // Super admin can do everything
+
+
         try {
             boolean ok = aclApi.isColumnsAllowed(user, catalog, tbl, schema, columns);
             if (!ok) {
@@ -125,34 +140,17 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         String schema  = table.getSchemaTableName().getSchemaName();
         String tbl     = table.getSchemaTableName().getTableName();
 
+        if (isSuperAdmin(user)) return List.of(); // Super admin can do everything
+
         try {
-            // API returns a list (could be strings or objects). AclAPI.rowFilters() returns List<Map<String,Object>>
-            List<Map<String, Object>> filters = aclApi.rowFilters(user, catalog, tbl, schema);
-            if (filters == null || filters.isEmpty()) {
+            String expr = aclApi.rowFilter(user, catalog, tbl, schema);
+            if (expr == null || expr.trim().isEmpty()) {
                 return List.of();
             }
-            List<ViewExpression> out = new ArrayList<>();
-            for (Object item : filters) {
-                // accept plain strings or maps with "expression"/"sql"
-                String expr = null;
-                if (item instanceof String) {
-                    expr = (String) item;
-                } else if (item instanceof Map) {
-                    Object v = ((Map<?, ?>) item).get("expression");
-                    if (v == null) v = ((Map<?, ?>) item).get("sql");
-                    if (v != null) expr = String.valueOf(v);
-                }
-                if (expr != null && !expr.isBlank()) {
-                    out.add(ViewExpression.builder().expression(expr).build());
-                }
-            }
-            return out;
+            return List.of(ViewExpression.builder().expression(expr.trim()).build());
         } catch (Exception e) {
             System.err.println("[MaskQL ACL] rowFilters error: " + e.getClass().getName() + ": " + e.getMessage());
-
-            List<ViewExpression> out = new ArrayList<>();
-            out.add(ViewExpression.builder().expression("false").build());
-            return out;
+            return List.of(ViewExpression.builder().expression("false").build());
         }
     }
 
@@ -165,14 +163,16 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         String schema  = table.getSchemaTableName().getSchemaName(); // can be null
         String tbl     = table.getSchemaTableName().getTableName();
 
+        if (isSuperAdmin(user)) return new LinkedHashMap<>(); // Super admin can do everything
+
         Map<ColumnSchema, ViewExpression> out = new LinkedHashMap<>();
         try {
             for (ColumnSchema col : columns) {
                 String colName = col.getName();
-                Optional<String> expr = aclApi.mask(user, catalog, tbl, colName, schema);
-                expr.ifPresent(sql ->
-                    out.put(col, ViewExpression.builder().expression(sql).build())
-                );
+                String expr = aclApi.mask(user, catalog, tbl, colName, schema).orElse(null);;
+                if(expr != null && !expr.equals("")) {
+                    out.put(col, ViewExpression.builder().expression(expr).build());
+                }
             }
         } catch (Exception e) {
             System.err.println("[MaskQL ACL] getColumnMasks error: " + e.getClass().getName() + ": " + e.getMessage());
@@ -184,6 +184,8 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
     @Override
     public boolean canAccessCatalog(SystemSecurityContext context, String catalogName) {
         String user = context.getIdentity().getUser();
+        if (isSuperAdmin(user)) return true; // Super admin can do everything
+
         try {
             return aclApi.canAccessCatalog(user, catalogName);
         } catch (Exception e) {
@@ -192,6 +194,7 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         }
     }
 
+    // TODO Do we keep this ?
     @Override
     public void checkCanExecuteQuery(Identity identity, QueryId queryId) {
         return; // All User can execute query

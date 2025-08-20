@@ -43,8 +43,8 @@ services:
     networks: [private, public]
     environment:
       - TRINO_URL=http://trino:8080
-      - DEMO_USER=admin
-      - DEMO_PASS=admin
+      - MASKQL_ADMIN_USER=admin
+      - MASKQL_ADMIN_PASSWORD_HASH=admin
       - TEST_ENV=true
     volumes:
       - ./maskql/tls:/etc/maskql/tls:ro
