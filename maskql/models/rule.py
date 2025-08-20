@@ -6,7 +6,7 @@ from sqlalchemy.orm import relationship as sa_relationship
 class Rule(SQLModel, table=True):
     __tablename__ = "rules"
     id: Optional[int] = Field(default=None, primary_key=True)
-    schema: Optional[str]
+    schema_name: Optional[str]
     table_name: Optional[str]
     column_name: Optional[str]
     allow: bool

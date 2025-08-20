@@ -8,6 +8,10 @@ from maskql.models.catalog import Catalog
 from maskql.schemas.catalog import CatalogCreate, CatalogPatch
 from maskql.utils.trino import trino_sql, trino_ddl
 
+import time
+import logging
+log = logging.getLogger(__name__)
+
 class CatalogService:
     @staticmethod
     async def list_all() -> Sequence[Catalog]:
@@ -19,6 +23,11 @@ class CatalogService:
     async def get(catalog_id: int) -> Optional[Catalog]:
         async with AsyncSessionLocal() as session:
             return await session.get(Catalog, catalog_id)
+        
+    @staticmethod
+    async def get_by_name(name: int) -> Optional[Catalog]:
+        async with AsyncSessionLocal() as session:
+            return (await session.exec(select(Catalog).where(Catalog.name == name))).one_or_none()
 
     @staticmethod
     async def create(data: CatalogCreate) -> Catalog:
@@ -60,7 +69,7 @@ class CatalogService:
 
     @staticmethod
     async def refresh_in_trino(init=False) -> dict:
-        if init:
+        if init: # REPRENDRE ICI TODO
             # Force Trino to scan catalogs
             try: 
                 await trino_ddl("CREATE CATALOG _noop USING tpch")
@@ -68,19 +77,20 @@ class CatalogService:
             except:
                 pass
                 
-        # Get catalog from DB
-        rows = await CatalogService.list_all()
-        
+        # Drop old catalogs
         protected_catalogs = {'jmx', 'memory', 'system', 'tpcds', 'tpch'}
         
-        trino_catalogs = {row[0] for row in (await trino_sql("SHOW CATALOGS"))['rows']}
+        trino_catalogs = {row[0] for row in  (await trino_sql("SHOW CATALOGS"))['rows']}
         for cat in (trino_catalogs - protected_catalogs):
             try:
                 await trino_ddl(f"DROP CATALOG {cat}")
             except Exception:
                 pass
+        
 
         # Create catalogs
+        rows = await CatalogService.list_all()
+        
         created: list[str] = []
         for c in rows:
             connector = c.sgbd
@@ -91,6 +101,7 @@ class CatalogService:
             ]
             sql = f"CREATE CATALOG {c.name} USING {connector} WITH (\n  {', '.join(parts)}\n)"
             await trino_ddl(sql)
+            
             created.append(c.name)
-
+        
         return {"dropped": trino_catalogs, "created": created}

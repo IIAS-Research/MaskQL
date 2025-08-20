@@ -52,7 +52,7 @@ class User(SQLModel, table=True):
         if not path:
             path = []
             
-        columns = [Catalog.name, Rule.schema, Rule.table_name, Rule.column_name]
+        columns = [Catalog.name, Rule.schema_name, Rule.table_name, Rule.column_name]
         looking_for_column = columns[len(path)]
         
         if looking_for_column is Catalog.name:
@@ -110,7 +110,7 @@ class User(SQLModel, table=True):
         return enabled
         
     async def row_filter(self, catalog, table, schema:str=None):
-        schema_where = (Rule.schema == schema) if schema else True
+        schema_where = (Rule.schema_name == schema) if schema else True
         
         async with AsyncSessionLocal() as s:
             return (await s.exec(
@@ -124,7 +124,7 @@ class User(SQLModel, table=True):
                 ))).one_or_none()
     
     async def mask(self, catalog, table, column, schema:str=None):
-        schema_where = (Rule.schema == schema) if schema else True
+        schema_where = (Rule.schema_name == schema) if schema else True
         async with AsyncSessionLocal() as s:
             return (await s.exec(
                 select(Rule.effect).select_from(Rule).join(Catalog, Rule.catalog_id == Catalog.id)

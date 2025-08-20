@@ -31,9 +31,15 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
     private static final HttpClient CLIENT = HttpClient.newHttpClient();
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    private boolean isSuperAdmin(String user) {
+        return user.equals("maskql-admin");
+    }
+
     @Override
     public void checkCanCreateCatalog(SystemSecurityContext context, String catalog) {
         String user = context.getIdentity().getUser();
+
+        if (isSuperAdmin(user)) return; // Super admin can do everything
         
         if (!user.equals("maskql-admin")) {
             throw new AccessDeniedException("Access Denied: Cannot create catalog " + catalog);
@@ -43,14 +49,16 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
     @Override
     public void checkCanDropCatalog(SystemSecurityContext context, String catalog) {
         String user = context.getIdentity().getUser();
-        if (!user.equals("maskql-admin")) {
-            throw new AccessDeniedException("Access Denied: Cannot drop catalog " + catalog);
-        }
+        if (isSuperAdmin(user)) return;
+
+        throw new AccessDeniedException("Access Denied: Cannot drop catalog " + catalog);
     }
 
     @Override
     public Set<String> filterCatalogs(SystemSecurityContext context, Set<String> catalogs) {
         String user = context.getIdentity().getUser();
+        if (isSuperAdmin(user)) return catalogs; // Super admin can do everything
+
         try {
             List<String> allowed = aclApi.catalogs(user, catalogs);
             return new HashSet<>(allowed);
@@ -64,6 +72,8 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
     @Override
     public Set<String> filterSchemas(SystemSecurityContext context, String catalogName, Set<String> schemaNames) {
         String user = context.getIdentity().getUser();
+        if (isSuperAdmin(user)) return schemaNames; // Super admin can do everything
+        
         try {
             List<String> allowed = aclApi.schemas(user, catalogName, schemaNames);
             return new LinkedHashSet<>(allowed);
@@ -76,6 +86,8 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
     @Override
     public Set<SchemaTableName> filterTables(SystemSecurityContext context, String catalogName, Set<SchemaTableName> tableNames) {
         String user = context.getIdentity().getUser();
+        if (isSuperAdmin(user)) return tableNames; // Super admin can do everything
+
         try {
             // Group requested tables by schema because the API takes one schema per call
             Map<String, List<String>> bySchema = new LinkedHashMap<>();
@@ -107,6 +119,9 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         String schema  = table.getSchemaTableName().getSchemaName(); // may be null
         String tbl     = table.getSchemaTableName().getTableName();
 
+        if (isSuperAdmin(user)) return; // Super admin can do everything
+
+
         try {
             boolean ok = aclApi.isColumnsAllowed(user, catalog, tbl, schema, columns);
             if (!ok) {
@@ -124,6 +139,8 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         String catalog = table.getCatalogName();
         String schema  = table.getSchemaTableName().getSchemaName();
         String tbl     = table.getSchemaTableName().getTableName();
+
+        if (isSuperAdmin(user)) return List.of(); // Super admin can do everything
 
         try {
             String expr = aclApi.rowFilter(user, catalog, tbl, schema);
@@ -146,6 +163,8 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         String schema  = table.getSchemaTableName().getSchemaName(); // can be null
         String tbl     = table.getSchemaTableName().getTableName();
 
+        if (isSuperAdmin(user)) return new LinkedHashMap<>(); // Super admin can do everything
+
         Map<ColumnSchema, ViewExpression> out = new LinkedHashMap<>();
         try {
             for (ColumnSchema col : columns) {
@@ -165,6 +184,8 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
     @Override
     public boolean canAccessCatalog(SystemSecurityContext context, String catalogName) {
         String user = context.getIdentity().getUser();
+        if (isSuperAdmin(user)) return true; // Super admin can do everything
+
         try {
             return aclApi.canAccessCatalog(user, catalogName);
         } catch (Exception e) {

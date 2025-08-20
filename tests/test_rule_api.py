@@ -118,13 +118,17 @@ class RuleApiTests(unittest.TestCase):
         *,
         catalog_id: int,
         user_id: int,
-        path: Optional[str] = None,
+        table_name: Optional[str] = None,
+        column_name: Optional[str] = None,
+        schema_name: Optional[str] = None,
         allow: Optional[bool] = None,
         effect: Optional[str] = None
     ) -> Dict[str, Any]:
         """Build a valid rule payload."""
         return {
-            "path": path or _rand_str("path"),
+            "table_name": table_name or _rand_str("table"),
+            "column_name": column_name or _rand_str("column"),
+            "schema_name": schema_name or _rand_str("schema"),
             "allow": True if allow is None else allow,
             "effect": effect or "UPPER(column) AS column",
             "catalog_id": catalog_id,
@@ -135,7 +139,9 @@ class RuleApiTests(unittest.TestCase):
     def test_admin_auth_needed(self):
         """All /rules routes must require admin auth."""
         dummy_payload = {
-            "path": _rand_str("path"),
+            "table_name": _rand_str("table"),
+            "column_name": _rand_str("column"),
+            "schema_name": _rand_str("schema"),
             "allow": True,
             "effect": "MASK(col) AS col",
             "catalog_id": 123456,
@@ -189,14 +195,14 @@ class RuleApiTests(unittest.TestCase):
         self.assertEqual(gl.status_code, 200, f"GET /rules must be 200, got {gl.status_code}: {gl.text}")
         items = gl.json()
         self.assertIsInstance(items, list)
-        tuples: List[Tuple[int, int, str]] = [(it.get("catalog_id"), it.get("user_id"), it.get("path")) for it in items]
-        self.assertIn((payload["catalog_id"], payload["user_id"], payload["path"]), tuples)
+        tuples: List[Tuple[int, int, str]] = [(it.get("catalog_id"), it.get("user_id"), it.get("table_name"), it.get("column_name"), it.get("schema_name")) for it in items]
+        self.assertIn((payload["catalog_id"], payload["user_id"], payload["table_name"], payload["column_name"], payload["schema_name"]), tuples)
 
         # GET /rules/{id}
         g = self._get_rule(rule_id)
         self.assertEqual(g.status_code, 200, f"GET /rules/{rule_id} must be 200, got {g.status_code}: {g.text}")
         body = g.json()
-        self.assertEqual(body.get("path"), payload["path"])
+        self.assertEqual((body.get("table_name"), body.get("column_name"), body.get("schema_name")), (payload["table_name"], payload["column_name"], payload["schema_name"]))
         self.assertEqual(body.get("catalog_id"), payload["catalog_id"])
         self.assertEqual(body.get("user_id"), payload["user_id"])
 
