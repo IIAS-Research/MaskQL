@@ -2,6 +2,39 @@
 
 <!-- version list -->
 
+## v0.5.0 (2025-08-20)
+
+### Bug Fixes
+
+- Force trino to scan catalog. Dirty..
+  ([`770be3c`](https://gitlab.domchurs.ad/eds/maskql/-/commit/770be3c16062fbf8363218527de9f2240854643d))
+
+### Features
+
+- Access control with API fully working
+  ([`69c336f`](https://gitlab.domchurs.ad/eds/maskql/-/commit/69c336fe29391f4ab7aa06619f09231eaffbbff7))
+
+- Add rules in seed
+  ([`55b53eb`](https://gitlab.domchurs.ad/eds/maskql/-/commit/55b53ebc15ece7a72717d2a4a46dbae3da6200d1))
+
+- Full ACL with API
+  ([`27c4139`](https://gitlab.domchurs.ad/eds/maskql/-/commit/27c413981162540b1e1b90202dd9df0d01ece27d))
+
+- Gateway user and admin user working with policies on routes
+  ([`6055959`](https://gitlab.domchurs.ad/eds/maskql/-/commit/6055959345c7d1955d9a7bdf7bfb1a974200ce19))
+
+- Models etc for users
+  ([`b7fd18c`](https://gitlab.domchurs.ad/eds/maskql/-/commit/b7fd18c180876e66e15a6e74da5c67f2969e3823))
+
+- Rules models, routes, schema, db and test
+  ([`9a85da7`](https://gitlab.domchurs.ad/eds/maskql/-/commit/9a85da7d19e61a1d6403915c57e604f0e4c2c3b3))
+
+### Testing
+
+- Test User API and adapt old ones to new policies
+  ([`7ff13e5`](https://gitlab.domchurs.ad/eds/maskql/-/commit/7ff13e58a971ba9bcac32724749a6c980ff100f2))
+
+
 ## v0.4.0 (2025-08-17)
 
 ### Features
