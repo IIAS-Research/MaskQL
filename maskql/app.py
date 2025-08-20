@@ -21,7 +21,7 @@ app = FastAPI(title="MaskQL Gateway", version="0.1")
 async def _startup():
     async def _trino_init():
         await asyncio.sleep(5)
-        await CatalogService.refresh_in_trino(init=True)
+        await CatalogService.refresh_in_trino()
 
     asyncio.create_task(_trino_init())
     

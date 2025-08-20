@@ -68,14 +68,15 @@ class CatalogService:
             return True
 
     @staticmethod
-    async def refresh_in_trino(init=False) -> dict:
-        if init: # REPRENDRE ICI TODO
-            # Force Trino to scan catalogs
-            try: 
-                await trino_ddl("CREATE CATALOG _noop USING tpch")
-                await trino_ddl("DROP CATALOG _noop")
-            except:
-                pass
+    async def refresh_in_trino() -> dict:
+            
+        # Force Trino to scan catalogs, it will crash but that's ok
+        # TODO -> It must have something better to do...
+        try: 
+            await trino_ddl("CREATE CATALOG _noop USING tpch")
+            await trino_ddl("DROP CATALOG _noop")
+        except:
+            pass
                 
         # Drop old catalogs
         protected_catalogs = {'jmx', 'memory', 'system', 'tpcds', 'tpch'}
