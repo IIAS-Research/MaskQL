@@ -105,39 +105,39 @@ public class AclAPI {
     // =======================
     // 5) POST /acl/{user}/{catalog}/{table}/row_filters?schema=...
     // =======================
-    @SuppressWarnings("unchecked")
-    public List<Map<String,Object>> rowFilters(String user, String catalog, String table, String schema) throws Exception {
-        URI uri = buildUri("/acl/" + enc(user) + "/" + enc(catalog) + "/" + enc(table) + "/row_filters", schema);
+    public String rowFilter(String user, String catalog, String table, String schema) throws Exception {
+        URI uri = buildUri("/acl/" + enc(user) + "/" + enc(catalog) + "/" + enc(table) + "/row_filter", schema);
         HttpResponse<String> resp = postNoBody(uri);
         ensure2xx(resp);
-        Map<String,Object> m = mapper.readValue(resp.body(), Map.class);
-        Object filters = m.getOrDefault("filters", Collections.emptyList());
-        return (filters instanceof List) ? (List<Map<String,Object>>) filters : Collections.emptyList();
+
+        String body = resp.body();
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+
+        var node = mapper.readTree(body);
+        if (node == null || node.isNull() || !node.has("filter") || node.get("filter").isNull()) {
+            return null;
+        }
+
+        String expr = node.get("filter").asText();
+        expr = (expr == null) ? null : expr.trim();
+        return (expr == null || expr.isEmpty()) ? null : expr;
     }
+
+
 
     // =======================
     // 6) POST /acl/{user}/{catalog}/{table}/{column}/mask?schema=...
     // =======================
-    @SuppressWarnings("unchecked")
     public Optional<String> mask(String user, String catalog, String table, String column, String schema) throws Exception {
         URI uri = buildUri("/acl/" + enc(user) + "/" + enc(catalog) + "/" + enc(table) + "/" + enc(column) + "/mask", schema);
         HttpResponse<String> resp = postNoBody(uri);
         ensure2xx(resp);
 
-        // { "mask": "expr" }  ou  { "mask": { "expression": "expr" } }  (fallback: { "mask": { "sql": "expr" } })
-        Map<?,?> root = mapper.readValue(resp.body(), Map.class);
-        Object mask = root.get("mask");
-        if (mask instanceof String s && !s.isBlank()) {
-            return Optional.of(s);
-        }
-        if (mask instanceof Map<?,?> m) {
-            Object v = (m.get("expression") != null) ? m.get("expression") : m.get("sql");
-            if (v != null) {
-                String s = String.valueOf(v);
-                if (!s.isBlank()) return Optional.of(s);
-            }
-        }
-        return Optional.empty();
+        String expr = mapper.readTree(resp.body()).path("mask").asText(); // "" if no mask
+        expr = (expr == null) ? null : expr.trim();
+        return (expr == null || expr.isEmpty()) ? Optional.empty() : Optional.of(expr);
     }
 
     public boolean canAccessCatalog(String user, String catalog) throws Exception {

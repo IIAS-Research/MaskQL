@@ -126,33 +126,14 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         String tbl     = table.getSchemaTableName().getTableName();
 
         try {
-            // API returns a list (could be strings or objects). AclAPI.rowFilters() returns List<Map<String,Object>>
-            List<Map<String, Object>> filters = aclApi.rowFilters(user, catalog, tbl, schema);
-            if (filters == null || filters.isEmpty()) {
+            String expr = aclApi.rowFilter(user, catalog, tbl, schema);
+            if (expr == null || expr.trim().isEmpty()) {
                 return List.of();
             }
-            List<ViewExpression> out = new ArrayList<>();
-            for (Object item : filters) {
-                // accept plain strings or maps with "expression"/"sql"
-                String expr = null;
-                if (item instanceof String) {
-                    expr = (String) item;
-                } else if (item instanceof Map) {
-                    Object v = ((Map<?, ?>) item).get("expression");
-                    if (v == null) v = ((Map<?, ?>) item).get("sql");
-                    if (v != null) expr = String.valueOf(v);
-                }
-                if (expr != null && !expr.isBlank()) {
-                    out.add(ViewExpression.builder().expression(expr).build());
-                }
-            }
-            return out;
+            return List.of(ViewExpression.builder().expression(expr.trim()).build());
         } catch (Exception e) {
             System.err.println("[MaskQL ACL] rowFilters error: " + e.getClass().getName() + ": " + e.getMessage());
-
-            List<ViewExpression> out = new ArrayList<>();
-            out.add(ViewExpression.builder().expression("false").build());
-            return out;
+            return List.of(ViewExpression.builder().expression("false").build());
         }
     }
 
@@ -169,10 +150,10 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         try {
             for (ColumnSchema col : columns) {
                 String colName = col.getName();
-                Optional<String> expr = aclApi.mask(user, catalog, tbl, colName, schema);
-                expr.ifPresent(sql ->
-                    out.put(col, ViewExpression.builder().expression(sql).build())
-                );
+                String expr = aclApi.mask(user, catalog, tbl, colName, schema).orElse(null);;
+                if(expr != null && !expr.equals("")) {
+                    out.put(col, ViewExpression.builder().expression(expr).build());
+                }
             }
         } catch (Exception e) {
             System.err.println("[MaskQL ACL] getColumnMasks error: " + e.getClass().getName() + ": " + e.getMessage());

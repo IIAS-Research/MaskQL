@@ -69,7 +69,7 @@ async def columns(
     else:
         return await user.is_allowed(body.columns, path=(catalog, schema, table))
 
-@router.post("/{user}/{catalog}/{table}/row_filter", response_model=str)
+@router.post("/{user}/{catalog}/{table}/row_filter", response_model=Dict)
 async def row_filter(
     user: str = Path(..., min_length=1),
     catalog: str = Path(..., min_length=1),
@@ -78,11 +78,11 @@ async def row_filter(
 ) -> Dict:
     user = await UserService.get_by_name(user)
     if not user:
-        return []
+        return {"filter": "false"}
     else:
-        return (await user.row_filter(catalog, table, schema=schema) or "")
+        return {"filter": (await user.row_filter(catalog, table, schema=schema) or "")}
 
-@router.post("/{user}/{catalog}/{table}/{column}/mask", response_model=str)
+@router.post("/{user}/{catalog}/{table}/{column}/mask", response_model=Dict)
 async def mask(
     user: str = Path(..., min_length=1),
     catalog: str = Path(..., min_length=1),
@@ -92,9 +92,9 @@ async def mask(
 ) -> Dict:
     user = await UserService.get_by_name(user)
     if not user:
-        return []
+        return {"mask": ""}
     else:
-        return (await user.mask(catalog, table, column, schema=schema)) or ""
+        return {"mask": (await user.mask(catalog, table, column, schema=schema)) or ""}
 
 @router.post("/{user}/{catalog}/can_access", response_model=dict)
 async def can_access_catalog(
