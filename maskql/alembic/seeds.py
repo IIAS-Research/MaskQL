@@ -17,7 +17,7 @@ def seed_test_data(conn):
     conn.execute(text("""
         INSERT INTO rules(schema_name, table_name, column_name, allow, effect, catalog_id, user_id)
         VALUES 
-            ('public', 'client', 'name', true, 'UPPER(name)', 1, 1),
+            ('public', 'client', 'name', true, 'TEXT_PSEUDO(name)', 1, 1),
             ('public', 'client', null, true, 'name like ''Al%''', 1, 1)
         ON CONFLICT (id) DO NOTHING
     """))

@@ -6,8 +6,8 @@
   <groupId>com.maskql</groupId>
   <artifactId>maskql-acl</artifactId>
   <version>0.1.0</version>
-  <name>MaskQL Trino Access Control List Plugin</name>
-  <description>Override Trino behavior for User, Access Control, schema filtering and column masking</description>
+  <name>MaskQL Plugin for Trino</name>
+  <description>Override Trino behavior for access control (User, schema filtering, row filtering and column masking) and add some masking functions</description>
   <packaging>jar</packaging>
   
   <properties>

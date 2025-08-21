@@ -7,7 +7,7 @@ FROM maven:3.9-eclipse-temurin-24 AS builder
 WORKDIR /build
 
 # Plugin source code
-COPY ./plugins/maskql-acl/ ./
+COPY ./plugins/maskql-plugin/ ./
 
 # Build command
 RUN --mount=type=cache,target=/root/.m2 \
@@ -26,8 +26,8 @@ FROM trinodb/trino:476
 
 USER root
 COPY ./etc-template/ /etc/trino/
-RUN mkdir -p /usr/lib/trino/plugin/maskql-acl
+RUN mkdir -p /usr/lib/trino/plugin/maskql-plugin
 RUN chown -R trino:trino /etc/trino /usr/lib/trino/plugin
-COPY --from=builder /out/*.jar /usr/lib/trino/plugin/maskql-acl/
+COPY --from=builder /out/*.jar /usr/lib/trino/plugin/maskql-plugin/
 RUN chmod -R u+rwX /etc/trino /usr/lib/trino/plugin
 USER trino
