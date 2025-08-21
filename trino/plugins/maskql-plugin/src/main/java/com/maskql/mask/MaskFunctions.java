@@ -18,6 +18,8 @@ public final class MaskFunctions {
         String text = input.toStringUtf8();
         
         // Basic first try
+        if (text.length() < 3) return Slices.utf8Slice("***");
+
         String out = text.substring(0, 2) + "*".repeat(Math.max(3, text.length()));
         return Slices.utf8Slice(out);
     }
