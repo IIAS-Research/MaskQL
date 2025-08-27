@@ -5,6 +5,8 @@ import io.trino.spi.function.Description;
 import io.trino.spi.function.ScalarFunction;
 import io.trino.spi.function.SqlType;
 import io.trino.spi.type.StandardTypes;
+import io.trino.spi.TrinoException;
+import io.trino.spi.StandardErrorCode;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 
@@ -12,7 +14,21 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import java.io.IOException;
 
+import org.jasypt.util.text.AES256TextEncryptor;
+
 public final class MaskFunctions {
+    private static final AES256TextEncryptor ENCRYPTOR = new AES256TextEncryptor();
+
+    static {
+        String pwd = System.getenv("TEXT_ENCRYPT_PASSWORD");
+        if (pwd == null || pwd.isEmpty()) {
+            throw new IllegalStateException(
+                "Missing environment variable TEXT_ENCRYPT_PASSWORD for Jasypt AES256TextEncryptor"
+            );
+        }
+        ENCRYPTOR.setPassword(pwd);
+    }
+
     private static final EdsPseudoBridge BRIDGE = EdsPseudoBridge.getInstance();
 
 
@@ -46,6 +62,19 @@ public final class MaskFunctions {
             return Slices.utf8Slice(text.trim());
         } catch (IOException e) {
             return null;
+        }
+    }
+
+    @ScalarFunction("text_encrypt")
+    @Description("Encrypt a VARCHAR using Jasypt AES-256 (CBC+salt+IV). Password from env TEXT_ENCRYPT_PASSWORD. Returns Base64 text.")
+    @SqlType(StandardTypes.VARCHAR)
+    public static Slice textEncrypt(@SqlType(StandardTypes.VARCHAR) Slice input) {
+        if (input == null) return null;
+
+        try {
+            return Slices.utf8Slice(ENCRYPTOR.encrypt(input.toStringUtf8()));
+        } catch (Exception e) {
+            throw new TrinoException(StandardErrorCode.GENERIC_INTERNAL_ERROR, "AES encryption failed", e);
         }
     }
 }

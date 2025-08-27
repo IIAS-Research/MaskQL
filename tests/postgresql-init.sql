@@ -21,7 +21,6 @@ CREATE TABLE IF NOT EXISTS documents (
     file BYTEA NOT NULL
 );
 INSERT INTO documents (client_id, file)
-VALUES (
-    1,
-    pg_read_binary_file('/docker-entrypoint-initdb.d/example.pdf')
-);
+VALUES 
+  (1, pg_read_binary_file('/docker-entrypoint-initdb.d/example.pdf')),
+  (1, pg_read_binary_file('/docker-entrypoint-initdb.d/example2.pdf'));
