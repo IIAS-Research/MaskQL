@@ -11,6 +11,8 @@ tests:
   tags:
     - unix
     - test
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
   script:
     - cp ./.env.example ./.env
     - uv run tox
