@@ -35,7 +35,7 @@ services:
     environment:
       # JAVA_TOOL_OPTIONS: "-DAI_MASK_URL=http://ai:8000/mask"
       TRINO_SHARED_SECRET: "/wasSj8niUsV5si9fnXiRC7nfM2p2acptOh2Jfqoz6o="
-      TEXT_ENCRYPT_PASSWORD: "1234567890abcdef"
+      ENCRYPT_PASSWORD: "1234567890abcdef"
     depends_on: [postgres]
     healthcheck:
       # Trino is ready when /v1/info return "starting": false

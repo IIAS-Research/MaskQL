@@ -14,21 +14,20 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import java.io.IOException;
 
-import org.jasypt.util.text.AES256TextEncryptor;
+import org.bouncycastle.crypto.fpe.FPEFF1Engine;
+import org.bouncycastle.crypto.params.KeyParameter;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.text.SimpleDateFormat;
+import java.time.*;
+import java.util.Base64;
 
-public final class MaskFunctions {
-    private static final AES256TextEncryptor ENCRYPTOR = new AES256TextEncryptor();
 
-    static {
-        String pwd = System.getenv("TEXT_ENCRYPT_PASSWORD");
-        if (pwd == null || pwd.isEmpty()) {
-            throw new IllegalStateException(
-                "Missing environment variable TEXT_ENCRYPT_PASSWORD for Jasypt AES256TextEncryptor"
-            );
-        }
-        ENCRYPTOR.setPassword(pwd);
-    }
-
+public final class MaskUnstructured {
+    
     private static final EdsPseudoBridge BRIDGE = EdsPseudoBridge.getInstance();
 
 
@@ -62,19 +61,6 @@ public final class MaskFunctions {
             return Slices.utf8Slice(text.trim());
         } catch (IOException e) {
             return null;
-        }
-    }
-
-    @ScalarFunction("text_encrypt")
-    @Description("Encrypt a VARCHAR using Jasypt AES-256 (CBC+salt+IV). Password from env TEXT_ENCRYPT_PASSWORD. Returns Base64 text.")
-    @SqlType(StandardTypes.VARCHAR)
-    public static Slice textEncrypt(@SqlType(StandardTypes.VARCHAR) Slice input) {
-        if (input == null) return null;
-
-        try {
-            return Slices.utf8Slice(ENCRYPTOR.encrypt(input.toStringUtf8()));
-        } catch (Exception e) {
-            throw new TrinoException(StandardErrorCode.GENERIC_INTERNAL_ERROR, "AES encryption failed", e);
         }
     }
 }
