@@ -4,7 +4,7 @@ def seed_test_data(conn):
     
     conn.execute(text("""
         INSERT INTO catalogs(name, url, sgbd, username, password)
-        VALUES ('demo', 'jdbc:postgresql://postgres:5432/demo', 'postgresql', 'postgres', 'postgres')
+        VALUES ('demo', 'jdbc:postgresql://postgres:5432/maskqltest', 'postgresql', 'postgres', 'postgres')
         ON CONFLICT (id) DO NOTHING
     """))
     conn.execute(text("""

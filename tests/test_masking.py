@@ -59,7 +59,7 @@ class TestMasking(unittest.TestCase):
                     masked = row[0]
                     self.assertIsInstance(masked, str, "name must be a string")
 
-                    # TODO Enable this when masks are handled be FastAPI
+                    # TODO Enable this when masks are handled by FastAPI
                     # self.assertNotEqual(
                     #     masked, plain_name,
                     #     f"Name is not masked ({plain_name})",
