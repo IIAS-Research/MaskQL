@@ -13,6 +13,10 @@ tests:
     - test
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
+    GIT_SUBMODULE_FORCE_HTTPS: "true"
+
+  before_script:
+    - git config --global http.sslCAInfo "$GITLAB_CA"
   script:
     - cp ./.env.example ./.env
     - uv run tox
@@ -43,7 +47,6 @@ release:
     - export REQUESTS_CA_BUNDLE="$GITLAB_CA"
     - export SSL_CERT_FILE="$GITLAB_CA"
     - export GIT_SSL_CAINFO="$GITLAB_CA"
-
     - git fetch --tags --force
     - git checkout -B "$CI_COMMIT_BRANCH"
   script:
