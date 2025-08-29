@@ -10,8 +10,9 @@ CREATE TABLE IF NOT EXISTS client (
   email text
 );
 INSERT INTO client (name, email) VALUES
-  ('Alice Dupont','alice@example.com'),
-  ('Bob Martin','bob@example.com')
+  ('Alice Dupont', 'alice@example.com'),
+  ('Bob Martin', 'bob@example.com'),
+  ('Amandine Durant', 'amandine@example.com')
 ON CONFLICT DO NOTHING;
 
 

@@ -20,7 +20,6 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
-import java.util.Base64;
 
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -50,6 +49,18 @@ class MaskCrypto {
     private static final SecretKeySpec MASTER_KEY; // Derived key from password
     private static final String CONTEXT; // Global MaskQL context
 
+    // DATE (epochDay)
+    static final int DATE_MIN_EPOCH_DAY = -719_162;   // 0001-01-01
+    static final int DATE_MAX_EPOCH_DAY =  2_932_896; // 9999-12-31
+    static final int DATE_DOMAIN_SIZE   = DATE_MAX_EPOCH_DAY - DATE_MIN_EPOCH_DAY + 1;
+
+    // TIMESTAMP(3)
+    static final long TS_MIN_EPOCH_MICROS   = -62135596800000000L;   // 0001-01-01T00:00:00Z
+    static final long TS_MAX_EPOCH_MICROS   =  253402300799999000L; // 9999-12-31T23:59:59.999Z
+    static final long TS_MIN_EPOCH_MILLIS   = Math.floorDiv(TS_MIN_EPOCH_MICROS, 1000L);
+    static final long TS_MAX_EPOCH_MILLIS   = Math.floorDiv(TS_MAX_EPOCH_MICROS, 1000L);
+    static final long TS_DOMAIN_SIZE_MILLIS = (TS_MAX_EPOCH_MILLIS - TS_MIN_EPOCH_MILLIS) + 1L;
+
     static {
         String secret = System.getenv("ENCRYPT_PASSWORD");
         if (secret == null || secret.isEmpty()) {
@@ -71,7 +82,9 @@ class MaskCrypto {
         }
     }
 
-    // AES-GCM
+    // ========================================
+    //  AES-GCM (deterministic nonce via HMAC)
+    // ========================================
     static byte[] encryptDeterministicBytes(byte[] plaintext, String domain) {
         try {
             byte[] dom = domainWithContext(domain);
@@ -105,8 +118,10 @@ class MaskCrypto {
         }
     }
 
-    // PRP Feistel (HMAC-SHA-256)
-    static long prp64Encrypt(long x, String domain) {
+    // ==================================
+    //  PRP Feistel (HMAC-SHA-256) — RAW
+    // ==================================
+    static long prp64EncryptRaw(long x, String domain) {
         int L = (int)(x >>> 32);
         int R = (int)(x & 0xFFFFFFFFL);
         for (int i = 0; i < 8; i++) {
@@ -119,7 +134,8 @@ class MaskCrypto {
         }
         return ((long)L << 32) | (R & 0xFFFFFFFFL);
     }
-    static long prp64Decrypt(long x, String domain) {
+
+    static long prp64DecryptRaw(long x, String domain) {
         int L = (int)(x >>> 32);
         int R = (int)(x & 0xFFFFFFFFL);
         for (int i = 7; i >= 0; i--) {
@@ -133,7 +149,7 @@ class MaskCrypto {
         return ((long)L << 32) | (R & 0xFFFFFFFFL);
     }
 
-    static int prp32Encrypt(int x, String domain) {
+    static int prp32EncryptRaw(int x, String domain) {
         short L = (short)((x >>> 16) & 0xFFFF);
         short R = (short)(x & 0xFFFF);
         for (int i = 0; i < 8; i++) {
@@ -146,7 +162,8 @@ class MaskCrypto {
         }
         return ((L & 0xFFFF) << 16) | (R & 0xFFFF);
     }
-    static int prp32Decrypt(int x, String domain) {
+
+    static int prp32DecryptRaw(int x, String domain) {
         short L = (short)((x >>> 16) & 0xFFFF);
         short R = (short)(x & 0xFFFF);
         for (int i = 7; i >= 0; i--) {
@@ -159,6 +176,108 @@ class MaskCrypto {
         }
         return ((L & 0xFFFF) << 16) | (R & 0xFFFF);
     }
+
+    // ================================================
+    //  Wrappers PRP with range for DATE and TIMESTAMP
+    // ================================================
+
+    static int permuteInRange32(int x, int n, String domain) {
+        int y = prp32EncryptRaw(x, domain);
+        while (Integer.compareUnsigned(y, n) >= 0) {
+            x = y;
+            y = prp32EncryptRaw(x, domain);
+        }
+        return y;
+    }
+
+    static int invertPermuteInRange32(int y, int n, String domain) {
+        int x = prp32DecryptRaw(y, domain);
+        while (Integer.compareUnsigned(x, n) >= 0) {
+            y = x;
+            x = prp32DecryptRaw(y, domain);
+        }
+        return x;
+    }
+
+    static int prp32Encrypt(int x, String domain) {
+        if (DOMAIN_DATE.equals(domain)) {
+            if (x < DATE_MIN_EPOCH_DAY || x > DATE_MAX_EPOCH_DAY) {
+                throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "Date out of range");
+            }
+            int rel = x - DATE_MIN_EPOCH_DAY;
+            int enc = permuteInRange32(rel, DATE_DOMAIN_SIZE, DOMAIN_DATE);
+            return enc + DATE_MIN_EPOCH_DAY;
+        }
+        return prp32EncryptRaw(x, domain);
+    }
+
+    static int prp32Decrypt(int x, String domain) {
+        if (DOMAIN_DATE.equals(domain)) {
+            if (x < DATE_MIN_EPOCH_DAY || x > DATE_MAX_EPOCH_DAY) {
+                throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "Date out of range");
+            }
+            int rel = x - DATE_MIN_EPOCH_DAY;
+            int dec = invertPermuteInRange32(rel, DATE_DOMAIN_SIZE, DOMAIN_DATE);
+            return dec + DATE_MIN_EPOCH_DAY;
+        }
+        return prp32DecryptRaw(x, domain);
+    }
+
+    static long permuteInRange64(long x, long n, String domain) {
+        long y = prp64EncryptRaw(x, domain);
+        while (Long.compareUnsigned(y, n) >= 0) {
+            x = y;
+            y = prp64EncryptRaw(x, domain);
+        }
+        return y;
+    }
+
+    static long invertPermuteInRange64(long y, long n, String domain) {
+        long x = prp64DecryptRaw(y, domain);
+        while (Long.compareUnsigned(x, n) >= 0) {
+            y = x;
+            x = prp64DecryptRaw(y, domain);
+        }
+        return x;
+    }
+
+    static long prp64Encrypt(long x, String domain) {
+        if (DOMAIN_TIMESTAMP.equals(domain)) {
+            if ((x % 1000L) != 0L) {
+                throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "TIMESTAMP(3) excepted");
+            }
+            if (x < TS_MIN_EPOCH_MICROS || x > TS_MAX_EPOCH_MICROS) {
+                throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "TIMESTAMP out of range");
+            }
+            long millis = Math.floorDiv(x, 1000L);
+            long rel    = millis - TS_MIN_EPOCH_MILLIS;
+            long enc    = permuteInRange64(rel, TS_DOMAIN_SIZE_MILLIS, DOMAIN_TIMESTAMP);
+            long outMs  = enc + TS_MIN_EPOCH_MILLIS;
+            return Math.multiplyExact(outMs, 1000L);
+        }
+        return prp64EncryptRaw(x, domain);
+    }
+
+    static long prp64Decrypt(long x, String domain) {
+        if (DOMAIN_TIMESTAMP.equals(domain)) {
+            if ((x % 1000L) != 0L) {
+                throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "TIMESTAMP(3) excepted");
+            }
+            if (x < TS_MIN_EPOCH_MICROS || x > TS_MAX_EPOCH_MICROS) {
+                throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "TIMESTAMP out of range");
+            }
+            long millis = Math.floorDiv(x, 1000L);
+            long rel    = millis - TS_MIN_EPOCH_MILLIS;
+            long dec    = invertPermuteInRange64(rel, TS_DOMAIN_SIZE_MILLIS, DOMAIN_TIMESTAMP);
+            long outMs  = dec + TS_MIN_EPOCH_MILLIS;
+            return Math.multiplyExact(outMs, 1000L);
+        }
+        return prp64DecryptRaw(x, domain);
+    }
+
+    // ===============
+    //  PRP 16/8 bits
+    // ===============
 
     static short prp16Encrypt(short x, String domain) {
         int L = (x >>> 8) & 0xFF;
@@ -173,6 +292,7 @@ class MaskCrypto {
         }
         return (short)((L << 8) | (R & 0xFF));
     }
+
     static short prp16Decrypt(short x, String domain) {
         int L = (x >>> 8) & 0xFF;
         int R = x & 0xFF;
@@ -200,6 +320,7 @@ class MaskCrypto {
         }
         return (byte)((L << 4) | (R & 0x0F));
     }
+
     static byte prp8Decrypt(byte x, String domain) {
         int L = (x >>> 4) & 0x0F;
         int R = x & 0x0F;
@@ -214,7 +335,10 @@ class MaskCrypto {
         return (byte)((L << 4) | (R & 0x0F));
     }
 
-    // PRF HMAC-SHA256
+    // ==================
+    //  PRF + HMAC utils
+    // ==================
+
     private static byte[] prf(String domain, int half, int round, byte sep) {
         byte[] dom = domainWithContext(domain);
         ByteBuffer buf = ByteBuffer.allocate(dom.length + 4 + 4 + 1);
@@ -229,7 +353,6 @@ class MaskCrypto {
         return (CONTEXT + "::" + domain).getBytes(StandardCharsets.UTF_8);
     }
 
-    // HMAC utils
     private static byte[] hmacSha256(SecretKeySpec key, byte[] data) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
@@ -239,6 +362,7 @@ class MaskCrypto {
             throw new TrinoException(StandardErrorCode.GENERIC_INTERNAL_ERROR, "HMAC failed", e);
         }
     }
+
     private static byte[] hmacSha256(byte[] key, String data) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
@@ -249,7 +373,6 @@ class MaskCrypto {
         }
     }
 
-    // small helper
     static byte[] concat(byte[] a, byte[] b) {
         byte[] out = Arrays.copyOf(a, a.length + b.length);
         System.arraycopy(b, 0, out, a.length, b.length);
