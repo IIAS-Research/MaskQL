@@ -17,7 +17,6 @@ tests:
 
   before_script:
     - git config --global http.sslCAInfo "$GITLAB_CA"
-    - export HF_TOKEN="$HF_TOKEN"
   script:
     - cp ./.env.example ./.env
     - uv run tox
