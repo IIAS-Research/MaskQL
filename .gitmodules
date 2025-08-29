@@ -1,0 +1,3 @@
+[submodule "trino/python/pseudonymization_package"]
+	path = trino/python/pseudonymization_package
+	url  = ../../DataScience/pseudonymization_package.git

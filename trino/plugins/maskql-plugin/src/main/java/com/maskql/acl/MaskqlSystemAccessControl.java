@@ -30,16 +30,33 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
     private static final String BASE_URL = "http://maskql:8081";
     private static final HttpClient CLIENT = HttpClient.newHttpClient();
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final Set<String> SYSTEM_CATALOGS = Set.of(
+        "system",
+        "jmx",
+        "tpch",
+        "tpcds",
+        "memory",
+        "blackhole"
+    );
+
+    private boolean isSystem(String catalog) {
+        // System catalogs must by accessible
+        return SYSTEM_CATALOGS.contains(catalog.toLowerCase(Locale.ROOT));
+    }
 
     private boolean isSuperAdmin(String user) {
         return user.equals("maskql-admin");
+    }
+
+    private boolean isAllowedByDefault(String user, String catalog) {
+        return isSuperAdmin(user) || isSystem(catalog);
     }
 
     @Override
     public void checkCanCreateCatalog(SystemSecurityContext context, String catalog) {
         String user = context.getIdentity().getUser();
 
-        if (isSuperAdmin(user)) return; // Super admin can do everything
+        if (isAllowedByDefault(user, catalog)) return;
         
         if (!user.equals("maskql-admin")) {
             throw new AccessDeniedException("Access Denied: Cannot create catalog " + catalog);
@@ -49,7 +66,7 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
     @Override
     public void checkCanDropCatalog(SystemSecurityContext context, String catalog) {
         String user = context.getIdentity().getUser();
-        if (isSuperAdmin(user)) return;
+        if (isAllowedByDefault(user, catalog)) return;
 
         throw new AccessDeniedException("Access Denied: Cannot drop catalog " + catalog);
     }
@@ -57,22 +74,38 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
     @Override
     public Set<String> filterCatalogs(SystemSecurityContext context, Set<String> catalogs) {
         String user = context.getIdentity().getUser();
-        if (isSuperAdmin(user)) return catalogs; // Super admin can do everything
+        if (isSuperAdmin(user)) return catalogs;
+
+
+        Set<String> result = new HashSet<>();
+
+        // Always allow system catalogs
+        for (String catalog : catalogs) {
+            if (isSystem(catalog)) {
+                result.add(catalog);
+            }
+        }
 
         try {
             List<String> allowed = aclApi.catalogs(user, catalogs);
-            return new HashSet<>(allowed);
+            for (String c : allowed) {
+                if (catalogs.contains(c)) {
+                    result.add(c);
+                }
+            }
         } catch (Exception e) {
             System.err.println("[MaskQL ACL] filterCatalogs error: " + e.getClass().getName() + ": " + e.getMessage());
             // return catalogs; // DEBUG -> Allow all
             return Collections.emptySet();
         }
+    
+        return result;
     }
 
     @Override
     public Set<String> filterSchemas(SystemSecurityContext context, String catalogName, Set<String> schemaNames) {
         String user = context.getIdentity().getUser();
-        if (isSuperAdmin(user)) return schemaNames; // Super admin can do everything
+        if (isAllowedByDefault(user, catalogName)) return schemaNames;
         
         try {
             List<String> allowed = aclApi.schemas(user, catalogName, schemaNames);
@@ -86,7 +119,7 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
     @Override
     public Set<SchemaTableName> filterTables(SystemSecurityContext context, String catalogName, Set<SchemaTableName> tableNames) {
         String user = context.getIdentity().getUser();
-        if (isSuperAdmin(user)) return tableNames; // Super admin can do everything
+        if (isAllowedByDefault(user, catalogName)) return tableNames;
 
         try {
             // Group requested tables by schema because the API takes one schema per call
@@ -119,7 +152,7 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         String schema  = table.getSchemaTableName().getSchemaName(); // may be null
         String tbl     = table.getSchemaTableName().getTableName();
 
-        if (isSuperAdmin(user)) return; // Super admin can do everything
+        if (isAllowedByDefault(user, catalog)) return;
 
 
         try {
@@ -140,7 +173,7 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         String schema  = table.getSchemaTableName().getSchemaName();
         String tbl     = table.getSchemaTableName().getTableName();
 
-        if (isSuperAdmin(user)) return List.of(); // Super admin can do everything
+        if (isAllowedByDefault(user, catalog)) return List.of();
 
         try {
             String expr = aclApi.rowFilter(user, catalog, tbl, schema);
@@ -163,7 +196,7 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         String schema  = table.getSchemaTableName().getSchemaName(); // can be null
         String tbl     = table.getSchemaTableName().getTableName();
 
-        if (isSuperAdmin(user)) return new LinkedHashMap<>(); // Super admin can do everything
+        if (isAllowedByDefault(user, catalog)) return new LinkedHashMap<>();
 
         Map<ColumnSchema, ViewExpression> out = new LinkedHashMap<>();
         try {
@@ -184,7 +217,7 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
     @Override
     public boolean canAccessCatalog(SystemSecurityContext context, String catalogName) {
         String user = context.getIdentity().getUser();
-        if (isSuperAdmin(user)) return true; // Super admin can do everything
+        if (isAllowedByDefault(user, catalogName)) return true;
 
         try {
             return aclApi.canAccessCatalog(user, catalogName);

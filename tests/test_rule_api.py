@@ -9,7 +9,7 @@ from requests.auth import HTTPBasicAuth
 
 API_HOST = os.getenv("MASKQL_HOST", "localhost")
 API_PORT = os.getenv("MASKQL_PORT", "8443")
-API_SCHEME = os.getenv("MASKQL_SCHEME", "https")  # use "http" if needed
+API_SCHEME = os.getenv("MASKQL_SCHEME", "https")
 API_BASE_URL = f"{API_SCHEME}://{API_HOST}:{API_PORT}"
 API_TIMEOUT = float(os.getenv("API_TIMEOUT", "15"))
 API_VERIFY_SSL = os.getenv("API_VERIFY_SSL", "true").lower() not in {"0", "false", "no"}

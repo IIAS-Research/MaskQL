@@ -37,16 +37,12 @@ class TestMasking(unittest.TestCase):
     def test_masking_applied_on_name(self):
         """
         Check if column name is masked
-            - Still be a string
-            - Begin by the two first letter
-            - If not equal to the real value
-            - Must contain *
         """
         cases = [
-            ("alice@example.com", "Al", "Alice Dupont"),
-            # ("bob@example.com",   "Bo", "Bob Martin"),
+            ("alice@example.com", "Alice Dupont"),
+            ("amandine@example.com", "Amandine Durant")
         ]
-        for email, expected_prefix, plain_name in cases:
+        for email, plain_name in cases:
             with self.subTest(email=email):
                 with self.conn.cursor() as cur:
                     row = cur.execute(
@@ -59,18 +55,29 @@ class TestMasking(unittest.TestCase):
                     masked = row[0]
                     self.assertIsInstance(masked, str, "name must be a string")
 
-                    # TODO Enable this when masks are handled be FastAPI
-                    # self.assertNotEqual(
-                    #     masked, plain_name,
-                    #     f"Name is not masked ({plain_name})",
-                    # )
+                    self.assertNotEqual(
+                        masked, plain_name,
+                        f"Name is not masked ({plain_name})",
+                    )
                     
-                    # self.assertTrue(
-                    #     masked.startswith(expected_prefix),
-                    #     f"{masked!r} doesn't begin by {expected_prefix!r}",
-                    # )
+    def test_filter_applied_on_name(self):
+        """
+        Check if row filter is applied of column email
+        """
+        cases = [
+            ("bob@example.com", False),
+            ("alice@example.com", True),
+            ("amandine@example.com", True)
+        ]
+        for email, must_be_present in cases:
+            with self.subTest(email=email):
+                with self.conn.cursor() as cur:
+                    row = cur.execute(
+                        "SELECT name FROM client WHERE email = ?",
+                        (email,),
+                    ).fetchone()
                     
-                    # self.assertTrue(
-                    #     ("*" in masked),
-                    #     f"Mask pattern (*) not detected in {masked!r}",
-                    # )
+                    if must_be_present:
+                        self.assertIsNotNone(row, f"No row for {email}, it should be present")
+                    else:
+                        self.assertIsNone(row, f"Row for {email}, it shouldn't be present")

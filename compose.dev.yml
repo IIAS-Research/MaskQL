@@ -6,6 +6,10 @@ networks:
 volumes:
   trino_data:
 
+secrets:
+  HF_TOKEN:
+    environment: HF_TOKEN
+
 services:
   postgres:
     image: postgres:16
@@ -17,15 +21,21 @@ services:
       - "5432:5432"
     volumes:
       - ./tests/postgresql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./tests/example.pdf:/docker-entrypoint-initdb.d/example.pdf:ro
+      - ./tests/example2.pdf:/docker-entrypoint-initdb.d/example2.pdf:ro
 
   trino:
-    build: ./trino
+    build: 
+      context: ./trino
+      secrets:
+        - HF_TOKEN
     networks: [private]
     volumes:
       - trino_data:/data/trino
     environment:
       # JAVA_TOOL_OPTIONS: "-DAI_MASK_URL=http://ai:8000/mask"
       TRINO_SHARED_SECRET: "/wasSj8niUsV5si9fnXiRC7nfM2p2acptOh2Jfqoz6o="
+      ENCRYPT_PASSWORD: "1234567890abcdef"
     depends_on: [postgres]
     healthcheck:
       # Trino is ready when /v1/info return "starting": false
