@@ -48,6 +48,11 @@ onMounted(load);
         <div v-if="loading" class="text-gray-500">Loading...</div>
 
         <RuleManager v-else :user-id="id" :key="id" />
+        <div class="mt-5 italic">
+            <span class="bold">Tips : </span><br />
+            - You can use any SQL function available in <a href="https://trino.io/docs/current/functions.html" target="_blank">Trino</a><br />
+            - You can use MaskQL functions : encrypt(), decrypt(), pdf_to_text() and text_pseudo()
+        </div>
     </div>
 </template>
 

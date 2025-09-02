@@ -101,7 +101,7 @@ onMounted(fetchUsers);
                     @click="goRules(u.id)"
                     title="Gérer les droits"
                     >
-                    Manager access
+                    Manage access
                     </button>
                     <button
                     class="px-3 py-1 rounded-lg bg-gray-800 text-white hover:bg-gray-700"

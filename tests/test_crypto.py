@@ -10,7 +10,7 @@ def _connect():
     auth = BasicAuthentication("demo", "demo")
     return trino.dbapi.connect(
         host=os.getenv("MASKQL_HOST", "localhost"),
-        port=int(os.getenv("MASKQL_PORT", "8443")),
+        port=int(os.getenv("MASKQL_PORT", "443")),
         catalog=os.getenv("MASKQL_CATALOG", "demo"),
         schema=os.getenv("MASKQL_SCHEMA", "public"),
         http_scheme="https",

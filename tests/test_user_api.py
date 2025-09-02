@@ -6,17 +6,21 @@ from typing import Optional, Dict, Any, List
 from requests.auth import HTTPBasicAuth
 
 API_HOST = os.getenv("MASKQL_HOST", "localhost")
-API_PORT = os.getenv("MASKQL_PORT", "8443")
+API_PORT = os.getenv("MASKQL_PORT", "443")
 API_SCHEME = os.getenv("MASKQL_SCHEME", "https")
-API_BASE_URL = f"{API_SCHEME}://{API_HOST}:{API_PORT}"
+API_BASE_URL = f"{API_SCHEME}://{API_HOST}:{API_PORT}/api"
 API_TIMEOUT = float(os.getenv("API_TIMEOUT", "15"))
 API_VERIFY_SSL = os.getenv("API_VERIFY_SSL", "true").lower() not in {"0", "false", "no"}
 
 ADMIN_USER = os.getenv("MASKQL_ADMIN_USER", "admin")
-ADMIN_PASSWORD = os.getenv("MASKQL_ADMIN_PASSWORD_HASH", "admin")
+# /admin/login attend le mot de passe en clair, pas le hash
+ADMIN_PASSWORD = os.getenv("MASKQL_ADMIN_PASSWORD", "admin")
 AUTH = HTTPBasicAuth(ADMIN_USER, ADMIN_PASSWORD)
 
 USERS_ENDPOINT = f"{API_BASE_URL}/users"
+LOGIN_ENDPOINT = f"{API_BASE_URL}/admin/login"
+LOGOUT_ENDPOINT = f"{API_BASE_URL}/admin/logout"
+
 HEADERS = {"Content-Type": "application/json"}
 
 
@@ -28,7 +32,7 @@ def _rand_username(prefix: str = "utuser") -> str:
 class UserApiTests(unittest.TestCase):
     """
     Integration tests for /users router.
-        - Admin auth is required on all routes (require_admin_auth).
+        - Admin auth is required on all routes (require_admin_token via cookie).
         - POST /users -> 201 + UserRead (id, username). Business errors -> 400.
         - GET  /users -> 200 + list[UserRead].
         - PATCH /users/{id} -> 200 + UserRead, or 404 if not found.
@@ -36,26 +40,35 @@ class UserApiTests(unittest.TestCase):
     """
 
     def setUp(self):
-        """Keep track of created user ids so we can clean up."""
+        """Create a session, log in as admin to get the cookie, track created ids."""
         self._created_ids: List[int] = []
 
+        # Session pour conserver le cookie admin_token
+        self.http = requests.Session()
+        self.http.verify = API_VERIFY_SSL
+        self.http.headers.update(HEADERS)
+
+        # Login admin (Basic UNIQUEMENT pour /admin/login) -> cookie admin_token
+        lr = self.http.post(LOGIN_ENDPOINT, auth=AUTH, timeout=API_TIMEOUT)
+        self.assertEqual(lr.status_code, 200, f"Admin login failed: {lr.status_code} {lr.text}")
+
     def tearDown(self):
-        """Try to delete any user that still exists."""
+        """Try to delete any user that still exists, puis logout."""
         for uid in list(self._created_ids):
             try:
-                requests.delete(f"{USERS_ENDPOINT}/{uid}", **self._query_params())
+                self.http.delete(f"{USERS_ENDPOINT}/{uid}", timeout=API_TIMEOUT)
             except Exception:
                 pass
 
+        try:
+            self.http.post(LOGOUT_ENDPOINT, timeout=API_TIMEOUT)
+        except Exception:
+            pass
+
     # Helpers
-    def _query_params(self, with_auth: bool = True) -> Dict[str, Any]:
-        """Build common request kwargs."""
-        return {
-            "headers": HEADERS,
-            "timeout": API_TIMEOUT,
-            "auth": (AUTH if with_auth else None),
-            "verify": API_VERIFY_SSL,
-        }
+    def _query_params(self) -> Dict[str, Any]:
+        """Common request kwargs (timeout only; cookies via Session)."""
+        return {"timeout": API_TIMEOUT}
 
     def _payload(self, *, username: Optional[str] = None, password: Optional[str] = None) -> Dict[str, Any]:
         """Build a valid user payload."""
@@ -66,7 +79,10 @@ class UserApiTests(unittest.TestCase):
 
     def _post_user(self, payload: Dict[str, Any], *, with_auth: bool = True) -> requests.Response:
         """POST /users"""
-        return requests.post(USERS_ENDPOINT, json=payload, **self._query_params(with_auth=with_auth))
+        if with_auth:
+            return self.http.post(USERS_ENDPOINT, json=payload, **self._query_params())
+        # sans auth => pas de cookie
+        return requests.post(USERS_ENDPOINT, json=payload, headers=HEADERS, verify=API_VERIFY_SSL, timeout=API_TIMEOUT)
 
     def _post_user_with_assert(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """POST /users and assert 201. Track the created id."""
@@ -78,20 +94,26 @@ class UserApiTests(unittest.TestCase):
 
     def _patch_user(self, user_id: int, payload: Dict[str, Any], *, with_auth: bool = True) -> requests.Response:
         """PATCH /users/{id}"""
-        return requests.patch(f"{USERS_ENDPOINT}/{user_id}", json=payload, **self._query_params(with_auth=with_auth))
+        if with_auth:
+            return self.http.patch(f"{USERS_ENDPOINT}/{user_id}", json=payload, **self._query_params())
+        return requests.patch(f"{USERS_ENDPOINT}/{user_id}", json=payload, headers=HEADERS, verify=API_VERIFY_SSL, timeout=API_TIMEOUT)
 
     def _get_users(self, *, with_auth: bool = True) -> requests.Response:
         """GET /users"""
-        return requests.get(USERS_ENDPOINT, **self._query_params(with_auth=with_auth))
+        if with_auth:
+            return self.http.get(USERS_ENDPOINT, **self._query_params())
+        return requests.get(USERS_ENDPOINT, headers=HEADERS, verify=API_VERIFY_SSL, timeout=API_TIMEOUT)
 
     def _delete_user(self, user_id: int, *, with_auth: bool = True) -> requests.Response:
         """DELETE /users/{id}"""
-        return requests.delete(f"{USERS_ENDPOINT}/{user_id}", **self._query_params(with_auth=with_auth))
+        if with_auth:
+            return self.http.delete(f"{USERS_ENDPOINT}/{user_id}", **self._query_params())
+        return requests.delete(f"{USERS_ENDPOINT}/{user_id}", headers=HEADERS, verify=API_VERIFY_SSL, timeout=API_TIMEOUT)
 
     # Tests
 
     def test_admin_auth_needed(self):
-        """All /users routes must require admin auth."""
+        """All /users routes must require admin auth (cookie)."""
         # POST without auth -> 401
         r_post = self._post_user(self._payload(), with_auth=False)
         self.assertEqual(r_post.status_code, 401, f"POST without auth must be 401, got {r_post.status_code}: {r_post.text}")
@@ -206,7 +228,3 @@ class UserApiTests(unittest.TestCase):
         # DELETE again should return 404
         d2 = self._delete_user(uid)
         self.assertEqual(d2.status_code, 404, f"Second DELETE must be 404, got {d2.status_code}: {d2.text}")
-
-
-if __name__ == "__main__":
-    unittest.main(verbosity=2)

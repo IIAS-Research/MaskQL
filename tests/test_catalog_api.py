@@ -1,48 +1,56 @@
 import os
-import time
 import uuid
 import unittest
 import requests
-from typing import Optional, Dict, Any, List, Iterable
+from typing import Optional, Dict, Any, List
 from requests.auth import HTTPBasicAuth
 
 API_HOST = os.getenv("MASKQL_HOST", "localhost")
-API_PORT = os.getenv("MASKQL_PORT", "8443")
+API_PORT = os.getenv("MASKQL_PORT", "443")
 API_SCHEME = os.getenv("MASKQL_SCHEME", "https")
-API_BASE_URL = f"{API_SCHEME}://{API_HOST}:{API_PORT}"
+API_BASE_URL = f"{API_SCHEME}://{API_HOST}:{API_PORT}/api"
 API_TIMEOUT = float(os.getenv("API_TIMEOUT", "15"))
 API_VERIFY_SSL = os.getenv("API_VERIFY_SSL", "true").lower() not in {"0", "false", "no"}
 
 ADMIN_USER = os.getenv("MASKQL_ADMIN_USER", "admin")
-ADMIN_PASSWORD = os.getenv("MASKQL_ADMIN_PASSWORD_HASH", "admin")
+ADMIN_PASSWORD = os.getenv("MASKQL_ADMIN_PASSWORD", "admin")  # mot de passe clair attendu par /admin/login
 AUTH = HTTPBasicAuth(ADMIN_USER, ADMIN_PASSWORD)
 
 CATALOG_ENDPOINT = f"{API_BASE_URL}/catalogs"
+LOGIN_ENDPOINT = f"{API_BASE_URL}/admin/login"
+LOGOUT_ENDPOINT = f"{API_BASE_URL}/admin/logout"
+
 HEADERS = {"Content-Type": "application/json"}
+
 
 def _rand_name(prefix: str = "ut") -> str:
     return f"{prefix}_{uuid.uuid4().hex[:10]}"
 
-#############
-# Tests API #
-#############
+
 class CatalogApiTests(unittest.TestCase):
     def setUp(self):
         self._created_ids: List[int] = []
+        # Session avec cookie admin_token
+        self.http = requests.Session()
+        self.http.verify = API_VERIFY_SSL
+        self.http.headers.update(HEADERS)
+
+        # Login admin (Basic pour /admin/login uniquement)
+        lr = self.http.post(LOGIN_ENDPOINT, auth=AUTH, timeout=API_TIMEOUT)
+        self.assertEqual(lr.status_code, 200, f"Admin login failed: {lr.status_code} {lr.text}")
 
     def tearDown(self):
-        # Delete catalogs
+        # Delete catalogs créés
         for cid in list(self._created_ids):
             try:
-                requests.delete(
-                    f"{CATALOG_ENDPOINT}/{cid}",
-                    timeout=API_TIMEOUT,
-                    headers=HEADERS,
-                    auth=AUTH,
-                    verify=API_VERIFY_SSL,
-                )
+                self.http.delete(f"{CATALOG_ENDPOINT}/{cid}", timeout=API_TIMEOUT)
             except Exception:
                 pass
+        # Logout (cookie supprimé)
+        try:
+            self.http.post(LOGOUT_ENDPOINT, timeout=API_TIMEOUT)
+        except Exception:
+            pass
 
     # Helpers
     def _payload(self, *, name: Optional[str] = None) -> Dict[str, Any]:
@@ -53,70 +61,54 @@ class CatalogApiTests(unittest.TestCase):
             "username": "postgres",
             "password": "postgres",
         }
-        
-    def _query_params(self, with_auth=True):
-        return {'headers': HEADERS,
-            'timeout': API_TIMEOUT,
-            'auth': (AUTH if with_auth else None),
-            'verify': API_VERIFY_SSL}
 
-    def _post_catalog(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        return requests.post(
-            CATALOG_ENDPOINT,
-            json=payload,
-            **self._query_params(),
-        )
-        
+    def _post_catalog(self, payload: Dict[str, Any], *, with_auth=True):
+        if with_auth:
+            return self.http.post(CATALOG_ENDPOINT, json=payload, timeout=API_TIMEOUT)
+        return requests.post(CATALOG_ENDPOINT, json=payload, headers=HEADERS, verify=API_VERIFY_SSL, timeout=API_TIMEOUT)
+
     def _post_catalog_with_assert(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         r = self._post_catalog(payload)
         self.assertEqual(r.status_code, 201, f"POST error: {r.status_code} {r.text}")
-        if r.status_code == 201:
-            data = r.json()
-            self._created_ids.append(data["id"])
-            return data
-        raise AssertionError(f"Unable to create catalog (HTTPS {r.status_code}): {r.text}")
+        data = r.json()
+        self._created_ids.append(data["id"])
+        return data
 
     def _get(self, path: str):
-        return requests.get(
+        return self.http.get(
             f"{API_BASE_URL}{path}" if path.startswith("/") else path,
-            **self._query_params(),
+            timeout=API_TIMEOUT,
         )
 
     def _put(self, path: str, json: dict):
-        return requests.put(
+        return self.http.put(
             f"{API_BASE_URL}{path}" if path.startswith("/") else path,
             json=json,
-            **self._query_params(),
+            timeout=API_TIMEOUT,
         )
 
     def _patch(self, path: str, json: dict):
-        return requests.patch(
+        return self.http.patch(
             f"{API_BASE_URL}{path}" if path.startswith("/") else path,
             json=json,
-            **self._query_params(),
+            timeout=API_TIMEOUT,
         )
 
     def _delete(self, path: str):
-        return requests.delete(
+        return self.http.delete(
             f"{API_BASE_URL}{path}" if path.startswith("/") else path,
-            **self._query_params(),
+            timeout=API_TIMEOUT,
         )
 
     # Tests CRUD
     def test_admin_auth_needed(self):
-        r = requests.post(
-            CATALOG_ENDPOINT,
-            json=self._payload(),
-            **self._query_params(with_auth=False),
-        )
+        r = self._post_catalog(self._payload(), with_auth=False)
         self.assertEqual(r.status_code, 401, f"Must be Unauthorized : {r.status_code} {r.text}")
-        
 
     def test_create_and_get_by_id_and_list(self):
         payload = self._payload()
         created = self._post_catalog_with_assert(payload)
         cid = created["id"]
-        self._created_ids.append(cid)
 
         # GET by id
         g = self._get(f"/catalogs/{cid}")
@@ -137,8 +129,8 @@ class CatalogApiTests(unittest.TestCase):
         c2 = self._post_catalog(self._payload(name=name))
 
         self.assertEqual(sorted([c1.status_code, c2.status_code]), [201, 409],
-                        f"Wanted 201 and 409, received c1={c1.status_code}, c2={c2.status_code}. "
-                        f"c1.text={c1.text!r}, c2.text={c2.text!r}")
+                         f"Wanted 201 and 409, received c1={c1.status_code}, c2={c2.status_code}. "
+                         f"c1.text={c1.text!r}, c2.text={c2.text!r}")
 
         created = c1 if c1.status_code == 201 else c2
         rid = created.json()["id"]
@@ -157,7 +149,7 @@ class CatalogApiTests(unittest.TestCase):
         patch_doc = {"url": "jdbc:postgresql://postgres:5432/newdb", "username": "newuser"}
         r = self._patch(f"/catalogs/{item['id']}", patch_doc)
         self.assertEqual(r.status_code, 200, f"PATCH failed: {r.status_code} {r.text}")
-        
+
         data = r.json()
         self.assertEqual(data["url"], patch_doc["url"])
         self.assertEqual(data["username"], patch_doc["username"])
@@ -174,11 +166,10 @@ class CatalogApiTests(unittest.TestCase):
         d = self._delete(f"/catalogs/{cid}")
         self.assertEqual(d.status_code, 204, f"DELETE failed: {d.status_code} {d.text}")
 
-        # Clean up _created_ids because with deleted it manually
+        # Clean up _created_ids because we deleted it manually
         if cid in self._created_ids:
             self._created_ids.remove(cid)
 
         # Waiting for 404
         g = self._get(f"/catalogs/{cid}")
         self.assertEqual(g.status_code, 404, f"After delete, 404 must be received. {g.status_code}: {g.text}")
-

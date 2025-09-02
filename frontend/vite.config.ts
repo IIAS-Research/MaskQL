@@ -9,7 +9,7 @@ export default defineConfig({
     vue(),
   ],
   server: {
-    allowedHosts: ["maskql"]
+    allowedHosts: ["maskql", "localhost"]
   },
   resolve: {
     alias: {

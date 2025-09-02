@@ -6,8 +6,8 @@ import trino
 from trino.auth import BasicAuthentication
 
 MASKQL_HOST = os.getenv("MASKQL_HOST", "localhost")
-MASKQL_HTTP_PORT = int(os.getenv("MASKQL_HTTP_PORT", "8081"))
-MASKQL_HTTPS_PORT = int(os.getenv("MASKQL_HTTPS_PORT", "8443"))
+MASKQL_HTTP_PORT = int(os.getenv("MASKQL_HTTP_PORT", "80"))
+MASKQL_HTTPS_PORT = int(os.getenv("MASKQL_HTTPS_PORT", "443"))
 
 TRINO_BACKEND_HOST = os.getenv("TRINO_BACKEND_HOST", "trino")
 TRINO_BACKEND_PORT = int(os.getenv("TRINO_BACKEND_PORT", "8080"))
@@ -72,7 +72,7 @@ class TestAuthRouting(unittest.TestCase):
         """
         # Ping /healthz with HTTPS
         try:
-            r = requests.get(f"https://{MASKQL_HOST}:{MASKQL_HTTPS_PORT}/healthz",
+            r = requests.get(f"https://{MASKQL_HOST}:{MASKQL_HTTPS_PORT}/api/healthz",
                             timeout=3.0, verify=False)
         except requests.RequestException as e:
             self.fail(f"No HTTPS access to MaskQL: {e}")

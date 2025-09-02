@@ -8,15 +8,15 @@ from requests.auth import HTTPBasicAuth
 
 # Config
 API_HOST = os.getenv("MASKQL_HOST", "localhost")
-API_PORT = os.getenv("MASKQL_PORT", "8443")
+API_PORT = os.getenv("MASKQL_PORT", "443")
 API_SCHEME = os.getenv("MASKQL_SCHEME", "https")
-API_BASE_URL = f"{API_SCHEME}://{API_HOST}:{API_PORT}"
+API_BASE_URL = f"{API_SCHEME}://{API_HOST}:{API_PORT}/api"
 API_TIMEOUT = float(os.getenv("API_TIMEOUT", "15"))
 API_VERIFY_SSL = os.getenv("API_VERIFY_SSL", "true").lower() not in {"0", "false", "no"}
 
-# Admin auth for /users and /rules (require_admin_auth)
+# Admin auth: /admin/login attend le mot de passe en clair
 ADMIN_USER = os.getenv("MASKQL_ADMIN_USER", "admin")
-ADMIN_PASSWORD = os.getenv("MASKQL_ADMIN_PASSWORD_HASH", "admin")
+ADMIN_PASSWORD = os.getenv("MASKQL_ADMIN_PASSWORD", "admin")
 AUTH = HTTPBasicAuth(ADMIN_USER, ADMIN_PASSWORD)
 
 HEADERS = {"Content-Type": "application/json"}
@@ -24,21 +24,20 @@ HEADERS = {"Content-Type": "application/json"}
 USERS_ENDPOINT = f"{API_BASE_URL}/users"
 RULES_ENDPOINT = f"{API_BASE_URL}/rules"
 ACL_ENDPOINT = f"{API_BASE_URL}/acl"
-
+LOGIN_ENDPOINT = f"{API_BASE_URL}/admin/login"
+LOGOUT_ENDPOINT = f"{API_BASE_URL}/admin/logout"
 
 # Helpers
 def _rand_username(prefix: str = "acl_tester") -> str:
     """Create a short random username."""
     return f"{prefix}_{uuid.uuid4().hex[:8]}"
 
-
-def _api_kwargs(with_auth: bool = True) -> Dict[str, Any]:
-    """Common request kwargs."""
+def _unauth_kwargs() -> Dict[str, Any]:
+    """Common kwargs for requests SANS authentification (pas de cookie)."""
     return {
         "headers": HEADERS,
         "timeout": API_TIMEOUT,
         "verify": API_VERIFY_SSL,
-        "auth": (AUTH if with_auth else None),
     }
 
 
@@ -57,9 +56,17 @@ class AclAndRulesTests(unittest.TestCase):
         self._created_user_id: Optional[int] = None
         self._created_rules: List[int] = []
 
-        # create a fresh test user (so seeded rules do not apply)
+        # Session authentifiée (cookie admin_token)
+        self.http = requests.Session()
+        self.http.verify = API_VERIFY_SSL
+        self.http.headers.update(HEADERS)
+
+        lr = self.http.post(LOGIN_ENDPOINT, auth=AUTH, timeout=API_TIMEOUT)
+        self.assertEqual(lr.status_code, 200, f"Admin login failed: {lr.status_code} {lr.text}")
+
+        # create a fresh test user (afin que les règles seeded ne s'appliquent pas)
         payload = {"username": _rand_username(), "password": "password!"}
-        r = requests.post(USERS_ENDPOINT, json=payload, **_api_kwargs(with_auth=True))
+        r = self.http.post(USERS_ENDPOINT, json=payload, timeout=API_TIMEOUT)
         self.assertEqual(r.status_code, 201, f"Cannot create test user: {r.status_code} {r.text}")
         data = r.json()
         self.test_user_id = data["id"]
@@ -74,16 +81,22 @@ class AclAndRulesTests(unittest.TestCase):
         # delete rules created here
         for rid in list(self._created_rules):
             try:
-                requests.delete(f"{RULES_ENDPOINT}/{rid}", **_api_kwargs(with_auth=True))
+                self.http.delete(f"{RULES_ENDPOINT}/{rid}", timeout=API_TIMEOUT)
             except Exception:
                 pass
 
         # delete the test user
         if self._created_user_id is not None:
             try:
-                requests.delete(f"{USERS_ENDPOINT}/{self._created_user_id}", **_api_kwargs(with_auth=True))
+                self.http.delete(f"{USERS_ENDPOINT}/{self._created_user_id}", timeout=API_TIMEOUT)
             except Exception:
                 pass
+
+        # logout pour nettoyer le cookie
+        try:
+            self.http.post(LOGOUT_ENDPOINT, timeout=API_TIMEOUT)
+        except Exception:
+            pass
 
     # Rules API helpers
     def _rule_payload(
@@ -115,17 +128,16 @@ class AclAndRulesTests(unittest.TestCase):
 
     def _create_rule(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """POST /rules and assert success. Track the id for cleanup."""
-        r = requests.post(RULES_ENDPOINT, json=payload, **_api_kwargs(with_auth=True))
-        
+        r = self.http.post(RULES_ENDPOINT, json=payload, timeout=API_TIMEOUT)
         self.assertIn(r.status_code, (201, 200), f"POST /rules failed: {r.status_code} {r.text}")
         rule = r.json()
         self._created_rules.append(rule["id"])
         return rule
 
-    # ACL API helpers
+    # ACL API helpers (SANS auth -> pas de session, on utilise requests.* directement)
     def _acl_post(self, path: str, body: Optional[Dict[str, Any]] = None, query: Optional[Dict[str, Any]] = None):
         url = f"{ACL_ENDPOINT}{path}"
-        return requests.post(url, json=body, params=(query or {}), **_api_kwargs(with_auth=False))
+        return requests.post(url, json=body, params=(query or {}), **_unauth_kwargs())
 
     def acl_catalogs(self, user: str, catalogs: List[str]):
         return self._acl_post(f"/{user}/catalog", {"catalogs": catalogs})
@@ -154,17 +166,17 @@ class AclAndRulesTests(unittest.TestCase):
 
     # Tests
     def test_rules_admin_auth_required(self):
-        """All /rules routes must require admin auth."""
-        r_post = requests.post(RULES_ENDPOINT, json={"allow": True}, **_api_kwargs(with_auth=False))
+        """All /rules routes must require admin auth (pas de cookie ici)."""
+        r_post = requests.post(RULES_ENDPOINT, json={"allow": True}, **_unauth_kwargs())
         self.assertEqual(r_post.status_code, 401, f"POST /rules without auth must be 401, got {r_post.status_code}: {r_post.text}")
 
-        r_get = requests.get(RULES_ENDPOINT, **_api_kwargs(with_auth=False))
+        r_get = requests.get(RULES_ENDPOINT, **_unauth_kwargs())
         self.assertEqual(r_get.status_code, 401, f"GET /rules without auth must be 401, got {r_get.status_code}: {r_get.text}")
 
-        r_patch = requests.patch(f"{RULES_ENDPOINT}/1", json={"allow": False}, **_api_kwargs(with_auth=False))
+        r_patch = requests.patch(f"{RULES_ENDPOINT}/1", json={"allow": False}, **_unauth_kwargs())
         self.assertEqual(r_patch.status_code, 401, f"PATCH /rules without auth must be 401, got {r_patch.status_code}: {r_patch.text}")
 
-        r_del = requests.delete(f"{RULES_ENDPOINT}/1", **_api_kwargs(with_auth=False))
+        r_del = requests.delete(f"{RULES_ENDPOINT}/1", **_unauth_kwargs())
         self.assertEqual(r_del.status_code, 401, f"DELETE /rules without auth must be 401, got {r_del.status_code}: {r_del.text}")
 
     def test_acl_default_for_new_user(self):
@@ -256,9 +268,7 @@ class AclAndRulesTests(unittest.TestCase):
 
         rt = self.acl_tables(u, self.demo_catalog, self.demo_schema, [allowed_table, other_table])
         self.assertEqual(rt.status_code, 200, rt.text)
-        
         self.assertEqual(rt.json(), [allowed_table])
-        
 
     def test_row_filter_and_mask_via_effect(self):
         """
@@ -318,8 +328,8 @@ class AclAndRulesTests(unittest.TestCase):
         self.assertEqual(r1.status_code, 200, r1.text)
         self.assertEqual(r1.json(), ["name"])
 
-        # flip allow to True
-        rp = requests.patch(f"{RULES_ENDPOINT}/{rule['id']}", json={"allow": True}, **_api_kwargs(with_auth=True))
+        # flip allow to True (auth via session)
+        rp = self.http.patch(f"{RULES_ENDPOINT}/{rule['id']}", json={"allow": True}, timeout=API_TIMEOUT)
         self.assertEqual(rp.status_code, 200, f"PATCH /rules must be 200, got {rp.status_code}: {rp.text}")
 
         r2 = self.acl_columns(u, self.demo_catalog, self.demo_table, self.demo_schema, ["name", "phone"])
@@ -327,7 +337,7 @@ class AclAndRulesTests(unittest.TestCase):
         self.assertEqual(sorted(r2.json()), sorted(["name", "phone"]))
 
         # delete the rule
-        rd = requests.delete(f"{RULES_ENDPOINT}/{rule['id']}", **_api_kwargs(with_auth=True))
+        rd = self.http.delete(f"{RULES_ENDPOINT}/{rule['id']}", timeout=API_TIMEOUT)
         self.assertEqual(rd.status_code, 204, f"DELETE /rules must be 204, got {rd.status_code}: {rd.text}")
 
         if rule["id"] in self._created_rules:
@@ -345,7 +355,3 @@ class AclAndRulesTests(unittest.TestCase):
         r1 = self.acl_can_access_catalog(u, self.demo_catalog)
         self.assertEqual(r1.status_code, 200)
         self.assertEqual(r1.json(), {"allowed": True})
-
-
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
