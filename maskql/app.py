@@ -8,6 +8,7 @@ from maskql.routes import trino_proxy
 from maskql.routes import catalog
 from maskql.routes import user
 from maskql.routes import rule
+from maskql.routes import admin_auth
 
 from maskql.services.catalog_service import CatalogService
 
@@ -34,9 +35,11 @@ async def healthz():
     return {"status": "ok"}
 
 # Plug routes
+app.include_router(admin_auth.router)
 app.include_router(acl.router)
 app.include_router(trino_proxy.router)
 app.include_router(catalog.router)
 app.include_router(user.router)
 app.include_router(rule.router)
+
 

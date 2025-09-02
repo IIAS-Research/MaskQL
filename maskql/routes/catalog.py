@@ -4,12 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from maskql.schemas.catalog import CatalogCreate, CatalogPatch, CatalogRead
 from maskql.services.catalog_service import CatalogService
-from maskql.core import require_admin_auth
+from maskql.core import require_admin_token
 
 router = APIRouter(
     prefix="/catalogs", 
     tags=["catalogs"],
-    dependencies=[Depends(require_admin_auth)]
+    dependencies=[Depends(require_admin_token)]
     )
 
 @router.get("", response_model=list[CatalogRead])

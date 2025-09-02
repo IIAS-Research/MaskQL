@@ -1,20 +1,34 @@
 # maskql/routers/rule_router.py
 from __future__ import annotations
-from fastapi import APIRouter, HTTPException, Depends
-from typing import Optional
+from fastapi import APIRouter, HTTPException, Depends, Query
+from typing import Optional, List
 from maskql.schemas.rule import RuleCreate, RuleRead, RulePatch
 from maskql.services.rule_service import RuleService
-from maskql.core import require_admin_auth
+from maskql.core import require_admin_token
 
 router = APIRouter(
     prefix="/rules",
     tags=["rules"],
-    dependencies=[Depends(require_admin_auth)]
+    dependencies=[Depends(require_admin_token)]
 )
 
-@router.get("", response_model=list[RuleRead])
-async def list_rules():
-    rules = await RuleService.list_all()
+@router.get("", response_model=List[RuleRead])
+async def list_rules(
+    user_id: Optional[int] = Query(None),
+    catalog_id: Optional[int] = Query(None),
+    schema_name: Optional[str] = Query(None),
+    table_name: Optional[str] = Query(None),
+    column_name: Optional[str] = Query(None),
+    allow: Optional[bool] = Query(None),
+):
+    rules = await RuleService.list_filtered(
+        user_id=user_id,
+        catalog_id=catalog_id,
+        schema_name=schema_name,
+        table_name=table_name,
+        column_name=column_name,
+        allow=allow,
+    )
     return [RuleRead.model_validate(r) for r in rules]
 
 @router.get("/{rule_id}", response_model=RuleRead)

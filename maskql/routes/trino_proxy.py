@@ -58,7 +58,19 @@ def forward_request_headers(req: Request, user: str) -> dict:
     return h
 
 def gateway_base(req: Request) -> str:
-    return str(req.base_url).rstrip("/")
+    proto = req.headers.get("x-forwarded-proto") or req.url.scheme
+    host = (req.headers.get("x-forwarded-host")
+            or req.headers.get("host")
+            or req.url.netloc)
+
+    prefix = (req.headers.get("x-forwarded-prefix")
+                or req.scope.get("root_path", "")
+                or "")
+
+    if prefix and not prefix.startswith("/"):
+        prefix = "/" + prefix
+    base = f"{proto}://{host}{prefix}"
+    return base.rstrip("/")
 
 def rewrite_trino_uris(payload: dict, backend_base: str, front_base: str) -> dict:
     def rw(val):

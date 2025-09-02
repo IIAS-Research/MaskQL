@@ -20,6 +20,44 @@ class RuleService:
                 select(Rule)
             )
             return result.all()
+        
+    @staticmethod
+    async def list_filtered(
+        *,
+        user_id: Optional[int] = None,
+        catalog_id: Optional[int] = None,
+        schema_name: Optional[str] = None,
+        table_name: Optional[str] = None,
+        column_name: Optional[str] = None,
+        allow: Optional[bool] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> Sequence[Rule]:
+        async with AsyncSessionLocal() as session:
+            stmt = select(Rule)
+            conditions = []
+            if user_id is not None:
+                conditions.append(Rule.user_id == user_id)
+            if catalog_id is not None:
+                conditions.append(Rule.catalog_id == catalog_id)
+            if schema_name is not None:
+                conditions.append(Rule.schema_name == schema_name)
+            if table_name is not None:
+                conditions.append(Rule.table_name == table_name)
+            if column_name is not None:
+                conditions.append(Rule.column_name == column_name)
+            if allow is not None:
+                conditions.append(Rule.allow == allow)
+
+            if conditions:
+                stmt = stmt.where(*conditions)
+            if offset is not None:
+                stmt = stmt.offset(offset)
+            if limit is not None:
+                stmt = stmt.limit(limit)
+
+            result = await session.exec(stmt)
+            return result.all()
 
     @staticmethod
     async def list_by_catalog(catalog_id: int) -> Sequence[Rule]:

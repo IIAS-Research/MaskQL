@@ -202,5 +202,5 @@ public final class MaskStructured {
     @SqlType("timestamp(p)")
     public static long decryptTimestamp(@SqlType("timestamp(p)") long epochMicros) {
         return MaskCrypto.prp64Decrypt(epochMicros, MaskCrypto.DOMAIN_TIMESTAMP);
-}
+    }
 }

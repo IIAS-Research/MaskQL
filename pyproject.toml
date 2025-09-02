@@ -13,6 +13,7 @@ dependencies = [
     "passlib[argon2]>=1.7.4",
     "psycopg[binary]>=3.2.9",
     "pydantic>=2.11.7",
+    "python-jose[cryptography]>=3.5.0",
     "sqlalchemy>=2.0.43",
     "sqlmodel>=0.0.24",
     "tox>=4.28.4",

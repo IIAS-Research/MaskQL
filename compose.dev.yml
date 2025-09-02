@@ -1,31 +1,125 @@
-networks:
-  private: {}
-  public: {}
+version: "3.9"
 
+networks:
+  private:
+    internal: true
+  public: {}
 
 volumes:
   trino_data:
+  pgdata:
 
 secrets:
   HF_TOKEN:
     environment: HF_TOKEN
 
 services:
+  reverse-proxy:
+    image: traefik:v2.10
+    networks: [public, private]
+    command:
+      - --entrypoints.websecure.address=:443
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.file.filename=/dynamic/tls.yml
+      - --accesslog=true
+      - --accesslog.format=json
+    ports:
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./certs:/certs:ro
+      - ./dynamic:/dynamic:ro
+
+  frontend:
+    profiles: [prod]
+    image: nginx:alpine
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.front.rule=Host(`${APP_HOST}`) && PathPrefix(`/`)
+      - traefik.http.routers.front.entrypoints=websecure
+      - traefik.http.services.front.loadbalancer.server.port=80
+      - traefik.http.middlewares.front-compress.compress=true
+    networks: [public]
+    depends_on: [reverse-proxy]
+
+  # --- FRONT DEV (Vite HMR) ---
+  frontend-dev:
+    profiles: [dev]
+    image: node:18-alpine
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 5173"
+    environment:
+      VITE_API_BASE: "/api"
+      APP_HOST: ${APP_HOST}
+    volumes:
+      - ./frontend:/app
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=public
+      - traefik.http.routers.frontdev.rule=Host(`${APP_HOST}`) && PathPrefix(`/`)
+      - traefik.http.routers.frontdev.entrypoints=websecure
+      - traefik.http.routers.frontdev.tls=true
+      - traefik.http.services.frontdev.loadbalancer.server.port=5173
+    networks: [public]
+    depends_on: [reverse-proxy]
+
+  maskql:
+    build: ./maskql
+    depends_on:
+      trino:
+        condition: service_healthy
+    networks: [public, private]
+    environment:
+      TRINO_URL: http://trino:8080
+      MASKQL_ADMIN_USER: ${MASKQL_ADMIN_USER:-admin}
+      MASKQL_ADMIN_PASSWORD: ${MASKQL_ADMIN_PASSWORD:-admin}
+      MASKQL_JWT_SECRET: ${MASKQL_JWT_SECRET:-change-me}
+      MASKQL_ADMIN_JWT_EXPIRE_MIN: "30"
+      MASKQL_COOKIE_SAMESITE: "lax"   # même domaine => Lax
+      MASKQL_COOKIE_SECURE: "true"    # TLS via Traefik
+      TEST_ENV: "true"
+    labels:
+      - traefik.enable=true
+
+      # Front (prefix /api)
+      - traefik.http.routers.api.rule=Host(`${APP_HOST}`) && PathPrefix(`/api`)
+      - traefik.http.routers.api.entrypoints=websecure
+      - traefik.http.routers.api.tls=true
+      - traefik.http.routers.api.priority=1000
+      - traefik.http.routers.api.middlewares=api-strip,api-prefix
+      - traefik.http.middlewares.api-strip.stripprefix.prefixes=/api
+      - traefik.http.middlewares.api-prefix.headers.customrequestheaders.X-Forwarded-Prefix=/api
+      - traefik.http.middlewares.api-prefix.headers.customrequestheaders.X-Forwarded-Proto=https
+
+      # JDBC/CLI (raw /v1)
+      - traefik.http.routers.trino.rule=Host(`${APP_HOST}`) && PathPrefix(`/v1`)
+      - traefik.http.routers.trino.entrypoints=websecure
+      - traefik.http.routers.trino.tls=true
+      - traefik.http.routers.trino.priority=1000
+
+      - traefik.http.services.api.loadbalancer.server.port=8081
+    restart: unless-stopped
+
   postgres:
     image: postgres:16
-    networks: [private]
+    networks: [private, public]
     environment:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: demo
     ports:
       - "5432:5432"
     volumes:
+      - pgdata:/var/lib/postgresql/data
       - ./tests/postgresql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - ./tests/example.pdf:/docker-entrypoint-initdb.d/example.pdf:ro
       - ./tests/example2.pdf:/docker-entrypoint-initdb.d/example2.pdf:ro
 
   trino:
-    build: 
+    build:
       context: ./trino
       secrets:
         - HF_TOKEN
@@ -33,32 +127,12 @@ services:
     volumes:
       - trino_data:/data/trino
     environment:
-      # JAVA_TOOL_OPTIONS: "-DAI_MASK_URL=http://ai:8000/mask"
       TRINO_SHARED_SECRET: "/wasSj8niUsV5si9fnXiRC7nfM2p2acptOh2Jfqoz6o="
       ENCRYPT_PASSWORD: "1234567890abcdef"
     depends_on: [postgres]
     healthcheck:
-      # Trino is ready when /v1/info return "starting": false
       test: ["CMD-SHELL", "curl -sf http://localhost:8080/v1/info | grep -q '\"starting\":false'"]
       interval: 5s
       timeout: 3s
       retries: 60
       start_period: 15s
-
-  maskql:
-    build: ./maskql
-    depends_on:
-      trino:
-        condition: service_healthy
-    networks: [private, public]
-    environment:
-      - TRINO_URL=http://trino:8080
-      - MASKQL_ADMIN_USER=admin
-      - MASKQL_ADMIN_PASSWORD_HASH=admin
-      - TEST_ENV=true
-    volumes:
-      - ./maskql/tls:/etc/maskql/tls:ro
-    ports:
-      - "8443:8443"   # HTTPS if certs exist
-      # - "8081:8081"   # fallback HTTP if no certs
-    restart: unless-stopped

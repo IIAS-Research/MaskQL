@@ -24,5 +24,5 @@ ENV TRINO_URL=http://trino:8080 \
     DEMO_USER=admin \
     DEMO_PASS=admin
 
-EXPOSE 8443
+EXPOSE 8081
 CMD ["start.sh"]
