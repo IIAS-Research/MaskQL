@@ -77,32 +77,34 @@ class CatalogService:
             await trino_ddl("DROP CATALOG _noop")
         except:
             pass
-                
-        # Drop old catalogs
-        protected_catalogs = {'jmx', 'memory', 'system', 'tpcds', 'tpch'}
-        
-        trino_catalogs = {row[0] for row in  (await trino_sql("SHOW CATALOGS"))['rows']}
-        for cat in (trino_catalogs - protected_catalogs):
-            try:
-                await trino_ddl(f"DROP CATALOG {cat}")
-            except Exception:
-                pass
-        
-
-        # Create catalogs
-        rows = await CatalogService.list_all()
-        
-        created: list[str] = []
-        for c in rows:
-            connector = c.sgbd
-            parts = [
-                f'"connection-url" = \'{c.url}\'',
-                f'"connection-user" = \'{c.username}\'',
-                f'"connection-password" = \'{c.password}\'',
-            ]
-            sql = f"CREATE CATALOG {c.name} USING {connector} WITH (\n  {', '.join(parts)}\n)"
-            await trino_ddl(sql)
+        try:     
+            # Drop old catalogs
+            protected_catalogs = {'jmx', 'memory', 'system', 'tpcds', 'tpch'}
             
-            created.append(c.name)
-        
-        return {"dropped": trino_catalogs, "created": created}
+            trino_catalogs = {row[0] for row in  (await trino_sql("SHOW CATALOGS"))['rows']}
+            for cat in (trino_catalogs - protected_catalogs):
+                try:
+                    await trino_ddl(f"DROP CATALOG {cat}")
+                except Exception:
+                    pass
+            
+
+            # Create catalogs
+            rows = await CatalogService.list_all()
+            
+            created: list[str] = []
+            for c in rows:
+                connector = c.sgbd
+                parts = [
+                    f'"connection-url" = \'{c.url}\'',
+                    f'"connection-user" = \'{c.username}\'',
+                    f'"connection-password" = \'{c.password}\'',
+                ]
+                sql = f"CREATE CATALOG {c.name} USING {connector} WITH (\n  {', '.join(parts)}\n)"
+                await trino_ddl(sql)
+                
+                created.append(c.name)
+            
+            return {"dropped": trino_catalogs, "created": created}
+        except:
+            return {"dropped": None, "created": None}

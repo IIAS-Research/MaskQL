@@ -4,7 +4,7 @@ stages:
 
 # Vars
 variables:
-  COMPOSE_PROJECT_NAME: "maskql-ci"
+  COMPOSE_PROJECT_NAME: "maskql-${CI_PIPELINE_ID}"
 
 tests:
   stage: test
@@ -16,6 +16,8 @@ tests:
     GIT_SUBMODULE_FORCE_HTTPS: "true"
 
   before_script:
+    - export HOST_UID="$(id -u)"
+    - export HOST_GID="$(id -g)"
     - git config --global http.sslCAInfo "$GITLAB_CA"
   script:
     - cp ./.env.example ./.env
