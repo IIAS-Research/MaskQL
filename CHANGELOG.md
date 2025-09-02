@@ -2,6 +2,57 @@
 
 <!-- version list -->
 
+## v0.6.0 (2025-09-02)
+
+### Bug Fixes
+
+- Always allow system catalogs
+  ([`8938691`](https://gitlab.domchurs.ad/eds/maskql/-/commit/8938691a4fe94105e0ff65c7c2ba77f17dbc7ef5))
+
+- Ci
+  ([`14378e6`](https://gitlab.domchurs.ad/eds/maskql/-/commit/14378e63a47a37014b628357ee36618ac4a671d4))
+
+- Ci
+  ([`80c98a1`](https://gitlab.domchurs.ad/eds/maskql/-/commit/80c98a12eeceae392f4056da16fde39cf8fbec54))
+
+- Get submodules in cicd
+  ([`56c843f`](https://gitlab.domchurs.ad/eds/maskql/-/commit/56c843faa4b6bcafc0919b5164465d22dea1d9a9))
+
+- Pass HF_TOKEN with tox
+  ([`9f14fe4`](https://gitlab.domchurs.ad/eds/maskql/-/commit/9f14fe47109dfc3cacad1a4ae5f94f933f6f0e25))
+
+- Quicker Dockerfile, avoid crash when apply mask on empty string
+  ([`b90e6f9`](https://gitlab.domchurs.ad/eds/maskql/-/commit/b90e6f94ad8a45d04f63d7dcdee0d8bee7a5d277))
+
+- Tests
+  ([`e357750`](https://gitlab.domchurs.ad/eds/maskql/-/commit/e357750c378327bb6234d5047b27f12db30e6710))
+
+- Tests
+  ([`dc94e1a`](https://gitlab.domchurs.ad/eds/maskql/-/commit/dc94e1a5c5c1503743759f9eb46eaf67d7ad4aad))
+
+### Features
+
+- Basic basis for the Mask plugin
+  ([`7149941`](https://gitlab.domchurs.ad/eds/maskql/-/commit/7149941244f469ca017bf55bf725b589519309aa))
+
+- Configuration with front interface
+  ([`77074a5`](https://gitlab.domchurs.ad/eds/maskql/-/commit/77074a56f0ff8db090e945a967c4d7857fc105e2))
+
+- Mask to encrypt with AES256
+  ([`f982723`](https://gitlab.domchurs.ad/eds/maskql/-/commit/f982723af6388a45da6f11eebb0298f31785d9cb))
+
+- Use IIAS pseudo package, extract text from pdf, fixes
+  ([`79e9b80`](https://gitlab.domchurs.ad/eds/maskql/-/commit/79e9b8003093b923e9afdd3ce3bf57a87e34546c))
+
+- We can now encrypt any type
+  ([`f0cfd1a`](https://gitlab.domchurs.ad/eds/maskql/-/commit/f0cfd1ad072d53243568bb2f7cd15828de7c7cce))
+
+### Testing
+
+- Crypt and decrypt all types + fixes
+  ([`f501af8`](https://gitlab.domchurs.ad/eds/maskql/-/commit/f501af85c236a8f08fa381acace06600f69b6385))
+
+
 ## v0.5.0 (2025-08-20)
 
 ### Bug Fixes
