@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.0 (2025-09-08)
+
+### Features
+
+- Here is the v1
+  ([`0bee3cf`](https://gitlab.domchurs.ad/eds/maskql/-/commit/0bee3cf1a712ce18d7a1b22e43a12c05e0f8a5d6))
+
+
 ## v0.6.0 (2025-09-02)
 
 ### Bug Fixes
