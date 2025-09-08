@@ -1,49 +1,134 @@
-networks:
-  private: {}
-  public: {}
+version: "3.9"
 
+networks:
+  public:
+    name: "${COMPOSE_PROJECT_NAME:-maskql}_public"
+  private:
+    name: "${COMPOSE_PROJECT_NAME:-maskql}_private"
+    internal: true
 
 volumes:
   trino_data:
+  pgdata:
 
 services:
+  reverse-proxy:
+    image: traefik:v2.10
+    networks: [public, private]
+    command:
+      - --entrypoints.websecure.address=:443
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.file.filename=/dynamic/tls.yml
+      - --providers.file.watch=true
+      - --accesslog=true
+      - --accesslog.format=json
+      - --api.insecure=false
+      - --ping=true
+      - --ping.entryPoint=traefik
+    ports:
+      - "${MASKQL_PORT:-443}:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./certs:/certs:ro
+      - ./tls.yml:/dynamic/tls.yml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  frontend:
+    image: docker.io/rudymerieux/maskql-frontend:${MASKQL_IMAGE_TAG:-latest}
+    networks: [public]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-maskql}_public
+      - traefik.http.routers.front.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/`) && !PathPrefix(`/api`) && !PathPrefix(`/v1`)
+      - traefik.http.routers.front.entrypoints=websecure
+      - traefik.http.routers.front.tls=true
+      - traefik.http.services.front.loadbalancer.server.port=80
+      - traefik.http.middlewares.front-compress.compress=true
+    depends_on:
+      reverse-proxy:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1/ > /dev/null || exit 1"]
+      interval: 20s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  maskql:
+    image: docker.io/rudymerieux/maskql:${MASKQL_IMAGE_TAG:-latest}
+    networks: [public, private]
+    environment:
+      TRINO_URL: http://trino:8080
+      MASKQL_ADMIN_USER: ${MASKQL_ADMIN_USER:-admin}
+      MASKQL_ADMIN_PASSWORD: ${MASKQL_ADMIN_PASSWORD:-admin}
+      MASKQL_JWT_SECRET: ${MASKQL_JWT_SECRET:-change-me}
+      MASKQL_ADMIN_JWT_EXPIRE_MIN: "30"
+      MASKQL_COOKIE_SAMESITE: "lax"
+      MASKQL_COOKIE_SECURE: "true"
+      TEST_ENV: "false"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-maskql}_public
+
+      # API /app on /api
+      - traefik.http.routers.api.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/api`)
+      - traefik.http.routers.api.entrypoints=websecure
+      - traefik.http.routers.api.tls=true
+      - traefik.http.routers.api.priority=1000
+      - traefik.http.routers.api.middlewares=api-strip,api-prefix
+      - traefik.http.middlewares.api-strip.stripprefix.prefixes=/api
+      - traefik.http.middlewares.api-prefix.headers.customrequestheaders.X-Forwarded-Prefix=/api
+      - traefik.http.middlewares.api-prefix.headers.customrequestheaders.X-Forwarded-Proto=https
+
+      # Expose Trino raw JDBC/CLI (pass-through)
+      - traefik.http.routers.trino.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/v1`)
+      - traefik.http.routers.trino.entrypoints=websecure
+      - traefik.http.routers.trino.tls=true
+      - traefik.http.routers.trino.priority=1000
+
+      # internal port
+      - traefik.http.services.api.loadbalancer.server.port=8081
+    depends_on:
+      trino:
+        condition: service_healthy
+      reverse-proxy:
+        condition: service_healthy
+    restart: unless-stopped
+
   postgres:
     image: postgres:16
     networks: [private]
     environment:
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: demo
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: maskql
     volumes:
-      - ./tests/postgresql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
 
   trino:
-    build: ./trino
+    image: docker.io/rudymerieux/maskql-trino:${MASKQL_IMAGE_TAG:-latest}
     networks: [private]
     volumes:
       - trino_data:/data/trino
     environment:
       TRINO_SHARED_SECRET: "/wasSj8niUsV5si9fnXiRC7nfM2p2acptOh2Jfqoz6o="
-    depends_on: [postgres]
+      MASKQL_ENCRYPT_PASSWORD: ${MASKQL_ENCRYPT_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_started
     healthcheck:
-      # Trino is ready when /v1/info return "starting": false
       test: ["CMD-SHELL", "curl -sf http://localhost:8080/v1/info | grep -q '\"starting\":false'"]
       interval: 5s
       timeout: 3s
       retries: 60
       start_period: 15s
-
-  maskql:
-    build: ./maskql
-    depends_on:
-      trino:
-        condition: service_healthy
-    networks: [private, public]
-    environment:
-      - TRINO_URL=http://trino:8080
-      - DEMO_USER=admin
-      - DEMO_PASS=admin
-    volumes:
-      - ./maskql/tls:/etc/maskql/tls:ro
-    ports:
-      - "8443:8443"   # HTTPS
     restart: unless-stopped

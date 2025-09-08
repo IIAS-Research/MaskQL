@@ -1,45 +1,46 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
-import type { User, UserCreate } from "../types/user";
+    import { computed, ref } from "vue";
+    import type { User, UserCreate } from "../types/user";
 
-type Mode = "create" | "edit";
+    type Mode = "create" | "edit";
 
-const props = withDefaults(defineProps<{
-    modelValue: UserCreate | User;
-    saving?: boolean;
-    mode?: Mode;
-}>(), {
-    saving: false,
-    mode: "create",
-});
+    const props = withDefaults(defineProps<{
+        modelValue: UserCreate | User;
+        saving?: boolean;
+        mode?: Mode;
+    }>(), {
+        saving: false,
+        mode: "create",
+    });
 
-const emit = defineEmits<{
-    (e: "update:modelValue", value: UserCreate | User): void;
-    (e: "submit", value: UserCreate | User): void;
-    (e: "cancel"): void;
-}>();
+    const emit = defineEmits<{
+        (e: "update:modelValue", value: UserCreate | User): void;
+        (e: "submit", value: UserCreate | User): void;
+        (e: "cancel"): void;
+    }>();
 
-const local = ref<UserCreate | User>({ ...props.modelValue });
-watch(() => props.modelValue, (v) => { local.value = { ...v }; }, { deep: true });
-watch(local, (v) => emit("update:modelValue", { ...v }), { deep: true });
+    const local = computed<UserCreate | User>({
+        get: () => props.modelValue,
+        set: (v) => emit("update:modelValue", v),
+    });
 
-const showPwd = ref(false);
+    const showPwd = ref(false);
 
-const errors = ref<{ username?: string; password?: string }>({});
-function validate() {
-    const e: typeof errors.value = {};
-    if (!(local.value as any).username) e.username = "Username required";
-    if (props.mode === "create" && !(local.value as any).password) {
-        e.password = "Password required";
+    const errors = ref<{ username?: string; password?: string }>({});
+    function validate() {
+        const e: typeof errors.value = {};
+        if (!(local.value as any).username) e.username = "Username required";
+        if (props.mode === "create" && !(local.value as any).password) {
+            e.password = "Password required";
+        }
+        errors.value = e;
+        return Object.keys(e).length === 0;
     }
-    errors.value = e;
-    return Object.keys(e).length === 0;
-}
 
-function onSubmit() {
-    if (!validate()) return;
-    emit("submit", { ...local.value });
-}
+    function onSubmit() {
+        if (!validate()) return;
+        emit("submit", { ...(local.value as any) });
+    }
 </script>
 
 <template>

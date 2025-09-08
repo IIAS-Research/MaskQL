@@ -1,48 +1,56 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
-import type { Catalog, CatalogCreate } from "../types/catalog";
+    import { ref, watch } from "vue";
+    import type { Catalog, CatalogCreate } from "../types/catalog";
 
-type Mode = "create" | "edit";
+    type Mode = "create" | "edit";
 
-const props = withDefaults(defineProps<{
+    const props = withDefaults(defineProps<{
     modelValue: CatalogCreate | Catalog;
     saving?: boolean;
     mode?: Mode;
-}>(), {
+    }>(), {
     saving: false,
-    mode: "create"
-});
+    mode: "create",
+    });
 
-const emit = defineEmits<{
+    const emit = defineEmits<{
     (e: "update:modelValue", value: CatalogCreate | Catalog): void;
     (e: "submit", value: CatalogCreate | Catalog): void;
     (e: "cancel"): void;
-}>();
+    }>();
+    // Local copy to avoid mutation from parent
+    const clone = <T,>(v: T): T => (typeof structuredClone === "function" ? structuredClone(v) : JSON.parse(JSON.stringify(v)));
 
-// Local copy to avoid mutation from parent
-const local = ref<CatalogCreate | Catalog>({ ...props.modelValue });
-watch(() => props.modelValue, (v) => { local.value = { ...v }; }, { deep: true });
+    const local = ref<CatalogCreate | Catalog>(clone(props.modelValue));
 
-// Sync to parent after edit
-watch(local, (v) => emit("update:modelValue", { ...v }), { deep: true });
+    let syncingFromParent = false;
+    watch(() => props.modelValue, (v) => {
+    syncingFromParent = true;
+    local.value = clone(v);
+    queueMicrotask(() => (syncingFromParent = false));
+    });
 
-const showPwd = ref(false);
+    watch(local, (v) => {
+    if (syncingFromParent) return;
+    emit("update:modelValue", clone(v));
+    }, { deep: true });
 
-// Validations
-const errors = ref<{ name?: string; url?: string; sgbd?: string }>({});
-function validate() {
+    const showPwd = ref(false);
+
+    const errors = ref<{ name?: string; url?: string; sgbd?: string }>({});
+    function validate() {
     const e: typeof errors.value = {};
-    if (!local.value.name) e.name = "Nom requis";
-    if (!local.value.url) e.url = "URL requise";
-    if (!local.value.sgbd) e.sgbd = "SGBD requis";
+    if (!(local.value as any).name) e.name = "Nom requis";
+    if (!(local.value as any).url) e.url = "URL requise";
+    if (!(local.value as any).sgbd) e.sgbd = "SGBD requis";
     errors.value = e;
     return Object.keys(e).length === 0;
-}
+    }
 
-function onSubmit() {
+    function onSubmit() {
     if (!validate()) return;
-    emit("submit", { ...local.value });
-}
+    emit("submit", clone(local.value));
+    }
 </script>
 
 <template>

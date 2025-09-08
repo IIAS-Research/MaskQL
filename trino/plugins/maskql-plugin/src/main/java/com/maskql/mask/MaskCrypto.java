@@ -62,7 +62,7 @@ class MaskCrypto {
     static final long TS_DOMAIN_SIZE_MILLIS = (TS_MAX_EPOCH_MILLIS - TS_MIN_EPOCH_MILLIS) + 1L;
 
     static {
-        String secret = System.getenv("ENCRYPT_PASSWORD");
+        String secret = System.getenv("MASKQL_ENCRYPT_PASSWORD");
         if (secret == null || secret.isEmpty()) {
             throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "ENCRYPT_PASSWORD environment variable is required");
         }

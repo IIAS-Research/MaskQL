@@ -21,7 +21,7 @@ This is especially useful when you can read a database but cannot change it, and
 * Per-user access control with allow, deny, and inheritance.
 * Admin UI (Vue 3) to manage users, catalogs, and rules.
 * Export and import rules as JSON by user and catalog.
-* Docker Compose deployment with Traefik as reverse proxy.
+* All-in-one Docker Compose deployment with Traefik as reverse proxy.
 
 ---
 
@@ -30,6 +30,43 @@ This is especially useful when you can read a database but cannot change it, and
 * [Docker](https://docs.docker.com/get-docker/)
 * [uv](https://docs.astral.sh/uv/) for Python environment management
 * `make` (GNU Make)
+
+--
+
+## Deploy MaskQL in production
+
+All the necessary resources are included in the Docker images, so there is no need to clone this repository.
+You will only need three files, available at the root of this repository:
+1. `compose.yml` – Docker description of the containers to deploy and their interactions. This file must not be modified.
+2. `.env.example` (to be renamed as `.env`) – Configuration of environment variables for deployment. MaskQL will work with the default values, but it is strongly recommended to set your own passwords and encryption keys.
+3. `tls.yml` – Paths to the certificates required by MaskQL, which only works with HTTPS for security reasons. You will need to generate certificates and set their paths in this file.
+
+Once these three files are copied and configured in your directory, you are almost done!
+Simply run the following command:
+
+```bash
+docker compose up -d
+```
+
+MaskQL should be deployed within a few minutes. You can then access the interface via HTTPS at the address you defined in the `.env`.
+
+---
+
+## Run locally in development mode
+
+### Start
+Git clone the project and in the root dir run the following command.
+```bash
+make local
+```
+
+This starts the full stack with Docker Compose.
+
+### Stop and clean
+
+```bash
+make down
+```
 
 ---
 
@@ -60,24 +97,6 @@ This is especially useful when you can read a database but cannot change it, and
 
 ---
 
-## Run locally
-
-### Start the stack
-
-```bash
-make local
-```
-
-This starts the full stack with Docker Compose.
-
-### Stop and clean
-
-```bash
-make down
-```
-
----
-
 ## Tests
 
 Run tests with [tox](https://tox.wiki/) using `uv`:
@@ -88,10 +107,10 @@ uv run tox
 
 This will:
 
-1. Start the stack (`make local`)
-2. Run a Trino health check
+1. Build and start the stack (`make local`)
+2. Health check
 3. Run `unittest` tests
-4. Stop the stack (`make down`)
+4. Stop and clean the stack (`make down`)
 
 ---
 
@@ -99,11 +118,11 @@ This will:
 
 ```mermaid
 flowchart TD
-  A[Client (SQL / App / BI)] --> B[MaskQL Backend (FastAPI)]
-  B -->|Auth and rules| C[Trino (Custom)]
-  C --> D[(Databases)]
-  C -->|Filtered and masked result| B
-  B --> A
+A[Client (SQL / App / BI)] --> B[MaskQL Backend (FastAPI)]
+B -->|Auth and rules| C[Maskql-Trino]
+C --> D[(Databases)]
+C -->|Filtered and masked result| B
+B --> A
 ```
 
 1. The client sends a query to the MaskQL backend.
@@ -125,7 +144,7 @@ Each rule targets a user and a catalog. A rule can apply at different levels:
 | Column | X            | Y           | Z            | used as SQL expression |
 
 * `allow: true` allows the target and all its children, unless there is a local deny.
-* `allow: false` denies the target.
+* `allow: false` denies the target and all its children, unless there is a local allow.
 * If there is no local rule, the status is inherited from the parent.
 
 Examples:
@@ -142,13 +161,9 @@ The backend enforces a unique constraint on `(user_id, catalog_id, schema_name, 
 
 * Login for admins
 * Catalogs: create, edit, delete
-* Users: create, edit, delete, and a "Manage permissions" button
-* Permissions: four panels (Database, Schemas, Tables, Columns)
-
-  * Actions: Allow, Deny, Inherit
-  * Button "fx" to edit `effect` on tables and columns
-  * Add schema/table/column at the bottom of each panel
-  * Export and import JSON for the current user and the selected catalog
+* Users: create, edit, delete, and a manage permissions
+* Permissions: four panels (Database, Schemas, Tables, Columns) to define rules
+  * Also export and import JSON for the current user and the selected catalog
 
 ### Export and import format
 
@@ -186,31 +201,4 @@ The frontend redirects to `/login` if not authenticated.
 
 ## Configuration
 
-See `compose.yml` for defaults.
-
-* Traefik exposes the backend and frontend.
-* Trino custom configuration is in `trino/` (UDF and access control).
-* Backend: FastAPI with SQLModel. Environment variables such as `MASKQL_*`, `POSTGRES_*`, `TRINO_*`.
-* Frontend: Vue 3 build served behind Traefik.
-
-\[WIP] Documente all var needed in env to run compose
-
----
-
-## Development workflow
-
-Start locally:
-
-```bash
-make local-dev
-```
-
-Backend:
-
-* Code in `maskql/`
-* Hot reload
-* Tests:
-
-  ```bash
-  uv run tox
-  ```
+See `compose.dev.yml` and `.env.example` for defaults values.
