@@ -1,5 +1,8 @@
-# MaskQL
+<div align="center">
+  <img src="./maskql.png" alt="MaskQL">
+</div>
 
+# MaskQL
 **Protecting Gotham's citizens... and your database.**
 
 MaskQL is an open-source middleware, built on top of [Trino](https://trino.io), that applies masking, filtering, and transformation rules on the fly, without changing the source databases. It is designed for sensitive environments (healthcare, finance, etc.) where some columns must be pseudonymized, encrypted, or transformed before they are exposed.
