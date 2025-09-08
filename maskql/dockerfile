@@ -1,28 +1,43 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1.7
 FROM python:3.11-slim
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl && rm -rf /var/lib/apt/lists/*
+    ca-certificates curl tini \
+    && rm -rf /var/lib/apt/lists/*
 
+RUN useradd -r -u 10001 -g users -d /app appuser
 WORKDIR /app
-COPY ./requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+
+COPY ./requirements.txt ./requirements.txt
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir -r requirements.txt
+
 COPY ./ ./maskql/
 COPY start.sh /usr/local/bin/start.sh
-RUN chmod +x /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh && chown -R appuser:users /app /usr/local/bin/start.sh
 
-# TLS files (optional) mounted at /etc/maskql/tls/{cert.pem,key.pem}
 ENV TRINO_URL=http://trino:8080 \
-    TLS_CERT=/etc/maskql/tls/cert.pem \
-    TLS_KEY=/etc/maskql/tls/key.pem \
     CONNECT_TIMEOUT=10 \
     READ_TIMEOUT=3600 \
     MAX_CONN=200 \
     MAX_KEEPALIVE=50 \
     DEMO_USER=admin \
-    DEMO_PASS=admin
+    DEMO_PASS=admin \
+    RETRIES=20 \
+    SLEEP_SECS=3 \
+    FAIL_FAST=false
 
 EXPOSE 8081
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=5 \
+    CMD curl -fsS http://localhost:8081/healthz || exit 1
+
+USER appuser
+
+ENTRYPOINT ["/usr/bin/tini","--"]
 CMD ["start.sh"]

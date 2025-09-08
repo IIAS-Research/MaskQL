@@ -20,7 +20,7 @@ MAX_KEEPALIVE = int(os.getenv("MAX_KEEPALIVE", "50"))
 security_basic = HTTPBasic(realm="Admin area")
 pwd_context = CryptContext(schemes=["bcrypt", "argon2"], deprecated="auto")
 ADMIN_USER = os.getenv("MASKQL_ADMIN_USER", "admin")
-ADMIN_PASSWORD = os.getenv("MASKQL_ADMIN_PASSWORD_HASH","admin")
+ADMIN_PASSWORD = os.getenv("MASKQL_ADMIN_PASSWORD","admin")
 JWT_SECRET = os.getenv("MASKQL_JWT_SECRET", secrets.token_urlsafe(32))
 JWT_ALG = "HS256"
 ADMIN_JWT_EXPIRE_MIN = int(os.getenv("MASKQL_ADMIN_JWT_EXPIRE_MIN", "30"))

@@ -5,21 +5,44 @@ HOST="${HOST:-0.0.0.0}"
 PORT_HTTP="${PORT_HTTP:-8081}"
 APP="${APP:-maskql.app:app}"
 TEST_ENV="${TEST_ENV:-false}"
+RETRIES="${RETRIES:-20}"
+SLEEP_SECS="${SLEEP_SECS:-3}"
+FAIL_FAST="${FAIL_FAST:-false}"
+LOG_TS() { printf '[%s] ' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"; }
 
 SEED_FLAG=""
 if [ "$TEST_ENV" = true ]; then
     SEED_FLAG="-x seed=test"
 fi
 
-echo "[MaskQL] Migrate Database"
+LOG_TS; echo "[MaskQL] Running DB migrations (retry up to ${RETRIES}x)"
 if cd maskql 2>/dev/null; then
-    alembic $SEED_FLAG upgrade head || echo "[MaskQL] Alembic migration skipped/failed (continuing)"
+    n=0
+    until alembic $SEED_FLAG upgrade head; do
+        n=$((n+1))
+        if [ "$FAIL_FAST" = "true" ]; then
+        LOG_TS; echo "[MaskQL] Alembic migration failed (fail-fast)."; exit 1
+        fi
+        if [ "$n" -ge "$RETRIES" ]; then
+        LOG_TS; echo "[MaskQL] Alembic migration failed after ${RETRIES} retries. Exiting."
+        exit 1
+        fi
+        LOG_TS; echo "[MaskQL] Migration not ready (try ${n}/${RETRIES}). Waiting ${SLEEP_SECS}s..."
+        sleep "${SLEEP_SECS}"
+    done
     cd - >/dev/null || true
 else
-    echo "[MaskQL] 'maskql' dir not found; skipping migrations"
+    LOG_TS; echo "[MaskQL] 'maskql' dir not found; skipping migrations"
 fi
 
-echo "[MaskQL] Starting HTTP on ${HOST}:${PORT_HTTP}"
+LOG_TS; echo "[MaskQL] Starting HTTP ${HOST}:${PORT_HTTP}"
+
+
+_term() {
+    LOG_TS; echo "[MaskQL] Caught SIGTERM, shutting down…"
+}
+trap _term TERM INT
+
 exec uvicorn "$APP" \
     --host "$HOST" \
     --port "$PORT_HTTP" \

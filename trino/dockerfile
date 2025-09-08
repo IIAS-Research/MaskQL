@@ -40,13 +40,18 @@ ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk
 RUN python3.11 -m venv /opt/pyenv
 ENV VIRTUAL_ENV=/opt/pyenv
 ENV PATH="/opt/pyenv/bin:${PATH}"
-ENV PIP_PREFER_BINARY=1
-RUN pip install --no-cache-dir --upgrade pip wheel setuptools
-RUN python -m pip install --no-cache-dir \
-    "numpy>=2.0" \
-    "torch>=2.4" \
-    "edsnlp[ml]" \
-    "huggingface_hub>=0.23"
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_COMPILE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_PREFER_BINARY=1
+
+RUN python -m pip install --no-cache-dir --upgrade pip wheel setuptools \
+    && python -m pip install --no-cache-dir \
+        --extra-index-url https://download.pytorch.org/whl/cpu \
+        "numpy>=2.0" \
+        "torch==2.4.*" \
+        "edsnlp[ml]" \
+        "huggingface_hub>=0.23"
 
 COPY python/pseudonymization_package /app/pseudonymization_package
 RUN python -m pip install --no-cache-dir /app/pseudonymization_package
@@ -55,7 +60,10 @@ RUN python -m pip install --no-cache-dir /app/pseudonymization_package
 WORKDIR /app
 COPY python/download_edspseudo.py /app/download_eds_pseudo.py
 RUN --mount=type=secret,id=HF_TOKEN \
-    bash -lc 'python /app/download_eds_pseudo.py --token "$(cat /run/secrets/HF_TOKEN)"'
+    python3.11 /app/download_eds_pseudo.py \
+        --token "$(cat /run/secrets/HF_TOKEN)" \
+        --out_dir "/opt/models/eds-pseudo-public" \
+    && rm -rf /root/.cache/huggingface /root/.cache/pip "$HF_HOME"
 
 # JEP (to allow Java <-> Python communication)
 ENV LDFLAGS="-Wl,-rpath,/opt/cpython311/lib"
@@ -77,7 +85,7 @@ COPY --from=builder --chmod=u+rwX /out/*.jar /usr/lib/trino/plugin/maskql-plugin
 
 # venv + EDS Pseudo model
 COPY --from=pyenv --chown=trino:trino /opt/pyenv /opt/pyenv
-COPY --from=pyenv --chown=trino:trino /models/eds-pseudo-public /opt/models/eds-pseudo-public
+COPY --from=pyenv --chown=trino:trino /opt/models/eds-pseudo-public /opt/models/eds-pseudo-public
 
 # Runtime CPython
 RUN mkdir -p /opt/python/lib /opt/python/lib/python3.11

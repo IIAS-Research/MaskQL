@@ -14,7 +14,6 @@ class Catalog(SQLModel, table=True):
     sgbd: str  # ex: postgresql, mysql…
     username: str
     # Password not hashed, must be used to connect to databases.
-    # TODO Encrypt it
     password: str = Field(sa_column=Column(String, nullable=False), repr=False)
     rules: list["Rule"] = Relationship(
         sa_relationship=sa_relationship(

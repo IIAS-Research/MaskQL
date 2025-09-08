@@ -1,6 +1,7 @@
 stages:
   - test
   - release
+  - build
 
 # Vars
 variables:
@@ -42,8 +43,6 @@ release:
     - set -e 
     - git config user.name  "MaskQL CI"
     - git config user.email "ci@maskql.local"
-
-    
     # Token & certificat
     - export GITLAB_TOKEN="$push_token"
     - export REQUESTS_CA_BUNDLE="$GITLAB_CA"
@@ -53,3 +52,33 @@ release:
     - git checkout -B "$CI_COMMIT_BRANCH"
   script:
     - uvx python-semantic-release version
+
+build_and_push_images:
+  stage: build
+  tags: [unix]
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  before_script:
+    - |
+      set -euo pipefail
+      echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+      export IMAGE_TAG="${CI_COMMIT_TAG#v}"
+      echo "Image Tag: $IMAGE_TAG"
+  script:
+    # backend
+    - docker build -f maskql/Dockerfile -t docker.io/rudymerieux/maskql:$IMAGE_TAG ./maskql
+    - docker tag docker.io/rudymerieux/maskql:$IMAGE_TAG docker.io/rudymerieux/maskql:latest
+    - docker push docker.io/rudymerieux/maskql:$IMAGE_TAG
+    - docker push docker.io/rudymerieux/maskql:latest
+
+    # frontend
+    - docker build -f frontend/Dockerfile -t docker.io/rudymerieux/maskql-frontend:$IMAGE_TAG ./frontend
+    - docker tag docker.io/rudymerieux/maskql-frontend:$IMAGE_TAG docker.io/rudymerieux/maskql-frontend:latest
+    - docker push docker.io/rudymerieux/maskql-frontend:$IMAGE_TAG
+    - docker push docker.io/rudymerieux/maskql-frontend:latest
+
+    # maskql-trino
+    - docker build -f trino/Dockerfile -t docker.io/rudymerieux/maskql-trino:$IMAGE_TAG ./trino
+    - docker tag docker.io/rudymerieux/maskql-trino:$IMAGE_TAG docker.io/rudymerieux/maskql-trino:latest
+    - docker push docker.io/rudymerieux/maskql-trino:$IMAGE_TAG
+    - docker push docker.io/rudymerieux/maskql-trino:latest
