@@ -24,6 +24,7 @@ services:
       - --entrypoints.websecure.address=:443
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=${COMPOSE_PROJECT_NAME:-maskql}_public
       - --providers.file.filename=/dynamic/tls.yml
       - --providers.file.watch=true
       - --accesslog=true
@@ -79,15 +80,15 @@ services:
       WATCHPACK_POLLING: "true"
     volumes:
       - ./frontend:/app
-      - node_modules_front:/app/node_modules
+      # - node_modules_front:/app/node_modules
     labels:
       - traefik.enable=true
       - traefik.docker.network=${COMPOSE_PROJECT_NAME:-maskql}_public
-      - traefik.http.routers.front.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/`) && !PathPrefix(`/api`) && !PathPrefix(`/v1`)
+      - traefik.http.routers.frontdev.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/`) && !PathPrefix(`/api`) && !PathPrefix(`/v1`)
       - traefik.http.routers.frontdev.entrypoints=websecure
       - traefik.http.routers.frontdev.tls=true
       - traefik.http.services.frontdev.loadbalancer.server.port=5173
-    networks: [public]
+    networks: [private, public]
     depends_on: [reverse-proxy]
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5173/ > /dev/null || exit 1"]

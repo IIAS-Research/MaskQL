@@ -1,5 +1,5 @@
 <script setup lang="ts">
-    import { ref, watch } from "vue";
+    import { ref, watch, toRaw, unref, isProxy } from "vue";
     import type { Catalog, CatalogCreate } from "../types/catalog";
 
     type Mode = "create" | "edit";
@@ -18,21 +18,19 @@
     (e: "submit", value: CatalogCreate | Catalog): void;
     (e: "cancel"): void;
     }>();
-    // Local copy to avoid mutation from parent
-    const clone = <T,>(v: T): T => (typeof structuredClone === "function" ? structuredClone(v) : JSON.parse(JSON.stringify(v)));
-
-    const local = ref<CatalogCreate | Catalog>(clone(props.modelValue));
+    
+    const local = ref<CatalogCreate | Catalog>(props.modelValue);
 
     let syncingFromParent = false;
     watch(() => props.modelValue, (v) => {
     syncingFromParent = true;
-    local.value = clone(v);
+    local.value = v;
     queueMicrotask(() => (syncingFromParent = false));
     });
 
     watch(local, (v) => {
     if (syncingFromParent) return;
-    emit("update:modelValue", clone(v));
+    emit("update:modelValue", v);
     }, { deep: true });
 
     const showPwd = ref(false);
@@ -49,7 +47,7 @@
 
     function onSubmit() {
     if (!validate()) return;
-    emit("submit", clone(local.value));
+    emit("submit", local.value);
     }
 </script>
 
