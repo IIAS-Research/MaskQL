@@ -116,7 +116,7 @@ services:
 
   trino:
     image: docker.io/rudymerieux/maskql-trino:${MASKQL_IMAGE_TAG:-latest}
-    networks: [private]
+    networks: [private, public]
     volumes:
       - trino_data:/data/trino
     environment:
