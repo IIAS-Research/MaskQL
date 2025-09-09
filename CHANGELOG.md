@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.0.1 (2025-09-09)
+
+### Bug Fixes
+
+- Catalog From
+  ([`1081af4`](https://gitlab.domchurs.ad/eds/maskql/-/commit/1081af406e81d47e6c3396d19dc63ccb24cb31bc))
+
+- Must have public network to access database
+  ([`6679c21`](https://gitlab.domchurs.ad/eds/maskql/-/commit/6679c21f7498cdb96f7579361fdf3200229eb3d0))
+
+
 ## v1.0.0 (2025-09-08)
 
 ### Features
