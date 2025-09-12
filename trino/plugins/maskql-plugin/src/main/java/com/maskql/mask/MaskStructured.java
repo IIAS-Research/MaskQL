@@ -25,10 +25,10 @@ public final class MaskStructured {
     @ScalarFunction("decrypt")
     @Description("Decrypt VARCHAR produced by encrypt(VARCHAR)")
     @SqlType(StandardTypes.VARCHAR)
-    public static Slice decryptVarchar(@SqlType(StandardTypes.VARCHAR) Slice valueBase64) {
+    public static Slice decryptVarchar(@SqlType(StandardTypes.VARCHAR) Slice valueBase64, @SqlType(StandardTypes.VARCHAR) Slice password) {
         if (valueBase64 == null) return null;
         byte[] all = Base64.getDecoder().decode(valueBase64.toStringUtf8());
-        byte[] pt = MaskCrypto.decryptDeterministicBytes(all, MaskCrypto.DOMAIN_VARCHAR);
+        byte[] pt = MaskCrypto.decryptDeterministicBytes(all, password.toStringUtf8(), MaskCrypto.DOMAIN_VARCHAR);
         return Slices.wrappedBuffer(pt);
     }
 
@@ -45,9 +45,9 @@ public final class MaskStructured {
     @ScalarFunction("decrypt")
     @Description("Decrypt VARBINARY produced by encrypt(VARBINARY)")
     @SqlType(StandardTypes.VARBINARY)
-    public static Slice decryptVarbinary(@SqlType(StandardTypes.VARBINARY) Slice value) {
+    public static Slice decryptVarbinary(@SqlType(StandardTypes.VARBINARY) Slice value, @SqlType(StandardTypes.VARCHAR) Slice password) {
         if (value == null) return null;
-        byte[] pt = MaskCrypto.decryptDeterministicBytes(value.getBytes(), MaskCrypto.DOMAIN_VARBINARY);
+        byte[] pt = MaskCrypto.decryptDeterministicBytes(value.getBytes(), password.toStringUtf8(), MaskCrypto.DOMAIN_VARBINARY);
         return Slices.wrappedBuffer(pt);
     }
 
@@ -61,8 +61,8 @@ public final class MaskStructured {
     @ScalarFunction("decrypt")
     @Description("Decrypt BIGINT with env password")
     @SqlType(StandardTypes.BIGINT)
-    public static long decryptBigint(@SqlType(StandardTypes.BIGINT) long x) {
-        return MaskCrypto.prp64Decrypt(x, MaskCrypto.DOMAIN_BIGINT);
+    public static long decryptBigint(@SqlType(StandardTypes.BIGINT) long x, @SqlType(StandardTypes.VARCHAR) Slice password) {
+        return MaskCrypto.prp64Decrypt(x, password.toStringUtf8(), MaskCrypto.DOMAIN_BIGINT);
     }
 
     //  INTEGER (carrier: long)
@@ -77,9 +77,9 @@ public final class MaskStructured {
     @ScalarFunction("decrypt")
     @Description("Decrypt INTEGER with env password")
     @SqlType(StandardTypes.INTEGER)
-    public static long decryptInteger(@SqlType(StandardTypes.INTEGER) long x) {
+    public static long decryptInteger(@SqlType(StandardTypes.INTEGER) long x, @SqlType(StandardTypes.VARCHAR) Slice password) {
         int xi = (int) x;
-        int out = MaskCrypto.prp32Decrypt(xi, MaskCrypto.DOMAIN_INTEGER);
+        int out = MaskCrypto.prp32Decrypt(xi, password.toStringUtf8(), MaskCrypto.DOMAIN_INTEGER);
         return (long) out;
     }
 
@@ -95,9 +95,9 @@ public final class MaskStructured {
     @ScalarFunction("decrypt")
     @Description("Decrypt SMALLINT with env password")
     @SqlType(StandardTypes.SMALLINT)
-    public static long decryptSmallint(@SqlType(StandardTypes.SMALLINT) long x) {
+    public static long decryptSmallint(@SqlType(StandardTypes.SMALLINT) long x, @SqlType(StandardTypes.VARCHAR) Slice password) {
         short xs = (short) x;
-        short out = MaskCrypto.prp16Decrypt(xs, MaskCrypto.DOMAIN_SMALLINT);
+        short out = MaskCrypto.prp16Decrypt(xs, password.toStringUtf8(), MaskCrypto.DOMAIN_SMALLINT);
         return (long) out;
     }
 
@@ -113,9 +113,9 @@ public final class MaskStructured {
     @ScalarFunction("decrypt")
     @Description("Decrypt TINYINT with env password")
     @SqlType(StandardTypes.TINYINT)
-    public static long decryptTinyint(@SqlType(StandardTypes.TINYINT) long x) {
+    public static long decryptTinyint(@SqlType(StandardTypes.TINYINT) long x, @SqlType(StandardTypes.VARCHAR) Slice password) {
         byte xb = (byte) x;
-        byte out = MaskCrypto.prp8Decrypt(xb, MaskCrypto.DOMAIN_TINYINT);
+        byte out = MaskCrypto.prp8Decrypt(xb, password.toStringUtf8(), MaskCrypto.DOMAIN_TINYINT);
         return (long) out;
     }
 
@@ -131,9 +131,9 @@ public final class MaskStructured {
     @ScalarFunction("decrypt")
     @Description("Decrypt DOUBLE with env password")
     @SqlType(StandardTypes.DOUBLE)
-    public static double decryptDouble(@SqlType(StandardTypes.DOUBLE) double v) {
+    public static double decryptDouble(@SqlType(StandardTypes.DOUBLE) double v, @SqlType(StandardTypes.VARCHAR) Slice password) {
         long bits = Double.doubleToRawLongBits(v);
-        long out = MaskCrypto.prp64Decrypt(bits, MaskCrypto.DOMAIN_DOUBLE);
+        long out = MaskCrypto.prp64Decrypt(bits, password.toStringUtf8(), MaskCrypto.DOMAIN_DOUBLE);
         return Double.longBitsToDouble(out);
     }
 
@@ -149,9 +149,9 @@ public final class MaskStructured {
     @ScalarFunction("decrypt")
     @Description("Decrypt REAL with env password")
     @SqlType(StandardTypes.REAL)
-    public static long decryptReal(@SqlType(StandardTypes.REAL) long valueBits) {
+    public static long decryptReal(@SqlType(StandardTypes.REAL) long valueBits, @SqlType(StandardTypes.VARCHAR) Slice password) {
         int bits = (int) valueBits;
-        int out = MaskCrypto.prp32Decrypt(bits, MaskCrypto.DOMAIN_REAL);
+        int out = MaskCrypto.prp32Decrypt(bits, password.toStringUtf8(), MaskCrypto.DOMAIN_REAL);
         return out & 0xFFFF_FFFFL;
     }
 
@@ -166,8 +166,8 @@ public final class MaskStructured {
     @ScalarFunction("decrypt")
     @Description("Decrypt BOOLEAN with env password")
     @SqlType(StandardTypes.BOOLEAN)
-    public static boolean decryptBoolean(@SqlType(StandardTypes.BOOLEAN) boolean v) {
-        byte dec = MaskCrypto.prp8Decrypt((byte) (v ? 1 : 0), MaskCrypto.DOMAIN_BOOLEAN);
+    public static boolean decryptBoolean(@SqlType(StandardTypes.BOOLEAN) boolean v, @SqlType(StandardTypes.VARCHAR) Slice password) {
+        byte dec = MaskCrypto.prp8Decrypt((byte) (v ? 1 : 0), password.toStringUtf8(), MaskCrypto.DOMAIN_BOOLEAN);
         return (dec & 0x01) == 1;
     }
 
@@ -182,9 +182,9 @@ public final class MaskStructured {
     @ScalarFunction("decrypt")
     @Description("Decrypt DATE with env password")
     @SqlType(StandardTypes.DATE)
-    public static long decryptDate(@SqlType(StandardTypes.DATE) long daysSinceEpoch) {
+    public static long decryptDate(@SqlType(StandardTypes.DATE) long daysSinceEpoch, @SqlType(StandardTypes.VARCHAR) Slice password) {
         int x = (int) daysSinceEpoch;
-        return (long) MaskCrypto.prp32Decrypt(x, MaskCrypto.DOMAIN_DATE);
+        return (long) MaskCrypto.prp32Decrypt(x, password.toStringUtf8(), MaskCrypto.DOMAIN_DATE);
     }
 
     //  TIMESTAMP
@@ -200,7 +200,7 @@ public final class MaskStructured {
     @LiteralParameters("p")
     @Description("Decrypt TIMESTAMP(p) with env password (p ≤ 6)")
     @SqlType("timestamp(p)")
-    public static long decryptTimestamp(@SqlType("timestamp(p)") long epochMicros) {
-        return MaskCrypto.prp64Decrypt(epochMicros, MaskCrypto.DOMAIN_TIMESTAMP);
+    public static long decryptTimestamp(@SqlType("timestamp(p)") long epochMicros, @SqlType(StandardTypes.VARCHAR) Slice password) {
+        return MaskCrypto.prp64Decrypt(epochMicros, password.toStringUtf8(), MaskCrypto.DOMAIN_TIMESTAMP);
     }
 }

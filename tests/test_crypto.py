@@ -16,6 +16,9 @@ def _connect():
         http_scheme="https",
         auth=auth,
     )
+    
+ENCRYPT_PASSWORD = os.getenv("MASKQL_ENCRYPT_PASSWORD", "something")
+
 
 
 class TestCryptoFunctions(unittest.TestCase):
@@ -52,10 +55,10 @@ class TestCryptoFunctions(unittest.TestCase):
             SELECT
                 encrypt(CAST(? AS VARCHAR)) AS enc,
                 typeof(encrypt(CAST(? AS VARCHAR))) AS enc_type,
-                decrypt(encrypt(CAST(? AS VARCHAR))) AS dec,
-                typeof(decrypt(encrypt(CAST(? AS VARCHAR)))) AS dec_type
+                decrypt(encrypt(CAST(? AS VARCHAR)), ?) AS dec,
+                typeof(decrypt(encrypt(CAST(? AS VARCHAR)), ?)) AS dec_type
             """,
-            (original, original, original, original),
+            (original, original, original, ENCRYPT_PASSWORD, original, ENCRYPT_PASSWORD),
         )
         enc, enc_type, dec, dec_type = row
         self.assertIsInstance(enc, str, "Encrypted VARCHAR must be a string")
@@ -72,10 +75,10 @@ class TestCryptoFunctions(unittest.TestCase):
             SELECT
                 to_hex(encrypt(from_hex(?))) AS enc_hex,
                 typeof(encrypt(from_hex(?))) AS enc_type,
-                to_hex(decrypt(encrypt(from_hex(?)))) AS dec_hex,
-                typeof(decrypt(encrypt(from_hex(?)))) AS dec_type
+                to_hex(decrypt(encrypt(from_hex(?)), ?)) AS dec_hex,
+                typeof(decrypt(encrypt(from_hex(?)), ?)) AS dec_type
             """,
-            (original_hex, original_hex, original_hex, original_hex),
+            (original_hex, original_hex, original_hex, ENCRYPT_PASSWORD, original_hex, ENCRYPT_PASSWORD),
         )
         enc_hex, enc_type, dec_hex, dec_type = row
         self.assertIsInstance(enc_hex, str, "Encrypted VARBINARY must be hex string")
@@ -92,10 +95,10 @@ class TestCryptoFunctions(unittest.TestCase):
             SELECT
                 encrypt(CAST(? AS BIGINT)),
                 typeof(encrypt(CAST(? AS BIGINT))),
-                decrypt(encrypt(CAST(? AS BIGINT))),
-                typeof(decrypt(encrypt(CAST(? AS BIGINT))))
+                decrypt(encrypt(CAST(? AS BIGINT)), ?),
+                typeof(decrypt(encrypt(CAST(? AS BIGINT)), ?))
             """,
-            (original, original, original, original),
+            (original, original, original, ENCRYPT_PASSWORD, original, ENCRYPT_PASSWORD),
         )
         enc, enc_type, dec, dec_type = row
         self.assertIsInstance(enc, int, "Encrypted BIGINT must be an int")
@@ -112,10 +115,10 @@ class TestCryptoFunctions(unittest.TestCase):
             SELECT
                 encrypt(CAST(? AS INTEGER)),
                 typeof(encrypt(CAST(? AS INTEGER))),
-                decrypt(encrypt(CAST(? AS INTEGER))),
-                typeof(decrypt(encrypt(CAST(? AS INTEGER))))
+                decrypt(encrypt(CAST(? AS INTEGER)), ?),
+                typeof(decrypt(encrypt(CAST(? AS INTEGER)), ?))
             """,
-            (original, original, original, original),
+            (original, original, original, ENCRYPT_PASSWORD, original, ENCRYPT_PASSWORD),
         )
         enc, enc_type, dec, dec_type = row
         self.assertIsInstance(enc, int)
@@ -132,10 +135,10 @@ class TestCryptoFunctions(unittest.TestCase):
             SELECT
                 encrypt(CAST(? AS SMALLINT)),
                 typeof(encrypt(CAST(? AS SMALLINT))),
-                decrypt(encrypt(CAST(? AS SMALLINT))),
-                typeof(decrypt(encrypt(CAST(? AS SMALLINT))))
+                decrypt(encrypt(CAST(? AS SMALLINT)), ?),
+                typeof(decrypt(encrypt(CAST(? AS SMALLINT)), ?))
             """,
-            (original, original, original, original),
+            (original, original, original, ENCRYPT_PASSWORD, original, ENCRYPT_PASSWORD),
         )
         enc, enc_type, dec, dec_type = row
         self.assertIsInstance(enc, int)
@@ -152,10 +155,10 @@ class TestCryptoFunctions(unittest.TestCase):
             SELECT
                 encrypt(CAST(? AS TINYINT)),
                 typeof(encrypt(CAST(? AS TINYINT))),
-                decrypt(encrypt(CAST(? AS TINYINT))),
-                typeof(decrypt(encrypt(CAST(? AS TINYINT))))
+                decrypt(encrypt(CAST(? AS TINYINT)), ?),
+                typeof(decrypt(encrypt(CAST(? AS TINYINT)), ?))
             """,
-            (original, original, original, original),
+            (original, original, original, ENCRYPT_PASSWORD, original, ENCRYPT_PASSWORD),
         )
         enc, enc_type, dec, dec_type = row
         self.assertIsInstance(enc, int)
@@ -172,10 +175,10 @@ class TestCryptoFunctions(unittest.TestCase):
             SELECT
                 encrypt(CAST(? AS DOUBLE)),
                 typeof(encrypt(CAST(? AS DOUBLE))),
-                decrypt(encrypt(CAST(? AS DOUBLE))),
-                typeof(decrypt(encrypt(CAST(? AS DOUBLE))))
+                decrypt(encrypt(CAST(? AS DOUBLE)), ?),
+                typeof(decrypt(encrypt(CAST(? AS DOUBLE)), ?))
             """,
-            (original, original, original, original),
+            (original, original, original, ENCRYPT_PASSWORD, original, ENCRYPT_PASSWORD),
         )
         enc, enc_type, dec, dec_type = row
         self.assertIsInstance(enc, float)
@@ -192,10 +195,10 @@ class TestCryptoFunctions(unittest.TestCase):
             SELECT
                 encrypt(CAST(? AS REAL)),
                 typeof(encrypt(CAST(? AS REAL))),
-                decrypt(encrypt(CAST(? AS REAL))),
-                typeof(decrypt(encrypt(CAST(? AS REAL))))
+                decrypt(encrypt(CAST(? AS REAL)), ?),
+                typeof(decrypt(encrypt(CAST(? AS REAL)), ?))
             """,
-            (original, original, original, original),
+            (original, original, original, ENCRYPT_PASSWORD, original, ENCRYPT_PASSWORD),
         )
         enc, enc_type, dec, dec_type = row
         self.assertIsInstance(enc, float)
@@ -212,10 +215,10 @@ class TestCryptoFunctions(unittest.TestCase):
             SELECT
                 encrypt(CAST(? AS DATE)),
                 typeof(encrypt(CAST(? AS DATE))),
-                CAST(decrypt(encrypt(CAST(? AS DATE))) AS VARCHAR),
-                typeof(decrypt(encrypt(CAST(? AS DATE))))
+                CAST(decrypt(encrypt(CAST(? AS DATE)), ?) AS VARCHAR),
+                typeof(decrypt(encrypt(CAST(? AS DATE)), ?))
             """,
-            (original, original, original, original),
+            (original, original, original, ENCRYPT_PASSWORD, original, ENCRYPT_PASSWORD),
         )
         enc, enc_type, dec_str, dec_type = row
         
@@ -232,10 +235,10 @@ class TestCryptoFunctions(unittest.TestCase):
             SELECT
                 encrypt(CAST(? AS TIMESTAMP(3))),
                 typeof(encrypt(CAST(? AS TIMESTAMP(3)))),
-                CAST(decrypt(encrypt(CAST(? AS TIMESTAMP(3)))) AS VARCHAR),
-                typeof(decrypt(encrypt(CAST(? AS TIMESTAMP(3)))))
+                CAST(decrypt(encrypt(CAST(? AS TIMESTAMP(3))), ?) AS VARCHAR),
+                typeof(decrypt(encrypt(CAST(? AS TIMESTAMP(3))), ?))
             """,
-            (original_ts, original_ts, original_ts, original_ts),
+            (original_ts, original_ts, original_ts, ENCRYPT_PASSWORD, original_ts, ENCRYPT_PASSWORD),
         )
         enc, enc_type, dec_str, dec_type = row
         
