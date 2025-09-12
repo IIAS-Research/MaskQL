@@ -19,7 +19,6 @@ tests:
   before_script:
     - export HOST_UID="$(id -u)"
     - export HOST_GID="$(id -g)"
-    - git config --global http.sslCAInfo "$GITLAB_CA"
     
   script:
     - cp ./.env.example ./.env

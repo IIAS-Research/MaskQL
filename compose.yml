@@ -120,7 +120,7 @@ services:
     volumes:
       - trino_data:/data/trino
     environment:
-      TRINO_SHARED_SECRET: "/wasSj8niUsV5si9fnXiRC7nfM2p2acptOh2Jfqoz6o="
+      TRINO_SHARED_SECRET: ${MASKQL_TRINO_SHARED_SECRET}
       MASKQL_ENCRYPT_PASSWORD: ${MASKQL_ENCRYPT_PASSWORD}
     depends_on:
       postgres:

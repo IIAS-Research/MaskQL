@@ -82,6 +82,10 @@ class MaskCrypto {
         }
     }
 
+    private static SecretKeySpec keyFromPassword(String password) {
+        return deriveAesKey(password, CONTEXT);
+    }
+
     // ========================================
     //  AES-GCM (deterministic nonce via HMAC)
     // ========================================
@@ -100,7 +104,7 @@ class MaskCrypto {
         }
     }
 
-    static byte[] decryptDeterministicBytes(byte[] nonceAndCiphertext, String domain) {
+    static byte[] decryptDeterministicBytes(byte[] nonceAndCiphertext, String password, String domain) {
         try {
             if (nonceAndCiphertext.length < 12 + 16) {
                 throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "Ciphertext too short");
@@ -110,7 +114,8 @@ class MaskCrypto {
             byte[] dom = domainWithContext(domain);
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_BITS, nonce);
-            cipher.init(Cipher.DECRYPT_MODE, MASTER_KEY, spec);
+
+            cipher.init(Cipher.DECRYPT_MODE, keyFromPassword(password), spec);
             cipher.updateAAD(dom);
             return cipher.doFinal(ciphertext);
         } catch (GeneralSecurityException e) {
@@ -125,7 +130,7 @@ class MaskCrypto {
         int L = (int)(x >>> 32);
         int R = (int)(x & 0xFFFFFFFFL);
         for (int i = 0; i < 8; i++) {
-            byte[] f = prf(domain, R, i, (byte)0xE1);
+            byte[] f = prf(MASTER_KEY, domain, R, i, (byte)0xE1);
             int f32 = ByteBuffer.wrap(f).order(ByteOrder.BIG_ENDIAN).getInt();
             int newL = R;
             int newR = L ^ f32;
@@ -135,11 +140,12 @@ class MaskCrypto {
         return ((long)L << 32) | (R & 0xFFFFFFFFL);
     }
 
-    static long prp64DecryptRaw(long x, String domain) {
+    static long prp64DecryptRaw(long x, String password, String domain) {
+        SecretKeySpec key = keyFromPassword(password);
         int L = (int)(x >>> 32);
         int R = (int)(x & 0xFFFFFFFFL);
         for (int i = 7; i >= 0; i--) {
-            byte[] f = prf(domain, L, i, (byte)0xE1);
+            byte[] f = prf(key, domain, L, i, (byte)0xE1);
             int f32 = ByteBuffer.wrap(f).order(ByteOrder.BIG_ENDIAN).getInt();
             int newR = L;
             int newL = R ^ f32;
@@ -153,7 +159,7 @@ class MaskCrypto {
         short L = (short)((x >>> 16) & 0xFFFF);
         short R = (short)(x & 0xFFFF);
         for (int i = 0; i < 8; i++) {
-            byte[] f = prf(domain, R & 0xFFFF, i, (byte)0xE2);
+            byte[] f = prf(MASTER_KEY, domain, R & 0xFFFF, i, (byte)0xE2);
             short f16 = (short)(ByteBuffer.wrap(f).order(ByteOrder.BIG_ENDIAN).getShort() & 0xFFFF);
             short newL = R;
             short newR = (short)(L ^ f16);
@@ -163,11 +169,12 @@ class MaskCrypto {
         return ((L & 0xFFFF) << 16) | (R & 0xFFFF);
     }
 
-    static int prp32DecryptRaw(int x, String domain) {
+    static int prp32DecryptRaw(int x, String password, String domain) {
+        SecretKeySpec key = keyFromPassword(password);
         short L = (short)((x >>> 16) & 0xFFFF);
         short R = (short)(x & 0xFFFF);
         for (int i = 7; i >= 0; i--) {
-            byte[] f = prf(domain, L & 0xFFFF, i, (byte)0xE2);
+            byte[] f = prf(key, domain, L & 0xFFFF, i, (byte)0xE2);
             short f16 = (short)(ByteBuffer.wrap(f).order(ByteOrder.BIG_ENDIAN).getShort() & 0xFFFF);
             short newR = L;
             short newL = (short)(R ^ f16);
@@ -190,11 +197,11 @@ class MaskCrypto {
         return y;
     }
 
-    static int invertPermuteInRange32(int y, int n, String domain) {
-        int x = prp32DecryptRaw(y, domain);
+    static int invertPermuteInRange32(int y, int n, String password, String domain) {
+        int x = prp32DecryptRaw(y, password, domain);
         while (Integer.compareUnsigned(x, n) >= 0) {
             y = x;
-            x = prp32DecryptRaw(y, domain);
+            x = prp32DecryptRaw(y, password, domain);
         }
         return x;
     }
@@ -211,32 +218,40 @@ class MaskCrypto {
         return prp32EncryptRaw(x, domain);
     }
 
-    static int prp32Decrypt(int x, String domain) {
+    static int prp32Decrypt(int x, String password, String domain) {
         if (DOMAIN_DATE.equals(domain)) {
             if (x < DATE_MIN_EPOCH_DAY || x > DATE_MAX_EPOCH_DAY) {
                 throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "Date out of range");
             }
             int rel = x - DATE_MIN_EPOCH_DAY;
-            int dec = invertPermuteInRange32(rel, DATE_DOMAIN_SIZE, DOMAIN_DATE);
+            int dec = invertPermuteInRange32(rel, DATE_DOMAIN_SIZE, password, DOMAIN_DATE);
             return dec + DATE_MIN_EPOCH_DAY;
         }
-        return prp32DecryptRaw(x, domain);
+        return prp32DecryptRaw(x, password, domain);
     }
 
     static long permuteInRange64(long x, long n, String domain) {
-        long y = prp64EncryptRaw(x, domain);
+        int bits = 64 - Long.numberOfLeadingZeros(n - 1L); // ceil(log2(n))
+        long mask = (bits == 64) ? -1L : ((1L << bits) - 1L);
+
+        long y = prpEncryptBits(x & mask, bits, MASTER_KEY, domain);
         while (Long.compareUnsigned(y, n) >= 0) {
             x = y;
-            y = prp64EncryptRaw(x, domain);
+            y = prpEncryptBits(x, bits, MASTER_KEY, domain);
         }
         return y;
     }
 
-    static long invertPermuteInRange64(long y, long n, String domain) {
-        long x = prp64DecryptRaw(y, domain);
+    // DECRYPT
+    static long invertPermuteInRange64(long y, long n, String password, String domain) {
+        SecretKeySpec key = keyFromPassword(password);
+        int bits = 64 - Long.numberOfLeadingZeros(n - 1L);
+        long mask = (bits == 64) ? -1L : ((1L << bits) - 1L);
+
+        long x = prpDecryptBits(y & mask, bits, key, domain);
         while (Long.compareUnsigned(x, n) >= 0) {
             y = x;
-            x = prp64DecryptRaw(y, domain);
+            x = prpDecryptBits(y, bits, key, domain);
         }
         return x;
     }
@@ -258,7 +273,7 @@ class MaskCrypto {
         return prp64EncryptRaw(x, domain);
     }
 
-    static long prp64Decrypt(long x, String domain) {
+    static long prp64Decrypt(long x, String password, String domain) {
         if (DOMAIN_TIMESTAMP.equals(domain)) {
             if ((x % 1000L) != 0L) {
                 throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "TIMESTAMP(3) excepted");
@@ -268,11 +283,11 @@ class MaskCrypto {
             }
             long millis = Math.floorDiv(x, 1000L);
             long rel    = millis - TS_MIN_EPOCH_MILLIS;
-            long dec    = invertPermuteInRange64(rel, TS_DOMAIN_SIZE_MILLIS, DOMAIN_TIMESTAMP);
+            long dec    = invertPermuteInRange64(rel, TS_DOMAIN_SIZE_MILLIS, password, DOMAIN_TIMESTAMP);
             long outMs  = dec + TS_MIN_EPOCH_MILLIS;
             return Math.multiplyExact(outMs, 1000L);
         }
-        return prp64DecryptRaw(x, domain);
+        return prp64DecryptRaw(x, password, domain);
     }
 
     // ===============
@@ -283,7 +298,7 @@ class MaskCrypto {
         int L = (x >>> 8) & 0xFF;
         int R = x & 0xFF;
         for (int i = 0; i < 8; i++) {
-            byte[] f = prf(domain, R & 0xFF, i, (byte)0xE3);
+            byte[] f = prf(MASTER_KEY, domain, R & 0xFF, i, (byte)0xE3);
             int f8 = f[0] & 0xFF;
             int newL = R;
             int newR = L ^ f8;
@@ -293,11 +308,12 @@ class MaskCrypto {
         return (short)((L << 8) | (R & 0xFF));
     }
 
-    static short prp16Decrypt(short x, String domain) {
+    static short prp16Decrypt(short x, String password, String domain) {
+        SecretKeySpec key = keyFromPassword(password);
         int L = (x >>> 8) & 0xFF;
         int R = x & 0xFF;
         for (int i = 7; i >= 0; i--) {
-            byte[] f = prf(domain, L & 0xFF, i, (byte)0xE3);
+            byte[] f = prf(key, domain, L & 0xFF, i, (byte)0xE3);
             int f8 = f[0] & 0xFF;
             int newR = L;
             int newL = R ^ f8;
@@ -311,7 +327,7 @@ class MaskCrypto {
         int L = (x >>> 4) & 0x0F;
         int R = x & 0x0F;
         for (int i = 0; i < 8; i++) {
-            byte[] f = prf(domain, R & 0x0F, i, (byte)0xE4);
+            byte[] f = prf(MASTER_KEY, domain, R & 0x0F, i, (byte)0xE4);
             int f4 = (f[0] & 0xFF) & 0x0F;
             int newL = R;
             int newR = L ^ f4;
@@ -321,11 +337,12 @@ class MaskCrypto {
         return (byte)((L << 4) | (R & 0x0F));
     }
 
-    static byte prp8Decrypt(byte x, String domain) {
+    static byte prp8Decrypt(byte x, String password, String domain) {
+        SecretKeySpec key = keyFromPassword(password);
         int L = (x >>> 4) & 0x0F;
         int R = x & 0x0F;
         for (int i = 7; i >= 0; i--) {
-            byte[] f = prf(domain, L & 0x0F, i, (byte)0xE4);
+            byte[] f = prf(key, domain, L & 0x0F, i, (byte)0xE4);
             int f4 = (f[0] & 0xFF) & 0x0F;
             int newR = L;
             int newL = R ^ f4;
@@ -339,14 +356,18 @@ class MaskCrypto {
     //  PRF + HMAC utils
     // ==================
 
-    private static byte[] prf(String domain, int half, int round, byte sep) {
+    private static byte[] prf(SecretKeySpec key, String domain, int half, int round, byte sep) {
         byte[] dom = domainWithContext(domain);
         ByteBuffer buf = ByteBuffer.allocate(dom.length + 4 + 4 + 1);
         buf.put(dom);
         buf.putInt(half);
         buf.putInt(round);
         buf.put(sep);
-        return hmacSha256(MASTER_KEY, buf.array());
+        return hmacSha256(key, buf.array());
+    }
+
+    private static byte[] prf(String domain, int half, int round, byte sep) {
+        return prf(MASTER_KEY, domain, half, round, sep);
     }
 
     private static byte[] domainWithContext(String domain) {
@@ -377,5 +398,45 @@ class MaskCrypto {
         byte[] out = Arrays.copyOf(a, a.length + b.length);
         System.arraycopy(b, 0, out, a.length, b.length);
         return out;
+    }
+
+    private static long prpEncryptBits(long x, int bits, SecretKeySpec key, String domain) {
+        int Lbits = bits / 2;
+        int Rbits = bits - Lbits;
+        long Lmask = (1L << Lbits) - 1L;
+        long Rmask = (1L << Rbits) - 1L;
+
+        long L = (x >>> Rbits) & Lmask;
+        long R = x & Rmask;
+
+        for (int i = 0; i < 8; i++) {
+            byte[] f = prf(key, domain, (int) R, i, (byte) 0xE5);
+            long fval = ByteBuffer.wrap(f).order(ByteOrder.BIG_ENDIAN).getLong() & Lmask;
+            long newL = R;
+            long newR = (L ^ fval) & Rmask;
+            L = newL;
+            R = newR;
+        }
+        return ((L & Lmask) << Rbits) | (R & Rmask);
+    }
+
+    private static long prpDecryptBits(long x, int bits, SecretKeySpec key, String domain) {
+        int Lbits = bits / 2;
+        int Rbits = bits - Lbits;
+        long Lmask = (1L << Lbits) - 1L;
+        long Rmask = (1L << Rbits) - 1L;
+
+        long L = (x >>> Rbits) & Lmask;
+        long R = x & Rmask;
+
+        for (int i = 7; i >= 0; i--) {
+            byte[] f = prf(key, domain, (int) L, i, (byte) 0xE5);
+            long fval = ByteBuffer.wrap(f).order(ByteOrder.BIG_ENDIAN).getLong() & Lmask;
+            long newR = L;
+            long newL = (R ^ fval) & Lmask;
+            R = newR;
+            L = newL;
+        }
+        return ((L & Lmask) << Rbits) | (R & Rmask);
     }
 }
