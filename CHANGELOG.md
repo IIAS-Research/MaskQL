@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.2 (2025-09-15)
+
+### Bug Fixes
+
+- Rules logic & typo
+  ([`11b8fa5`](https://gitlab.domchurs.ad/eds/maskql/-/commit/11b8fa5475059c52ebfa95dc2be2f75185de1970))
+
+
 ## v1.0.1 (2025-09-09)
 
 ### Bug Fixes
