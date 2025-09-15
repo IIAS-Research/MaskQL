@@ -4,6 +4,8 @@ import unittest
 import requests
 from typing import Optional, Dict, Any, List
 from requests.auth import HTTPBasicAuth
+import random
+import string
 
 API_HOST = os.getenv("MASKQL_HOST", "localhost")
 API_PORT = os.getenv("MASKQL_PORT", "443")
@@ -24,7 +26,8 @@ HEADERS = {"Content-Type": "application/json"}
 
 
 def _rand_name(prefix: str = "ut") -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:10]}"
+    suffix = "".join(random.choice(string.ascii_lowercase) for _ in range(10))
+    return f"{prefix}{suffix}"
 
 
 class CatalogApiTests(unittest.TestCase):

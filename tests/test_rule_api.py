@@ -3,6 +3,8 @@ import os
 import uuid
 import unittest
 import requests
+import random
+import string
 from typing import Optional, Dict, Any, List, Tuple
 from requests.auth import HTTPBasicAuth
 
@@ -30,7 +32,8 @@ TEST_CATALOG_ID_ENV = os.getenv("MASKQL_TEST_CATALOG_ID")
 
 
 def _rand_str(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:10]}"
+    suffix = "".join(random.choice(string.ascii_lowercase) for _ in range(10))
+    return f"{prefix}{suffix}"
 
 
 class RuleApiTests(unittest.TestCase):

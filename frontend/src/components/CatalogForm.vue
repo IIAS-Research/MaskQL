@@ -1,5 +1,5 @@
 <script setup lang="ts">
-    import { ref, watch, toRaw, unref, isProxy } from "vue";
+    import { ref, watch, computed } from "vue";
     import type { Catalog, CatalogCreate } from "../types/catalog";
 
     type Mode = "create" | "edit";
@@ -49,6 +49,18 @@
     if (!validate()) return;
     emit("submit", local.value);
     }
+
+    const sanitizeName = (s: string) =>
+        s.toLowerCase()
+        .replace(/\s+/g, "")
+        .replace(/[^a-z]/g, "")
+
+    const nameModel = computed<string>({
+        get: () => ((local.value as any)?.name ?? ""),
+        set: (val: string) => {
+            (local.value as any).name = sanitizeName(val)
+        }
+})
 </script>
 
 <template>
@@ -57,7 +69,7 @@
         <div class="sm:col-span-2">
             <label class="block text-gray-700 mb-1">Name</label>
             <input
-            v-model="(local as any).name"
+            v-model="nameModel"
             type="text"
             class="w-full px-3 py-2 border rounded-lg focus:ring"
             :disabled="saving"
@@ -77,7 +89,7 @@
         </div>
 
         <div>
-            <label class="block text-gray-700 mb-1">SGBD</label>
+            <label class="block text-gray-700 mb-1">DBMS</label>
             <input
             v-model="(local as any).sgbd"
             type="text"

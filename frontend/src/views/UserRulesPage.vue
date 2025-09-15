@@ -39,8 +39,8 @@ onMounted(load);
         </div>
         <div class="flex gap-2">
             <button class="px-3 py-2 border rounded-lg hover:bg-gray-50" @click="$router.back()">Back</button>
-            <button class="px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700" @click="$router.push({ name: 'user-edit', params: { id } })">
-            Edit profil
+            <button class="px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700" @click="$router.push({ name: 'user', params: { id } })">
+            Edit profile
             </button>
         </div>
         </div>
