@@ -73,6 +73,33 @@ make down
 
 ---
 
+## Environment Variables  
+
+Here is the list of environment variables you can configure in the `.env` file:  
+
+- **POSTGRES_USER**: Username for the PostgreSQL connection  
+- **POSTGRES_PASSWORD**: Password for the PostgreSQL connection  
+- **MASKQL_HOST**: Hostname used by MaskQL (without port). This variable is required for TLS.  
+- **MASKQL_PORT**: Port used by MaskQL  
+- **MASKQL_ADMIN_USER**: Administrator username for MaskQL configuration  
+- **MASKQL_ADMIN_PASSWORD**: Administrator password for MaskQL configuration  
+- **MASKQL_JWT_SECRET**: Secret key used by MaskQL to secure JWT tokens  
+- **MASKQL_ENCRYPT_PASSWORD**: Secret key used by MaskQL to encrypt data on the fly  
+- **MASKQL_TRINO_SHARED_SECRET**: Shared secret used by Trino to communicate with the components  
+
+> You can generate secrets with `openssl rand -hex 16` or `openssl rand -hex 8`.
+
+---
+
+## Create a self-signed certificat for testing
+
+```bash
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 3650 -nodes -subj "/C=FR/ST=Grand-Est/L=Reims/O=CHU de Reims/OU=Institut de l'Intelligence Artificielle en Santé/CN=maskql" -addext "subjectAltName=DNS:localhost"
+```
+DNS must match the MaskQL host.
+
+---
+
 ## Project structure
 
 ```

@@ -56,7 +56,7 @@ onMounted(fetchCatalogs);
 <template>
   <div class="p-6 max-w-6xl mx-auto">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-800">Databases connections</h1>
+      <h1 class="text-2xl font-bold text-gray-800">Database connections</h1>
       <div class="flex gap-2">
         <input
           v-model="q"

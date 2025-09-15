@@ -61,7 +61,7 @@ class User(SQLModel, table=True):
             to_select = select(looking_for_column).select_from(Rule).join(Catalog, Rule.catalog_id == Catalog.id)
             
         # Clause to focus on subject
-        def where_clause():
+        def where_clause(strict):
             clauses = []
             full_path = list(path) + [values]
             for i, column in enumerate(columns):
@@ -81,31 +81,31 @@ class User(SQLModel, table=True):
         
         # Disable directly ?
         async with AsyncSessionLocal() as s:
-            disabled = (await s.exec(
+            direct_disable = (await s.exec(
                 to_select.where(
                     Rule.allow.is_(False),
                     Rule.user == self,
-                    *where_clause()
+                    *where_clause(True)
                 ).distinct())).all()
         
-        values = list(set(values) - set(disabled))
-        
-        # If not, allowed by parent ?
-        if path:
-            parent_value = path[-1]
-            parent_path = path[0:-1]
-            
-            if parent_value in (await self.is_allowed([parent_value], path=parent_path, strict=True)):
-                return values
-        
-        # If not, allowed directly ?
+        # If not, allowed directly or by children ?
         async with AsyncSessionLocal() as s:
             enabled = (await s.exec(
                 to_select.where(
                     Rule.allow.is_(True),
                     Rule.user == self,
-                    *where_clause()
+                    *where_clause(strict)
                 ).distinct())).all()
+            
+        values = list(set(values) - set(enabled) - set(direct_disable))
+        
+        # If not, allowed by parent ?
+        if path and values:
+            parent_value = path[-1]
+            parent_path = path[0:-1]
+            
+            if parent_value in (await self.is_allowed([parent_value], path=parent_path, strict=True)):
+                enabled = list(set(values) | set(enabled))
         
         return enabled
         
