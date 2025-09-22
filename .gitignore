@@ -88,3 +88,5 @@ coverage
 *.njsproj
 *.sln
 *.sw?
+
+install

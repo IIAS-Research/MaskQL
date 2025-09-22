@@ -148,9 +148,9 @@ This will:
 
 ```mermaid
 flowchart TD
-A[Client (SQL / App / BI)] --> B[MaskQL Backend (FastAPI)]
+A[Client] --> B[MaskQL Backend]
 B -->|Auth and rules| C[Maskql-Trino]
-C --> D[(Databases)]
+C --> D[Databases]
 C -->|Filtered and masked result| B
 B --> A
 ```
