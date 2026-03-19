@@ -2,7 +2,9 @@
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "primevue/usetoast";
-import { Catalog, CatalogAPI } from "../types/catalog";
+import type { Catalog } from "../types/catalog";
+import { CatalogAPI } from "../types/catalog";
+import { getTrinoDbmsLabel } from "../constants/trinoDbms";
 
 const router = useRouter();
 const toast = useToast();
@@ -14,8 +16,10 @@ const q = ref("");
 const filtered = computed(() => {
   const term = q.value.trim().toLowerCase();
   if (!term) return catalogs.value;
-  return catalogs.value.filter(c =>
-    [c.name, c.url, c.sgbd, c.username].some(v => (v || "").toLowerCase().includes(term))
+  return catalogs.value.filter((c) =>
+    [c.name, c.url, c.sgbd, getTrinoDbmsLabel(c.sgbd), c.username].some((v) =>
+      (v || "").toLowerCase().includes(term),
+    ),
   );
 });
 
@@ -25,7 +29,12 @@ async function fetchCatalogs() {
     catalogs.value = await CatalogAPI.list();
   } catch (e) {
     console.error(e);
-    toast.add({ severity: "error", summary: "Error", detail: "Unable to load databases", life: 3000 });
+    toast.add({
+      severity: "error",
+      summary: "Error",
+      detail: "Unable to load databases",
+      life: 3000,
+    });
   } finally {
     loading.value = false;
   }
@@ -37,12 +46,22 @@ async function removeCatalog(id: number) {
 
   try {
     await CatalogAPI.remove(id);
-    toast.add({ severity: "success", summary: "Deletec", detail: "Database connection deleted", life: 2000 });
+    toast.add({
+      severity: "success",
+      summary: "Deletec",
+      detail: "Database connection deleted",
+      life: 2000,
+    });
     // refresh
-    catalogs.value = catalogs.value.filter(c => c.id !== id);
+    catalogs.value = catalogs.value.filter((c) => c.id !== id);
   } catch (e) {
     console.error(e);
-    toast.add({ severity: "error", summary: "Error", detail: "Unable to delete database connection", life: 3000 });
+    toast.add({
+      severity: "error",
+      summary: "Error",
+      detail: "Unable to delete database connection",
+      life: 3000,
+    });
   }
 }
 
@@ -67,7 +86,8 @@ onMounted(fetchCatalogs);
         <RouterLink
           to="/catalogs/new"
           class="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-        >Create database</RouterLink>
+          >Create database</RouterLink
+        >
       </div>
     </div>
 
@@ -91,12 +111,22 @@ onMounted(fetchCatalogs);
             <td class="px-4 py-4 text-gray-500" colspan="5">No result.</td>
           </tr>
 
-          <tr v-for="c in filtered" :key="c.id" class="border-b hover:bg-gray-50">
+          <tr
+            v-for="c in filtered"
+            :key="c.id"
+            class="border-b hover:bg-gray-50"
+          >
             <td class="px-4 py-3 font-medium">{{ c.name }}</td>
             <td class="px-4 py-3">
-              <a :href="c.url" target="_blank" rel="noopener" class="text-indigo-600 hover:underline">{{ c.url }}</a>
+              <a
+                :href="c.url"
+                target="_blank"
+                rel="noopener"
+                class="text-indigo-600 hover:underline"
+                >{{ c.url }}</a
+              >
             </td>
-            <td class="px-4 py-3">{{ c.sgbd }}</td>
+            <td class="px-4 py-3">{{ getTrinoDbmsLabel(c.sgbd) }}</td>
             <td class="px-4 py-3">{{ c.username }}</td>
             <td class="px-4 py-3">
               <div class="flex gap-2">
