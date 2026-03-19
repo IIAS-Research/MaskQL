@@ -30,6 +30,8 @@ class CatalogSchemaEntry(SQLModel, table=True):
     schema_name: str
     table_name: Optional[str] = Field(default=None, nullable=True)
     column_name: Optional[str] = Field(default=None, nullable=True)
+    manually_added: bool = Field(default=False, nullable=False)
+    present_in_database: bool = Field(default=True, nullable=False)
 
     catalog_id: int = Field(foreign_key="catalogs.id", index=True)
     catalog: "Catalog" = Relationship(

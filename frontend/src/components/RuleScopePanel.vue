@@ -1,16 +1,23 @@
 <script setup lang="ts">
 type Status = "allow" | "deny" | "inherit";
+type ScopeItem = {
+    key: string;
+    label: string;
+    hint?: string;
+    removable?: boolean;
+};
 
 const props = withDefaults(defineProps<{
     title: string;
-    items: { key: string; label: string }[];
+    items: ScopeItem[];
     isColumn?: boolean;
     selectedKey?: string | null;
 
     statusOf: (key: string) => Status;
-    onAllow: (key: string) => void | Promise<void>;
-    onDeny: (key: string) => void | Promise<void>;
-    onInherit: (key: string) => void | Promise<void>;
+    onAllow: (key: string) => void | Promise<unknown>;
+    onDeny: (key: string) => void | Promise<unknown>;
+    onInherit: (key: string) => void | Promise<unknown>;
+    onRemove?: (key: string) => void | Promise<unknown>;
 
     showEffect?: boolean;
     getEffect?: (key: string) => string;
@@ -20,6 +27,7 @@ const props = withDefaults(defineProps<{
     addModel?: string;
     addPlaceholder?: string;
     addDisabled?: boolean;
+    removeTitle?: string;
 }>(), {
     showEffect: false,
     isColumn: false,
@@ -27,6 +35,7 @@ const props = withDefaults(defineProps<{
     addModel: "",
     addPlaceholder: "",
     addDisabled: false,
+    removeTitle: "Remove missing item",
 });
 
 const emit = defineEmits<{
@@ -58,7 +67,15 @@ function segBtn(active: boolean) {
             :class="selectedKey === it.key ? 'ring-2 ring-indigo-500' : ''"
             @click="emit('select', it.key)"
         >
-            <div class="text-sm font-medium truncate">{{ it.label }}</div>
+            <div class="flex items-center gap-2 min-w-0">
+                <div class="text-sm font-medium truncate">{{ it.label }}</div>
+                <i
+                    v-if="it.hint"
+                    class="pi pi-exclamation-triangle text-[11px] text-amber-500 shrink-0"
+                    :title="it.hint"
+                    :aria-label="it.hint"
+                ></i>
+            </div>
 
             <div class="mt-2 flex items-center gap-2 flex-wrap">
             <span
@@ -73,6 +90,15 @@ function segBtn(active: boolean) {
                 <button :class="segBtn(statusOf(it.key)==='deny')"    @click.stop="onDeny(it.key)"    title="Refuser"><i class="pi pi-ban text-xs"></i></button>
                 <button :class="segBtn(statusOf(it.key)==='inherit')" @click.stop="onInherit(it.key)" title="Hériter"><i class="pi pi-undo text-xs"></i></button>
             </div>
+
+            <button
+                v-if="it.removable"
+                class="inline-flex items-center justify-center h-7 w-7 border rounded-lg text-amber-600 hover:bg-amber-50"
+                :title="removeTitle"
+                @click.stop="onRemove?.(it.key)"
+            >
+                <i class="pi pi-trash text-xs"></i>
+            </button>
             </div>
 
             <div
@@ -86,8 +112,8 @@ function segBtn(active: boolean) {
                     Filter rows (SQL where)
                 </span>
                 <input
-                    :value="getEffect(it.key)"
-                    @input="setEffect(it.key, ($event.target as HTMLInputElement).value)"
+                    :value="getEffect?.(it.key) ?? ''"
+                    @input="setEffect?.(it.key, ($event.target as HTMLInputElement).value)"
                     class="w-full px-2 py-1 h-9 text-sm border rounded-lg"
                     :placeholder='isColumn ? "lower(my_column)" : "my_column == 42"'
                 />

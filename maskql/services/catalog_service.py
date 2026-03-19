@@ -9,11 +9,11 @@ from sqlmodel import select
 from maskql.db import AsyncSessionLocal
 from maskql.models.catalog import Catalog
 from maskql.models.catalog_schema import CatalogSchemaEntry
-from maskql.models.rule import Rule
 from maskql.schemas.catalog import (
     CatalogConnectionStatusRead,
     CatalogCreate,
     CatalogPatch,
+    CatalogSchemaEntryCreate,
     CatalogSchemaEntryRead,
     CatalogSchemaSyncRead,
 )
@@ -41,16 +41,51 @@ def _schema_path_sort_key(path: SchemaPath) -> tuple[str, str, str]:
 
 
 def _should_skip_schema(catalog: Catalog, schema_name: str) -> bool:
-    if not schema_name or schema_name == "information_schema":
+    normalized = (schema_name or "").strip()
+    if not normalized:
+        return True
+    lowered = normalized.lower()
+
+    if lowered == "information_schema":
         return True
 
     if catalog.sgbd == "postgresql":
-        if schema_name == "pg_catalog":
+        if lowered == "pg_catalog":
             return True
-        if schema_name.startswith("pg_toast") or schema_name.startswith("pg_temp_"):
+        if lowered.startswith("pg_toast") or lowered.startswith("pg_temp_"):
+            return True
+
+    if catalog.sgbd == "sqlserver":
+        if lowered in {"guest", "sys"}:
+            return True
+        if lowered.startswith("db_"):
             return True
 
     return False
+
+
+def _schema_filter_sql(catalog: Catalog, column_name: str) -> str:
+    lowered = f"lower({column_name})"
+    clauses = [f"{lowered} <> 'information_schema'"]
+
+    if catalog.sgbd == "postgresql":
+        clauses.extend(
+            [
+                f"{lowered} <> 'pg_catalog'",
+                f"{lowered} NOT LIKE 'pg_toast%'",
+                f"{lowered} NOT LIKE 'pg_temp_%'",
+            ]
+        )
+    elif catalog.sgbd == "sqlserver":
+        clauses.extend(
+            [
+                f"{lowered} <> 'guest'",
+                f"{lowered} <> 'sys'",
+                f"{lowered} NOT LIKE 'db_%'",
+            ]
+        )
+
+    return " AND ".join(clauses)
 
 
 def _catalog_connection_parts(catalog: Catalog) -> list[str]:
@@ -65,23 +100,6 @@ def _temp_catalog_name(prefix: str = "healthcheck") -> str:
     suffix = "".join(secrets.choice(string.ascii_lowercase) for _ in range(10))
     return f"{prefix}{suffix}"
 
-
-def _rule_path_exists(
-    rule: Rule,
-    *,
-    schemas: set[str],
-    tables: set[tuple[str, str]],
-    columns: set[tuple[str, str, str]],
-) -> bool:
-    if not rule.schema_name and not rule.table_name and not rule.column_name:
-        return True
-    if rule.schema_name and not rule.table_name and not rule.column_name:
-        return rule.schema_name in schemas
-    if rule.schema_name and rule.table_name and not rule.column_name:
-        return (rule.schema_name, rule.table_name) in tables
-    if rule.schema_name and rule.table_name and rule.column_name:
-        return (rule.schema_name, rule.table_name, rule.column_name) in columns
-    return False
 
 class CatalogService:
     @staticmethod
@@ -240,6 +258,62 @@ class CatalogService:
             return [CatalogSchemaEntryRead.model_validate(row) for row in rows.all()]
 
     @staticmethod
+    async def create_manual_schema_entry(
+        catalog_id: int,
+        payload: CatalogSchemaEntryCreate,
+    ) -> CatalogSchemaEntryRead:
+        schema_name = (payload.schema_name or "").strip()
+        table_name = payload.table_name.strip() if payload.table_name else None
+        column_name = payload.column_name.strip() if payload.column_name else None
+
+        if not schema_name:
+            raise ValueError("Schema name is required")
+        if column_name and not table_name:
+            raise ValueError("Column name requires table name")
+
+        async with AsyncSessionLocal() as session:
+            existing = await session.exec(
+                select(CatalogSchemaEntry).where(
+                    CatalogSchemaEntry.catalog_id == catalog_id,
+                    CatalogSchemaEntry.schema_name == schema_name,
+                    CatalogSchemaEntry.table_name == table_name,
+                    CatalogSchemaEntry.column_name == column_name,
+                )
+            )
+            if existing.first():
+                raise ValueError("Schema path already exists")
+
+            entry = CatalogSchemaEntry(
+                catalog_id=catalog_id,
+                schema_name=schema_name,
+                table_name=table_name,
+                column_name=column_name,
+                manually_added=True,
+                present_in_database=False,
+            )
+            session.add(entry)
+            await session.commit()
+            await session.refresh(entry)
+            return CatalogSchemaEntryRead.model_validate(entry)
+
+    @staticmethod
+    async def delete_manual_schema_entry(catalog_id: int, entry_id: int) -> bool:
+        async with AsyncSessionLocal() as session:
+            entry = await session.get(CatalogSchemaEntry, entry_id)
+            if not entry or entry.catalog_id != catalog_id:
+                return False
+            if not entry.manually_added:
+                raise ValueError("Only manual schema entries can be removed")
+
+            if entry.present_in_database:
+                entry.manually_added = False
+            else:
+                await session.delete(entry)
+
+            await session.commit()
+            return True
+
+    @staticmethod
     async def sync_schema(catalog_id: int, *, timeout: float = 30.0) -> CatalogSchemaSyncRead:
         catalog = await CatalogService.get(catalog_id)
         if not catalog:
@@ -274,9 +348,16 @@ class CatalogService:
             deleted_entries = 0
 
             for path, entry in existing_by_path.items():
-                if path not in desired_set:
-                    await session.delete(entry)
-                    deleted_entries += 1
+                if path in desired_set:
+                    entry.present_in_database = True
+                    continue
+
+                if entry.manually_added:
+                    entry.present_in_database = False
+                    continue
+
+                await session.delete(entry)
+                deleted_entries += 1
 
             for schema_name, table_name, column_name in sorted(
                 desired_set - set(existing_by_path),
@@ -288,23 +369,15 @@ class CatalogService:
                         schema_name=schema_name,
                         table_name=table_name,
                         column_name=column_name,
+                        manually_added=False,
+                        present_in_database=True,
                     )
                 )
                 created_entries += 1
 
-            rule_rows = await session.exec(select(Rule).where(Rule.catalog_id == catalog_id))
+            # Rules can now be managed manually and may legitimately target paths
+            # that are absent from the latest schema scan.
             deleted_rules = 0
-            for rule in rule_rows.all():
-                if _rule_path_exists(
-                    rule,
-                    schemas=desired_schemas,
-                    tables=desired_tables,
-                    columns=desired_columns,
-                ):
-                    continue
-                await session.delete(rule)
-                deleted_rules += 1
-
             await session.commit()
 
         return CatalogSchemaSyncRead(
@@ -319,6 +392,76 @@ class CatalogService:
 
     @staticmethod
     async def _scan_schema_paths(catalog: Catalog, *, timeout: float = 30.0) -> set[SchemaPath]:
+        try:
+            return await CatalogService._scan_schema_paths_via_information_schema(
+                catalog,
+                timeout=timeout,
+            )
+        except Exception:
+            log.exception(
+                "Information schema scan failed for catalog %s, falling back to SHOW queries",
+                catalog.name,
+            )
+            return await CatalogService._scan_schema_paths_via_show(catalog, timeout=timeout)
+
+    @staticmethod
+    async def _scan_schema_paths_via_information_schema(
+        catalog: Catalog,
+        *,
+        timeout: float = 30.0,
+    ) -> set[SchemaPath]:
+        paths: set[SchemaPath] = set()
+        catalog_ident = _sql_identifier(catalog.name)
+        schema_filter = _schema_filter_sql(catalog, "schema_name")
+        relation_filter = _schema_filter_sql(catalog, "table_schema")
+
+        schema_rows = await trino_sql(
+            f"SELECT schema_name FROM {catalog_ident}.information_schema.schemata "
+            f"WHERE {schema_filter}",
+            timeout=timeout,
+        )
+        for row in schema_rows["rows"]:
+            schema_name = row[0]
+            if _should_skip_schema(catalog, schema_name):
+                continue
+            paths.add((schema_name, None, None))
+
+        table_rows = await trino_sql(
+            f"SELECT table_schema, table_name FROM {catalog_ident}.information_schema.tables "
+            f"WHERE {relation_filter}",
+            timeout=timeout,
+        )
+        for row in table_rows["rows"]:
+            schema_name, table_name = row[0], row[1]
+            if _should_skip_schema(catalog, schema_name) or not table_name:
+                continue
+
+            paths.add((schema_name, None, None))
+            paths.add((schema_name, table_name, None))
+
+        column_rows = await trino_sql(
+            f"SELECT table_schema, table_name, column_name "
+            f"FROM {catalog_ident}.information_schema.columns "
+            f"WHERE {relation_filter}",
+            timeout=timeout,
+        )
+        for row in column_rows["rows"]:
+            schema_name, table_name, column_name = row[0], row[1], row[2]
+            if _should_skip_schema(catalog, schema_name) or not table_name or not column_name:
+                continue
+
+            paths.add((schema_name, None, None))
+            paths.add((schema_name, table_name, None))
+            paths.add((schema_name, table_name, column_name))
+
+        return paths
+
+    @staticmethod
+    async def _scan_schema_paths_via_show(
+        catalog: Catalog,
+        *,
+        timeout: float = 30.0,
+    ) -> set[SchemaPath]:
         paths: set[SchemaPath] = set()
         catalog_ident = _sql_identifier(catalog.name)
 

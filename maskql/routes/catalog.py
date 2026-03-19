@@ -5,6 +5,7 @@ from maskql.schemas.catalog import (
     CatalogConnectionStatusRead,
     CatalogCreate,
     CatalogPatch,
+    CatalogSchemaEntryCreate,
     CatalogRead,
     CatalogSchemaEntryRead,
     CatalogSchemaSyncRead,
@@ -35,6 +36,31 @@ async def list_catalog_schema(catalog_id: int):
     if not obj:
         raise HTTPException(status_code=404, detail="Catalog not found")
     return await CatalogService.list_schema_entries(catalog_id)
+
+
+@router.post("/{catalog_id}/schema", response_model=CatalogSchemaEntryRead, status_code=status.HTTP_201_CREATED)
+async def create_catalog_schema_entry(catalog_id: int, payload: CatalogSchemaEntryCreate):
+    obj = await CatalogService.get(catalog_id)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Catalog not found")
+    try:
+        return await CatalogService.create_manual_schema_entry(catalog_id, payload)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/{catalog_id}/schema/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_catalog_schema_entry(catalog_id: int, entry_id: int):
+    obj = await CatalogService.get(catalog_id)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Catalog not found")
+    try:
+        ok = await CatalogService.delete_manual_schema_entry(catalog_id, entry_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not ok:
+        raise HTTPException(status_code=404, detail="Schema entry not found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/{catalog_id}/schema/sync", response_model=CatalogSchemaSyncRead)

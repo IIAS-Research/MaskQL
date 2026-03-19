@@ -25,6 +25,14 @@ export interface CatalogSchemaEntry {
   schema_name: string;
   table_name: string | null;
   column_name: string | null;
+  manually_added: boolean;
+  present_in_database: boolean;
+}
+
+export interface CatalogSchemaEntryCreate {
+  schema_name: string;
+  table_name?: string | null;
+  column_name?: string | null;
 }
 
 export interface CatalogSchemaSyncResult {
@@ -58,6 +66,21 @@ export class Catalogs extends BaseResource<
       `${this.endpoint}/${catalogId}/schema`,
     );
     return data;
+  }
+
+  async createSchemaEntry(
+    catalogId: number,
+    payload: CatalogSchemaEntryCreate,
+  ): Promise<CatalogSchemaEntry> {
+    const { data } = await http.post<CatalogSchemaEntry>(
+      `${this.endpoint}/${catalogId}/schema`,
+      payload,
+    );
+    return data;
+  }
+
+  async deleteSchemaEntry(catalogId: number, entryId: number): Promise<void> {
+    await http.delete(`${this.endpoint}/${catalogId}/schema/${entryId}`);
   }
 
   async syncSchema(catalogId: number): Promise<CatalogSchemaSyncResult> {

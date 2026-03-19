@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Optional
+from pydantic import field_validator
 from sqlmodel import SQLModel
 
 class CatalogCreate(SQLModel):
@@ -36,6 +37,22 @@ class CatalogSchemaEntryRead(SQLModel):
     schema_name: str
     table_name: Optional[str] = None
     column_name: Optional[str] = None
+    manually_added: bool
+    present_in_database: bool
+
+
+class CatalogSchemaEntryCreate(SQLModel):
+    schema_name: str
+    table_name: Optional[str] = None
+    column_name: Optional[str] = None
+
+    @field_validator("schema_name", "table_name", "column_name", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, value):
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
 
 
 class CatalogSchemaSyncRead(SQLModel):

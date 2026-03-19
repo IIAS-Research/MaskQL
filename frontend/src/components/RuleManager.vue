@@ -14,6 +14,7 @@ const toast = useToast();
 const loading = ref(true);
 const loadingSchema = ref(false);
 const syncingSchema = ref(false);
+const mutatingSchemaEntry = ref(false);
 
 const catalogs = ref<Catalog[]>([]);
 const rules = ref<Rule[]>([]);
@@ -22,6 +23,17 @@ const schemaEntriesByCatalog = ref(new Map<number, CatalogSchemaEntry[]>());
 const selectedCatalogId = ref<number | null>(null);
 const selectedSchema = ref<string | null>(null);
 const selectedTable = ref<string | null>(null);
+const draftSchemaName = ref("");
+const draftTableName = ref("");
+const draftColumnName = ref("");
+const missingPathHint = "Possibly not present in the database";
+
+type ScopeItem = {
+  key: string;
+  label: string;
+  hint?: string;
+  removable?: boolean;
+};
 
 const keyFor = (userId: number, cId: number, schema = "", table = "", column = "") =>
   `${userId}||${cId}||${schema}||${table}||${column}`;
@@ -39,6 +51,16 @@ function ensureSet<K>(map: Map<K, Set<string>>, key: K) {
 
 function getRule(cId: number, schema = "", table = "", column = "") {
   return ruleMap.value.get(keyFor(props.userId, cId, schema, table, column));
+}
+
+function getSchemaEntry(cId: number, schema = "", table = "", column = "") {
+  const entries = schemaEntriesByCatalog.value.get(cId) ?? [];
+  return entries.find(
+    (entry) =>
+      entry.schema_name === schema &&
+      (entry.table_name ?? "") === table &&
+      (entry.column_name ?? "") === column,
+  );
 }
 
 function statusOf(
@@ -88,6 +110,26 @@ function rebuildSchemaTree() {
           `${catalogId}|${entry.schema_name}|${entry.table_name}`,
         ).add(entry.column_name);
       }
+    }
+  }
+
+  for (const rule of rules.value) {
+    if (!rule.schema_name) continue;
+
+    ensureSet(nextSchemasByCatalog, rule.catalog_id).add(rule.schema_name);
+
+    if (rule.table_name) {
+      ensureSet(
+        nextTablesByScope,
+        `${rule.catalog_id}|${rule.schema_name}`,
+      ).add(rule.table_name);
+    }
+
+    if (rule.table_name && rule.column_name) {
+      ensureSet(
+        nextColsByScope,
+        `${rule.catalog_id}|${rule.schema_name}|${rule.table_name}`,
+      ).add(rule.column_name);
     }
   }
 
@@ -160,6 +202,7 @@ async function upsertRule(
       ruleMap.value.set(key, updated);
       const idx = rules.value.findIndex((rule) => rule.id === existing.id);
       if (idx !== -1) rules.value[idx] = updated;
+      rebuildSchemaTree();
       return updated;
     }
 
@@ -177,6 +220,7 @@ async function upsertRule(
     });
     ruleMap.value.set(key, created);
     rules.value.push(created);
+    rebuildSchemaTree();
     return created;
   } catch (e) {
     console.error(e);
@@ -198,6 +242,7 @@ async function deleteRule(cId: number, schema = "", table = "", column = "") {
     ruleMap.value.delete(key);
     const idx = rules.value.findIndex((rule) => rule.id === existing.id);
     if (idx !== -1) rules.value.splice(idx, 1);
+    rebuildSchemaTree();
   } catch (e) {
     console.error(e);
     toast.add({
@@ -213,8 +258,13 @@ const setAllow = (c: number, s = "", t = "", col = "") =>
   upsertRule(c, s, t, col, { allow: true });
 const setDeny = (c: number, s = "", t = "", col = "") =>
   upsertRule(c, s, t, col, { allow: false });
-const setInherit = (c: number, s = "", t = "", col = "") =>
-  deleteRule(c, s, t, col);
+async function setInherit(c: number, s = "", t = "", col = "") {
+  const hadRule = !!getRule(c, s, t, col);
+  await deleteRule(c, s, t, col);
+  if (!hadRule) {
+    await deleteManualSchemaEntry(c, s, t, col);
+  }
+}
 
 const effectOpen = ref(new Set<string>());
 const effectDrafts = ref(new Map<string, string>());
@@ -263,13 +313,93 @@ function setEffectScope(cId: number, s = "", t = "", c = "", value = "") {
 }
 
 function hasScannedPath(catId: number, schema = "", table = "", column = "") {
-  const entries = schemaEntriesByCatalog.value.get(catId) ?? [];
-  return entries.some(
-    (entry) =>
-      entry.schema_name === schema &&
-      (entry.table_name ?? "") === table &&
-      (entry.column_name ?? "") === column,
-  );
+  return getSchemaEntry(catId, schema, table, column)?.present_in_database ?? false;
+}
+
+function hintForPath(catId: number, schema = "", table = "", column = "") {
+  return hasScannedPath(catId, schema, table, column) ? undefined : missingPathHint;
+}
+
+function canRemoveMissingPath(catId: number, schema = "", table = "", column = "") {
+  if (hasScannedPath(catId, schema, table, column)) return false;
+  return !!getRule(catId, schema, table, column) || !!getSchemaEntry(catId, schema, table, column);
+}
+
+async function refreshCatalogSchema(catalogId: number) {
+  await loadCatalogSchema(catalogId, true);
+}
+
+async function createManualSchemaEntry(
+  catalogId: number,
+  schema = "",
+  table = "",
+  column = "",
+) {
+  mutatingSchemaEntry.value = true;
+  try {
+    const entry = await CatalogAPI.createSchemaEntry(catalogId, {
+      schema_name: schema,
+      table_name: table || null,
+      column_name: column || null,
+    });
+    await refreshCatalogSchema(catalogId);
+    return entry;
+  } catch (e) {
+    console.error(e);
+    let detail = "Unable to add schema entry";
+    if (axios.isAxiosError(e)) {
+      detail = e.response?.data?.detail || detail;
+    }
+    toast.add({ severity: "error", summary: "Error", detail, life: 4000 });
+  } finally {
+    mutatingSchemaEntry.value = false;
+  }
+}
+
+async function deleteManualSchemaEntry(
+  catalogId: number,
+  schema = "",
+  table = "",
+  column = "",
+) {
+  const entry = getSchemaEntry(catalogId, schema, table, column);
+  if (!entry?.manually_added) return false;
+
+  mutatingSchemaEntry.value = true;
+  try {
+    await CatalogAPI.deleteSchemaEntry(catalogId, entry.id);
+    await refreshCatalogSchema(catalogId);
+    return true;
+  } catch (e) {
+    console.error(e);
+    let detail = "Unable to remove manual schema entry";
+    if (axios.isAxiosError(e)) {
+      detail = e.response?.data?.detail || detail;
+    }
+    toast.add({ severity: "error", summary: "Error", detail, life: 4000 });
+    return false;
+  } finally {
+    mutatingSchemaEntry.value = false;
+  }
+}
+
+async function removeMissingPath(
+  catalogId: number,
+  schema = "",
+  table = "",
+  column = "",
+) {
+  const hadRule = !!getRule(catalogId, schema, table, column);
+  const hadManualEntry = !!getSchemaEntry(catalogId, schema, table, column)?.manually_added;
+
+  if (!hadRule && !hadManualEntry) return;
+
+  if (hadRule) {
+    await deleteRule(catalogId, schema, table, column);
+  }
+  if (hadManualEntry) {
+    await deleteManualSchemaEntry(catalogId, schema, table, column);
+  }
 }
 
 function resetState() {
@@ -283,12 +413,16 @@ function resetState() {
   selectedCatalogId.value = null;
   selectedSchema.value = null;
   selectedTable.value = null;
+  draftSchemaName.value = "";
+  draftTableName.value = "";
+  draftColumnName.value = "";
   effectDrafts.value.clear();
   effectOpen.value.clear();
   effectTimers.value.forEach((timer) => window.clearTimeout(timer));
   effectTimers.value.clear();
   loadingSchema.value = false;
   syncingSchema.value = false;
+  mutatingSchemaEntry.value = false;
 }
 
 async function loadAll() {
@@ -302,6 +436,7 @@ async function loadAll() {
     catalogs.value = nextCatalogs;
     rules.value = nextRules;
     rebuildRuleMap();
+    rebuildSchemaTree();
 
     if (
       selectedCatalogId.value != null &&
@@ -404,14 +539,17 @@ const denyCatalogKey = (key: string) => setDeny(Number(key.split(":")[1]));
 const inheritCatalogKey = (key: string) =>
   setInherit(Number(key.split(":")[1]));
 
-const schemaItems = computed(() => {
+const schemaItems = computed<ScopeItem[]>(() => {
   if (!selectedCatalogId.value) return [];
+  const catalogId = selectedCatalogId.value;
   const schemas = Array.from(
-    ensureSet(schemasByCatalog.value, selectedCatalogId.value),
+    ensureSet(schemasByCatalog.value, catalogId),
   ).sort((a, b) => a.localeCompare(b));
   return schemas.map((schema) => ({
-    key: `sch:${selectedCatalogId.value}:${schema}`,
+    key: `sch:${catalogId}:${schema}`,
     label: schema,
+    hint: hintForPath(catalogId, schema),
+    removable: canRemoveMissingPath(catalogId, schema),
   }));
 });
 
@@ -422,6 +560,10 @@ const selectedSchemaKey = computed(() =>
 );
 
 function selectSchema(key: string) {
+  if (key === "__add__") {
+    void addManualSchema();
+    return;
+  }
   const [, cId, schema] = key.split(":");
   selectedCatalogId.value = Number(cId);
   selectedSchema.value = schema;
@@ -444,18 +586,26 @@ const inheritSchemaKey = (key: string) => {
   const [, cId, schema] = key.split(":");
   return setInherit(Number(cId), schema);
 };
+const removeSchemaKey = (key: string) => {
+  const [, cId, schema] = key.split(":");
+  return removeMissingPath(Number(cId), schema);
+};
 
-const tableItems = computed(() => {
+const tableItems = computed<ScopeItem[]>(() => {
   if (!selectedCatalogId.value || !selectedSchema.value) return [];
+  const catalogId = selectedCatalogId.value;
+  const schema = selectedSchema.value;
   const tables = Array.from(
     ensureSet(
       tablesByScope.value,
-      `${selectedCatalogId.value}|${selectedSchema.value}`,
+      `${catalogId}|${schema}`,
     ),
   ).sort((a, b) => a.localeCompare(b));
   return tables.map((table) => ({
-    key: `tbl:${selectedCatalogId.value}:${selectedSchema.value}:${table}`,
+    key: `tbl:${catalogId}:${schema}:${table}`,
     label: table,
+    hint: hintForPath(catalogId, schema, table),
+    removable: canRemoveMissingPath(catalogId, schema, table),
   }));
 });
 
@@ -466,6 +616,10 @@ const selectedTableKey = computed(() =>
 );
 
 function selectTable(key: string) {
+  if (key === "__add__") {
+    void addManualTable();
+    return;
+  }
   const [, cId, schema, table] = key.split(":");
   selectedCatalogId.value = Number(cId);
   selectedSchema.value = schema;
@@ -489,6 +643,10 @@ const inheritTableKey = (key: string) => {
   const [, cId, schema, table] = key.split(":");
   return setInherit(Number(cId), schema, table);
 };
+const removeTableKey = (key: string) => {
+  const [, cId, schema, table] = key.split(":");
+  return removeMissingPath(Number(cId), schema, table);
+};
 
 const isEffectOpenTableKey = (key: string) => {
   const [, cId, schema, table] = key.split(":");
@@ -507,26 +665,95 @@ const setEffectTableKey = (key: string, value: string) => {
   return setEffectScope(Number(cId), schema, table, "", value);
 };
 
-const columnItems = computed(() => {
+const columnItems = computed<ScopeItem[]>(() => {
   if (!selectedCatalogId.value || !selectedSchema.value || !selectedTable.value) {
     return [];
   }
+  const catalogId = selectedCatalogId.value;
+  const schema = selectedSchema.value;
+  const table = selectedTable.value;
   const columns = Array.from(
     ensureSet(
       colsByScope.value,
-      `${selectedCatalogId.value}|${selectedSchema.value}|${selectedTable.value}`,
+      `${catalogId}|${schema}|${table}`,
     ),
   ).sort((a, b) => a.localeCompare(b));
   return columns.map((column) => ({
-    key: `col:${selectedCatalogId.value}:${selectedSchema.value}:${selectedTable.value}:${column}`,
+    key: `col:${catalogId}:${schema}:${table}:${column}`,
     label: column,
+    hint: hintForPath(catalogId, schema, table, column),
+    removable: canRemoveMissingPath(catalogId, schema, table, column),
   }));
 });
 
 const selectedColumnKey = computed(() => null);
 
 function selectColumn(_key: string) {
-  return;
+  if (_key === "__add__") {
+    void addManualColumn();
+  }
+}
+
+async function addManualSchema() {
+  if (!selectedCatalogId.value) return;
+  const schema = draftSchemaName.value.trim();
+  if (!schema) return;
+
+  const created = await createManualSchemaEntry(selectedCatalogId.value, schema);
+  if (!created) return;
+
+  draftSchemaName.value = "";
+  selectedSchema.value = schema;
+  toast.add({
+    severity: "success",
+    summary: "Added",
+    detail: `Manual schema ${schema} added`,
+    life: 2000,
+  });
+}
+
+async function addManualTable() {
+  if (!selectedCatalogId.value || !selectedSchema.value) return;
+  const table = draftTableName.value.trim();
+  if (!table) return;
+
+  const created = await createManualSchemaEntry(
+    selectedCatalogId.value,
+    selectedSchema.value,
+    table,
+  );
+  if (!created) return;
+
+  draftTableName.value = "";
+  selectedTable.value = table;
+  toast.add({
+    severity: "success",
+    summary: "Added",
+    detail: `Manual table ${table} added`,
+    life: 2000,
+  });
+}
+
+async function addManualColumn() {
+  if (!selectedCatalogId.value || !selectedSchema.value || !selectedTable.value) return;
+  const column = draftColumnName.value.trim();
+  if (!column) return;
+
+  const created = await createManualSchemaEntry(
+    selectedCatalogId.value,
+    selectedSchema.value,
+    selectedTable.value,
+    column,
+  );
+  if (!created) return;
+
+  draftColumnName.value = "";
+  toast.add({
+    severity: "success",
+    summary: "Added",
+    detail: `Manual column ${column} added`,
+    life: 2000,
+  });
 }
 
 function statusOfColumnKey(key: string) {
@@ -545,6 +772,10 @@ const denyColumnKey = (key: string) => {
 const inheritColumnKey = (key: string) => {
   const [, cId, schema, table, column] = key.split(":");
   return setInherit(Number(cId), schema, table, column);
+};
+const removeColumnKey = (key: string) => {
+  const [, cId, schema, table, column] = key.split(":");
+  return removeMissingPath(Number(cId), schema, table, column);
 };
 
 const isEffectOpenColumnKey = (key: string) => {
@@ -652,19 +883,12 @@ async function handleImportFile(evt: Event) {
     const catalogId = selectedCatalogId.value;
     let created = 0;
     let updated = 0;
-    let skipped = 0;
-
     for (const raw of json.rules as ExportRule[]) {
       const schema = (raw.schema_name ?? "").trim();
       const table = (raw.table_name ?? "").trim();
       const column = (raw.column_name ?? "").trim();
       const allow = !!raw.allow;
       const effect = table || column ? (raw.effect ?? "") : "";
-
-      if (schema && !hasScannedPath(catalogId, schema, table, column)) {
-        skipped++;
-        continue;
-      }
 
       const existed = !!getRule(catalogId, schema, table, column);
       await upsertRule(catalogId, schema, table, column, { allow, effect });
@@ -677,7 +901,7 @@ async function handleImportFile(evt: Event) {
     toast.add({
       severity: "success",
       summary: "Import terminé",
-      detail: `${created} créé(e)s, ${updated} mis(e)s à jour, ${skipped} ignoré(e)s`,
+      detail: `${created} créé(e)s, ${updated} mis(e)s à jour`,
       life: 3000,
     });
   } catch (e: any) {
@@ -760,6 +984,13 @@ async function handleImportFile(evt: Event) {
         :on-allow="allowSchemaKey"
         :on-deny="denySchemaKey"
         :on-inherit="inheritSchemaKey"
+        :on-remove="removeSchemaKey"
+        :show-add="true"
+        :add-model="draftSchemaName"
+        add-placeholder="Add manual schema"
+        remove-title="Remove missing schema item"
+        :add-disabled="!selectedCatalogId || loading || loadingSchema || syncingSchema || mutatingSchemaEntry"
+        @update:add-model="(value) => (draftSchemaName = value)"
         @select="selectSchema"
       />
 
@@ -771,9 +1002,16 @@ async function handleImportFile(evt: Event) {
         :on-allow="allowTableKey"
         :on-deny="denyTableKey"
         :on-inherit="inheritTableKey"
+        :on-remove="removeTableKey"
         :show-effect="true"
         :get-effect="getEffectTableKey"
         :set-effect="setEffectTableKey"
+        :show-add="true"
+        :add-model="draftTableName"
+        add-placeholder="Add manual table"
+        remove-title="Remove missing table item"
+        :add-disabled="!selectedCatalogId || !selectedSchema || loading || loadingSchema || syncingSchema || mutatingSchemaEntry"
+        @update:add-model="(value) => (draftTableName = value)"
         @select="selectTable"
       />
 
@@ -785,10 +1023,17 @@ async function handleImportFile(evt: Event) {
         :on-allow="allowColumnKey"
         :on-deny="denyColumnKey"
         :on-inherit="inheritColumnKey"
+        :on-remove="removeColumnKey"
         :show-effect="true"
         :get-effect="getEffectColumnKey"
         :set-effect="setEffectColumnKey"
         :is-column="true"
+        :show-add="true"
+        :add-model="draftColumnName"
+        add-placeholder="Add manual column"
+        remove-title="Remove missing column item"
+        :add-disabled="!selectedCatalogId || !selectedSchema || !selectedTable || loading || loadingSchema || syncingSchema || mutatingSchemaEntry"
+        @update:add-model="(value) => (draftColumnName = value)"
         @select="selectColumn"
       />
     </div>

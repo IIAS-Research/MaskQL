@@ -227,7 +227,7 @@ class CatalogApiTests(unittest.TestCase):
             },
         )
 
-    def test_sync_catalog_schema_keeps_valid_rules_and_drops_stale_ones(self):
+    def test_sync_catalog_schema_keeps_valid_rules_and_preserves_manual_ones(self):
         catalog = self._post_catalog_with_assert(
             self._payload(url="jdbc:postgresql://postgres:5432/maskqltest")
         )
@@ -279,7 +279,7 @@ class CatalogApiTests(unittest.TestCase):
         )
         self.assertEqual(sync.status_code, 200, f"POST /catalogs/{{id}}/schema/sync failed: {sync.status_code} {sync.text}")
         body = sync.json()
-        self.assertGreaterEqual(body["deleted_rules"], 1)
+        self.assertEqual(body["deleted_rules"], 0)
 
         rules = self.http.get(
             RULES_ENDPOINT,
@@ -292,4 +292,66 @@ class CatalogApiTests(unittest.TestCase):
             for it in rules.json()
         }
         self.assertIn(("public", "client", "name"), tuples)
+        self.assertIn(("public", "missing_table", "ghost_column"), tuples)
+
+    def test_manual_schema_entry_can_be_added_synced_and_removed(self):
+        catalog = self._post_catalog_with_assert(
+            self._payload(url="jdbc:postgresql://postgres:5432/maskqltest")
+        )
+
+        create = self.http.post(
+            f"{CATALOG_ENDPOINT}/{catalog['id']}/schema",
+            json={
+                "schema_name": "public",
+                "table_name": "missing_table",
+                "column_name": "ghost_column",
+            },
+            timeout=API_TIMEOUT,
+        )
+        self.assertEqual(create.status_code, 201, f"POST /catalogs/{{id}}/schema failed: {create.status_code} {create.text}")
+        created = create.json()
+        self.assertTrue(created["manually_added"])
+        self.assertFalse(created["present_in_database"])
+
+        sync = self.http.post(
+            f"{CATALOG_ENDPOINT}/{catalog['id']}/schema/sync",
+            timeout=API_TIMEOUT,
+        )
+        self.assertEqual(sync.status_code, 200, f"POST /catalogs/{{id}}/schema/sync failed: {sync.status_code} {sync.text}")
+
+        listed = self.http.get(
+            f"{CATALOG_ENDPOINT}/{catalog['id']}/schema",
+            timeout=API_TIMEOUT,
+        )
+        self.assertEqual(listed.status_code, 200, f"GET /catalogs/{{id}}/schema failed: {listed.status_code} {listed.text}")
+        found = next(
+            (
+                item for item in listed.json()
+                if (
+                    item["schema_name"],
+                    item["table_name"],
+                    item["column_name"],
+                ) == ("public", "missing_table", "ghost_column")
+            ),
+            None,
+        )
+        self.assertIsNotNone(found)
+        self.assertTrue(found["manually_added"])
+        self.assertFalse(found["present_in_database"])
+
+        delete = self.http.delete(
+            f"{CATALOG_ENDPOINT}/{catalog['id']}/schema/{created['id']}",
+            timeout=API_TIMEOUT,
+        )
+        self.assertEqual(delete.status_code, 204, f"DELETE /catalogs/{{id}}/schema/{{entry_id}} failed: {delete.status_code} {delete.text}")
+
+        after_delete = self.http.get(
+            f"{CATALOG_ENDPOINT}/{catalog['id']}/schema",
+            timeout=API_TIMEOUT,
+        )
+        self.assertEqual(after_delete.status_code, 200, f"GET /catalogs/{{id}}/schema failed: {after_delete.status_code} {after_delete.text}")
+        tuples = {
+            (item["schema_name"], item["table_name"], item["column_name"])
+            for item in after_delete.json()
+        }
         self.assertNotIn(("public", "missing_table", "ghost_column"), tuples)
