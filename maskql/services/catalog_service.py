@@ -1,16 +1,33 @@
 # maskql/services/catalog_service.py
 from __future__ import annotations
-import os
+import asyncio
+import logging
+import secrets
+import string
 from typing import Sequence, Optional
 from sqlmodel import select
 from maskql.db import AsyncSessionLocal
 from maskql.models.catalog import Catalog
-from maskql.schemas.catalog import CatalogCreate, CatalogPatch
+from maskql.schemas.catalog import CatalogCreate, CatalogPatch, CatalogConnectionStatusRead
 from maskql.utils.trino import trino_sql, trino_ddl
-
-import time
-import logging
 log = logging.getLogger(__name__)
+
+
+def _sql_literal(value: str) -> str:
+    return value.replace("'", "''")
+
+
+def _catalog_connection_parts(catalog: Catalog) -> list[str]:
+    return [
+        f'"connection-url" = \'{_sql_literal(catalog.url)}\'',
+        f'"connection-user" = \'{_sql_literal(catalog.username)}\'',
+        f'"connection-password" = \'{_sql_literal(catalog.password)}\'',
+    ]
+
+
+def _temp_catalog_name(prefix: str = "healthcheck") -> str:
+    suffix = "".join(secrets.choice(string.ascii_lowercase) for _ in range(10))
+    return f"{prefix}{suffix}"
 
 class CatalogService:
     @staticmethod
@@ -95,11 +112,7 @@ class CatalogService:
             created: list[str] = []
             for c in rows:
                 connector = c.sgbd
-                parts = [
-                    f'"connection-url" = \'{c.url}\'',
-                    f'"connection-user" = \'{c.username}\'',
-                    f'"connection-password" = \'{c.password}\'',
-                ]
+                parts = _catalog_connection_parts(c)
                 sql = f"CREATE CATALOG {c.name} USING {connector} WITH (\n  {', '.join(parts)}\n)"
                 await trino_ddl(sql)
                 
@@ -108,3 +121,57 @@ class CatalogService:
             return {"dropped": trino_catalogs, "created": created}
         except:
             return {"dropped": None, "created": None}
+
+    @staticmethod
+    async def connection_status(catalog: Catalog, *, timeout: float = 10.0) -> CatalogConnectionStatusRead:
+        if catalog.id is None:
+            raise ValueError("Catalog ID is required to compute connection status")
+
+        temp_catalog = _temp_catalog_name()
+        create_sql = (
+            f"CREATE CATALOG {temp_catalog} USING {catalog.sgbd} WITH "
+            f"(\n  {', '.join(_catalog_connection_parts(catalog))}\n)"
+        )
+        created = False
+
+        try:
+            await trino_ddl(create_sql, timeout=timeout)
+            created = True
+            # `SHOW SCHEMAS` is blocked by the current Trino ACL plugin.
+            # Querying information_schema still proves the connector can load metadata.
+            await trino_sql(
+                f"SELECT schema_name FROM {temp_catalog}.information_schema.schemata LIMIT 1",
+                timeout=timeout,
+            )
+            return CatalogConnectionStatusRead(
+                catalog_id=catalog.id,
+                state="ok",
+                message="Connexion valide",
+            )
+        except Exception as exc:
+            detail = str(exc).strip() or "Connexion impossible"
+            return CatalogConnectionStatusRead(
+                catalog_id=catalog.id,
+                state="error",
+                message=detail[:300],
+            )
+        finally:
+            if created:
+                try:
+                    await trino_ddl(f"DROP CATALOG {temp_catalog}", timeout=timeout)
+                except Exception:
+                    log.exception("Unable to drop temporary Trino catalog %s", temp_catalog)
+
+    @staticmethod
+    async def list_connection_statuses() -> list[CatalogConnectionStatusRead]:
+        rows = list(await CatalogService.list_all())
+        if not rows:
+            return []
+
+        semaphore = asyncio.Semaphore(4)
+
+        async def _check(catalog: Catalog) -> CatalogConnectionStatusRead:
+            async with semaphore:
+                return await CatalogService.connection_status(catalog)
+
+        return await asyncio.gather(*(_check(catalog) for catalog in rows))

@@ -19,6 +19,7 @@ ADMIN_PASSWORD = os.getenv("MASKQL_ADMIN_PASSWORD", "admin")  # mot de passe cla
 AUTH = HTTPBasicAuth(ADMIN_USER, ADMIN_PASSWORD)
 
 CATALOG_ENDPOINT = f"{API_BASE_URL}/catalogs"
+CATALOG_STATUS_ENDPOINT = f"{CATALOG_ENDPOINT}/status"
 LOGIN_ENDPOINT = f"{API_BASE_URL}/admin/login"
 LOGOUT_ENDPOINT = f"{API_BASE_URL}/admin/logout"
 
@@ -176,3 +177,19 @@ class CatalogApiTests(unittest.TestCase):
         # Waiting for 404
         g = self._get(f"/catalogs/{cid}")
         self.assertEqual(g.status_code, 404, f"After delete, 404 must be received. {g.status_code}: {g.text}")
+
+    def test_list_connection_statuses(self):
+        item = self._post_catalog_with_assert(self._payload())
+
+        r = self.http.get(CATALOG_STATUS_ENDPOINT, timeout=API_TIMEOUT)
+        self.assertEqual(r.status_code, 200, f"GET /catalogs/status failed: {r.status_code} {r.text}")
+
+        items = r.json()
+        self.assertIsInstance(items, list)
+
+        by_id = {it["catalog_id"]: it for it in items}
+        self.assertIn(item["id"], by_id)
+
+        status = by_id[item["id"]]
+        self.assertIn(status["state"], {"ok", "error"})
+        self.assertIsInstance(status["message"], str)

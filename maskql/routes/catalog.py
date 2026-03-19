@@ -1,8 +1,7 @@
 from __future__ import annotations
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from maskql.schemas.catalog import CatalogCreate, CatalogPatch, CatalogRead
+from maskql.schemas.catalog import CatalogCreate, CatalogPatch, CatalogRead, CatalogConnectionStatusRead
 from maskql.services.catalog_service import CatalogService
 from maskql.core import require_admin_token
 
@@ -16,6 +15,11 @@ router = APIRouter(
 async def list_catalogs():
     rows = await CatalogService.list_all()
     return [CatalogRead.model_validate(r) for r in rows]
+
+
+@router.get("/status", response_model=list[CatalogConnectionStatusRead])
+async def list_catalog_statuses():
+    return await CatalogService.list_connection_statuses()
 
 @router.get("/{catalog_id}", response_model=CatalogRead)
 async def get_catalog(catalog_id: int):

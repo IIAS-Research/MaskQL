@@ -8,6 +8,8 @@ TEST_ENV="${TEST_ENV:-false}"
 RETRIES="${RETRIES:-20}"
 SLEEP_SECS="${SLEEP_SECS:-3}"
 FAIL_FAST="${FAIL_FAST:-false}"
+UVICORN_RELOAD="${UVICORN_RELOAD:-false}"
+RELOAD_DIR="${RELOAD_DIR:-/app/maskql}"
 LOG_TS() { printf '[%s] ' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"; }
 
 SEED_FLAG=""
@@ -36,17 +38,23 @@ else
 fi
 
 LOG_TS; echo "[MaskQL] Starting HTTP ${HOST}:${PORT_HTTP}"
+UVICORN_ARGS=(
+    --host "$HOST"
+    --port "$PORT_HTTP"
+    --loop uvloop
+    --http h11
+    --proxy-headers
+    --forwarded-allow-ips="*"
+)
 
+if [ "$UVICORN_RELOAD" = "true" ]; then
+    LOG_TS; echo "[MaskQL] Uvicorn reload enabled for ${RELOAD_DIR}"
+    UVICORN_ARGS+=(--reload --reload-dir "$RELOAD_DIR")
+fi
 
 _term() {
     LOG_TS; echo "[MaskQL] Caught SIGTERM, shutting down…"
 }
 trap _term TERM INT
 
-exec uvicorn "$APP" \
-    --host "$HOST" \
-    --port "$PORT_HTTP" \
-    --loop uvloop \
-    --http h11 \
-    --proxy-headers \
-    --forwarded-allow-ips="*"
+exec uvicorn "$APP" "${UVICORN_ARGS[@]}"

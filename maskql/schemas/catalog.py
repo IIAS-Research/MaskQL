@@ -22,3 +22,9 @@ class CatalogRead(SQLModel):
     url: str
     sgbd: str
     username: str
+
+
+class CatalogConnectionStatusRead(SQLModel):
+    catalog_id: int
+    state: str
+    message: str
