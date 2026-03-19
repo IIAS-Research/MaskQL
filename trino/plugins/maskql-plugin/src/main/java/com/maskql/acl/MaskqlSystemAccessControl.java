@@ -60,7 +60,10 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
             return trimmed;
         }
 
-        String typeSql = column.getType().toString();
+        String typeSql = column.getType().getTypeSignature().toString();
+        if (typeSql == null || typeSql.isBlank()) {
+            typeSql = column.getType().getDisplayName();
+        }
         if (typeSql == null || typeSql.isBlank()) {
             return trimmed;
         }
@@ -255,6 +258,8 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
             if (!ok) {
                 throw new AccessDeniedException("Access Denied: Cannot select from table " + table);
             }
+        } catch (AccessDeniedException e) {
+            throw e;
         } catch (Exception e) {
             System.err.println("[MaskQL ACL] checkCanSelectFromColumns error: " + e.getClass().getName() + ": " + e.getMessage());
             throw new AccessDeniedException("Access Denied (policy API failure) for table " + table);
