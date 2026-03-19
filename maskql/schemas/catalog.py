@@ -28,3 +28,21 @@ class CatalogConnectionStatusRead(SQLModel):
     catalog_id: int
     state: str
     message: str
+
+
+class CatalogSchemaEntryRead(SQLModel):
+    id: int
+    catalog_id: int
+    schema_name: str
+    table_name: Optional[str] = None
+    column_name: Optional[str] = None
+
+
+class CatalogSchemaSyncRead(SQLModel):
+    catalog_id: int
+    schemas: int
+    tables: int
+    columns: int
+    created_entries: int
+    deleted_entries: int
+    deleted_rules: int

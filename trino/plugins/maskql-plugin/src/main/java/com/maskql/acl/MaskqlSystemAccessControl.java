@@ -2,6 +2,7 @@ package com.maskql.acl;
 
 import com.maskql.acl.AclAPI;
 
+import io.trino.spi.connector.CatalogSchemaName;
 import io.trino.spi.connector.CatalogSchemaTableName;
 import io.trino.spi.connector.ColumnSchema;
 import io.trino.spi.connector.SchemaTableName;
@@ -27,9 +28,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class MaskqlSystemAccessControl implements SystemAccessControl {
 
     private final AclAPI aclApi = new AclAPI();
-    private static final String BASE_URL = "http://maskql:8081";
-    private static final HttpClient CLIENT = HttpClient.newHttpClient();
-    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Set<String> SYSTEM_CATALOGS = Set.of(
         "system",
         "jmx",
@@ -117,6 +115,19 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
     }
 
     @Override
+    public void checkCanShowSchemas(SystemSecurityContext context, String catalogName) {
+        String user = context.getIdentity().getUser();
+        if (isAllowedByDefault(user, catalogName)) return;
+
+        try {
+            if (aclApi.canAccessCatalog(user, catalogName)) return;
+        } catch (Exception e) {
+            System.err.println("[MaskQL ACL] checkCanShowSchemas error: " + e.getClass().getName() + ": " + e.getMessage());
+        }
+        throw new AccessDeniedException("Access Denied: Cannot show schemas");
+    }
+
+    @Override
     public Set<SchemaTableName> filterTables(SystemSecurityContext context, String catalogName, Set<SchemaTableName> tableNames) {
         String user = context.getIdentity().getUser();
         if (isAllowedByDefault(user, catalogName)) return tableNames;
@@ -143,6 +154,72 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
             System.err.println("[MaskQL ACL] filterTables error: " + e.getClass().getName() + ": " + e.getMessage());
             return Collections.emptySet();
         }
+    }
+
+    @Override
+    public void checkCanShowTables(SystemSecurityContext context, CatalogSchemaName schema) {
+        String user = context.getIdentity().getUser();
+        String catalog = schema.getCatalogName();
+        if (isAllowedByDefault(user, catalog)) return;
+
+        try {
+            List<String> allowed = aclApi.schemas(user, catalog, List.of(schema.getSchemaName()));
+            if (allowed.contains(schema.getSchemaName())) return;
+        } catch (Exception e) {
+            System.err.println("[MaskQL ACL] checkCanShowTables error: " + e.getClass().getName() + ": " + e.getMessage());
+        }
+
+        throw new AccessDeniedException("Access Denied: Cannot show tables of schema " + schema);
+    }
+
+    @Override
+    public void checkCanShowColumns(SystemSecurityContext context, CatalogSchemaTableName table) {
+        String user = context.getIdentity().getUser();
+        String catalog = table.getCatalogName();
+        String schema = table.getSchemaTableName().getSchemaName();
+        String tbl = table.getSchemaTableName().getTableName();
+        if (isAllowedByDefault(user, catalog)) return;
+
+        try {
+            List<String> allowed = aclApi.tables(user, catalog, schema, List.of(tbl));
+            if (allowed.contains(tbl)) return;
+        } catch (Exception e) {
+            System.err.println("[MaskQL ACL] checkCanShowColumns error: " + e.getClass().getName() + ": " + e.getMessage());
+        }
+
+        throw new AccessDeniedException("Access Denied: Cannot show columns of table " + table);
+    }
+
+    @Override
+    public Set<String> filterColumns(SystemSecurityContext context, CatalogSchemaTableName table, Set<String> columns) {
+        String user = context.getIdentity().getUser();
+        String catalog = table.getCatalogName();
+        String schema = table.getSchemaTableName().getSchemaName();
+        String tbl = table.getSchemaTableName().getTableName();
+        if (isAllowedByDefault(user, catalog)) return columns;
+
+        try {
+            return new LinkedHashSet<>(aclApi.columns(user, catalog, tbl, schema, columns));
+        } catch (Exception e) {
+            System.err.println("[MaskQL ACL] filterColumns error: " + e.getClass().getName() + ": " + e.getMessage());
+            return Collections.emptySet();
+        }
+    }
+
+    @Override
+    public Map<SchemaTableName, Set<String>> filterColumns(
+            SystemSecurityContext context,
+            String catalogName,
+            Map<SchemaTableName, Set<String>> tableColumns) {
+        String user = context.getIdentity().getUser();
+        if (isAllowedByDefault(user, catalogName)) return tableColumns;
+
+        Map<SchemaTableName, Set<String>> result = new LinkedHashMap<>();
+        for (Map.Entry<SchemaTableName, Set<String>> entry : tableColumns.entrySet()) {
+            CatalogSchemaTableName table = new CatalogSchemaTableName(catalogName, entry.getKey());
+            result.put(entry.getKey(), filterColumns(context, table, entry.getValue()));
+        }
+        return result;
     }
 
     @Override

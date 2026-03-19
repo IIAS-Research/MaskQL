@@ -4,17 +4,53 @@ import asyncio
 import logging
 import secrets
 import string
-from typing import Sequence, Optional
+from typing import Optional, Sequence
 from sqlmodel import select
 from maskql.db import AsyncSessionLocal
 from maskql.models.catalog import Catalog
-from maskql.schemas.catalog import CatalogCreate, CatalogPatch, CatalogConnectionStatusRead
+from maskql.models.catalog_schema import CatalogSchemaEntry
+from maskql.models.rule import Rule
+from maskql.schemas.catalog import (
+    CatalogConnectionStatusRead,
+    CatalogCreate,
+    CatalogPatch,
+    CatalogSchemaEntryRead,
+    CatalogSchemaSyncRead,
+)
 from maskql.utils.trino import trino_sql, trino_ddl
 log = logging.getLogger(__name__)
+
+SchemaPath = tuple[str, Optional[str], Optional[str]]
 
 
 def _sql_literal(value: str) -> str:
     return value.replace("'", "''")
+
+
+def _sql_identifier(value: str) -> str:
+    return '"' + value.replace('"', '""') + '"'
+
+
+def _schema_path_sort_key(path: SchemaPath) -> tuple[str, str, str]:
+    schema_name, table_name, column_name = path
+    return (
+        schema_name,
+        table_name or "",
+        column_name or "",
+    )
+
+
+def _should_skip_schema(catalog: Catalog, schema_name: str) -> bool:
+    if not schema_name or schema_name == "information_schema":
+        return True
+
+    if catalog.sgbd == "postgresql":
+        if schema_name == "pg_catalog":
+            return True
+        if schema_name.startswith("pg_toast") or schema_name.startswith("pg_temp_"):
+            return True
+
+    return False
 
 
 def _catalog_connection_parts(catalog: Catalog) -> list[str]:
@@ -28,6 +64,24 @@ def _catalog_connection_parts(catalog: Catalog) -> list[str]:
 def _temp_catalog_name(prefix: str = "healthcheck") -> str:
     suffix = "".join(secrets.choice(string.ascii_lowercase) for _ in range(10))
     return f"{prefix}{suffix}"
+
+
+def _rule_path_exists(
+    rule: Rule,
+    *,
+    schemas: set[str],
+    tables: set[tuple[str, str]],
+    columns: set[tuple[str, str, str]],
+) -> bool:
+    if not rule.schema_name and not rule.table_name and not rule.column_name:
+        return True
+    if rule.schema_name and not rule.table_name and not rule.column_name:
+        return rule.schema_name in schemas
+    if rule.schema_name and rule.table_name and not rule.column_name:
+        return (rule.schema_name, rule.table_name) in tables
+    if rule.schema_name and rule.table_name and rule.column_name:
+        return (rule.schema_name, rule.table_name, rule.column_name) in columns
+    return False
 
 class CatalogService:
     @staticmethod
@@ -57,6 +111,10 @@ class CatalogService:
             await session.commit()
             await session.refresh(obj)
             await CatalogService.refresh_in_trino()
+            try:
+                await CatalogService.sync_schema(obj.id)
+            except Exception:
+                log.exception("Unable to scan schema for catalog %s after creation", obj.name)
             return obj
 
     @staticmethod
@@ -71,6 +129,10 @@ class CatalogService:
             await session.commit()
             await session.refresh(obj)
             await CatalogService.refresh_in_trino()
+            try:
+                await CatalogService.sync_schema(obj.id)
+            except Exception:
+                log.exception("Unable to scan schema for catalog %s after update", obj.name)
             return obj
 
     @staticmethod
@@ -111,11 +173,7 @@ class CatalogService:
             
             created: list[str] = []
             for c in rows:
-                connector = c.sgbd
-                parts = _catalog_connection_parts(c)
-                sql = f"CREATE CATALOG {c.name} USING {connector} WITH (\n  {', '.join(parts)}\n)"
-                await trino_ddl(sql)
-                
+                await CatalogService._upsert_catalog_in_trino(c)
                 created.append(c.name)
             
             return {"dropped": trino_catalogs, "created": created}
@@ -127,16 +185,8 @@ class CatalogService:
         if catalog.id is None:
             raise ValueError("Catalog ID is required to compute connection status")
 
-        temp_catalog = _temp_catalog_name()
-        create_sql = (
-            f"CREATE CATALOG {temp_catalog} USING {catalog.sgbd} WITH "
-            f"(\n  {', '.join(_catalog_connection_parts(catalog))}\n)"
-        )
-        created = False
-
         try:
-            await trino_ddl(create_sql, timeout=timeout)
-            created = True
+            temp_catalog = await CatalogService._create_temp_catalog(catalog, prefix="healthcheck", timeout=timeout)
             # `SHOW SCHEMAS` is blocked by the current Trino ACL plugin.
             # Querying information_schema still proves the connector can load metadata.
             await trino_sql(
@@ -156,11 +206,10 @@ class CatalogService:
                 message=detail[:300],
             )
         finally:
-            if created:
-                try:
-                    await trino_ddl(f"DROP CATALOG {temp_catalog}", timeout=timeout)
-                except Exception:
-                    log.exception("Unable to drop temporary Trino catalog %s", temp_catalog)
+            try:
+                await CatalogService._drop_temp_catalog(temp_catalog, timeout=timeout)
+            except UnboundLocalError:
+                pass
 
     @staticmethod
     async def list_connection_statuses() -> list[CatalogConnectionStatusRead]:
@@ -175,3 +224,167 @@ class CatalogService:
                 return await CatalogService.connection_status(catalog)
 
         return await asyncio.gather(*(_check(catalog) for catalog in rows))
+
+    @staticmethod
+    async def list_schema_entries(catalog_id: int) -> list[CatalogSchemaEntryRead]:
+        async with AsyncSessionLocal() as session:
+            rows = await session.exec(
+                select(CatalogSchemaEntry)
+                .where(CatalogSchemaEntry.catalog_id == catalog_id)
+                .order_by(
+                    CatalogSchemaEntry.schema_name,
+                    CatalogSchemaEntry.table_name,
+                    CatalogSchemaEntry.column_name,
+                )
+            )
+            return [CatalogSchemaEntryRead.model_validate(row) for row in rows.all()]
+
+    @staticmethod
+    async def sync_schema(catalog_id: int, *, timeout: float = 30.0) -> CatalogSchemaSyncRead:
+        catalog = await CatalogService.get(catalog_id)
+        if not catalog:
+            raise ValueError("Catalog not found")
+
+        await CatalogService._upsert_catalog_in_trino(catalog, timeout=timeout)
+        desired_paths = await CatalogService._scan_schema_paths(catalog, timeout=timeout)
+        desired_schemas = {schema_name for schema_name, table_name, column_name in desired_paths if not table_name and not column_name}
+        desired_tables = {
+            (schema_name, table_name)
+            for schema_name, table_name, column_name in desired_paths
+            if table_name and not column_name
+        }
+        desired_columns = {
+            (schema_name, table_name, column_name)
+            for schema_name, table_name, column_name in desired_paths
+            if table_name and column_name
+        }
+
+        async with AsyncSessionLocal() as session:
+            entry_rows = await session.exec(
+                select(CatalogSchemaEntry).where(CatalogSchemaEntry.catalog_id == catalog_id)
+            )
+            existing_entries = entry_rows.all()
+            existing_by_path = {
+                (entry.schema_name, entry.table_name, entry.column_name): entry
+                for entry in existing_entries
+            }
+
+            desired_set = set(desired_paths)
+            created_entries = 0
+            deleted_entries = 0
+
+            for path, entry in existing_by_path.items():
+                if path not in desired_set:
+                    await session.delete(entry)
+                    deleted_entries += 1
+
+            for schema_name, table_name, column_name in sorted(
+                desired_set - set(existing_by_path),
+                key=_schema_path_sort_key,
+            ):
+                session.add(
+                    CatalogSchemaEntry(
+                        catalog_id=catalog_id,
+                        schema_name=schema_name,
+                        table_name=table_name,
+                        column_name=column_name,
+                    )
+                )
+                created_entries += 1
+
+            rule_rows = await session.exec(select(Rule).where(Rule.catalog_id == catalog_id))
+            deleted_rules = 0
+            for rule in rule_rows.all():
+                if _rule_path_exists(
+                    rule,
+                    schemas=desired_schemas,
+                    tables=desired_tables,
+                    columns=desired_columns,
+                ):
+                    continue
+                await session.delete(rule)
+                deleted_rules += 1
+
+            await session.commit()
+
+        return CatalogSchemaSyncRead(
+            catalog_id=catalog_id,
+            schemas=len(desired_schemas),
+            tables=len(desired_tables),
+            columns=len(desired_columns),
+            created_entries=created_entries,
+            deleted_entries=deleted_entries,
+            deleted_rules=deleted_rules,
+        )
+
+    @staticmethod
+    async def _scan_schema_paths(catalog: Catalog, *, timeout: float = 30.0) -> set[SchemaPath]:
+        paths: set[SchemaPath] = set()
+        catalog_ident = _sql_identifier(catalog.name)
+
+        schema_rows = await trino_sql(
+            f"SHOW SCHEMAS FROM {catalog_ident}",
+            timeout=timeout,
+        )
+        for row in schema_rows["rows"]:
+            schema_name = row[0]
+            if _should_skip_schema(catalog, schema_name):
+                continue
+
+            paths.add((schema_name, None, None))
+            schema_ident = _sql_identifier(schema_name)
+            table_rows = await trino_sql(
+                f"SHOW TABLES FROM {catalog_ident}.{schema_ident}",
+                timeout=timeout,
+            )
+
+            for table_row in table_rows["rows"]:
+                table_name = table_row[0]
+                if not table_name:
+                    continue
+
+                paths.add((schema_name, table_name, None))
+                table_ident = _sql_identifier(table_name)
+                column_rows = await trino_sql(
+                    f"SHOW COLUMNS FROM {catalog_ident}.{schema_ident}.{table_ident}",
+                    timeout=timeout,
+                )
+                for column_row in column_rows["rows"]:
+                    column_name = column_row[0]
+                    if not column_name:
+                        continue
+                    paths.add((schema_name, table_name, column_name))
+
+        return paths
+
+    @staticmethod
+    async def _create_temp_catalog(
+        catalog: Catalog,
+        *,
+        prefix: str,
+        timeout: float,
+    ) -> str:
+        temp_catalog = _temp_catalog_name(prefix)
+        create_sql = (
+            f"CREATE CATALOG {temp_catalog} USING {catalog.sgbd} WITH "
+            f"(\n  {', '.join(_catalog_connection_parts(catalog))}\n)"
+        )
+        await trino_ddl(create_sql, timeout=timeout)
+        return temp_catalog
+
+    @staticmethod
+    async def _drop_temp_catalog(temp_catalog: str, *, timeout: float) -> None:
+        await trino_ddl(f"DROP CATALOG {temp_catalog}", timeout=timeout)
+
+    @staticmethod
+    async def _upsert_catalog_in_trino(catalog: Catalog, *, timeout: float = 30.0) -> None:
+        try:
+            await trino_ddl(f"DROP CATALOG {catalog.name}", timeout=timeout)
+        except Exception:
+            pass
+
+        await trino_ddl(
+            f"CREATE CATALOG {catalog.name} USING {catalog.sgbd} WITH "
+            f"(\n  {', '.join(_catalog_connection_parts(catalog))}\n)",
+            timeout=timeout,
+        )

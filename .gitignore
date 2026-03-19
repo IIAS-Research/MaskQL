@@ -58,7 +58,7 @@ maskql/tls/cert.pem
 maskql/tls/key.pem
 
 # Maskql-ACL
-trino/plugins/maskql-acl/target
+trino/plugins/maskql-plugin/target/
 
 # Logs
 logs

@@ -11,6 +11,7 @@ const toast = useToast();
 
 const loading = ref(false);
 const loadingStatuses = ref(false);
+const syncingCatalogId = ref<number | null>(null);
 const catalogs = ref<Catalog[]>([]);
 const statusByCatalogId = ref<Record<number, CatalogConnectionStatus>>({});
 const q = ref("");
@@ -89,6 +90,30 @@ async function removeCatalog(id: number) {
       detail: "Unable to delete database connection",
       life: 3000,
     });
+  }
+}
+
+async function syncCatalogSchema(id: number) {
+  syncingCatalogId.value = id;
+  try {
+    const summary = await CatalogAPI.syncSchema(id);
+    toast.add({
+      severity: "success",
+      summary: "Schema synchronized",
+      detail: `${summary.schemas} schema(s), ${summary.tables} table(s), ${summary.columns} column(s)`,
+      life: 3000,
+    });
+    void fetchCatalogStatuses(catalogs.value);
+  } catch (e: any) {
+    console.error(e);
+    toast.add({
+      severity: "error",
+      summary: "Error",
+      detail: e?.response?.data?.detail || "Unable to synchronize schema",
+      life: 4000,
+    });
+  } finally {
+    syncingCatalogId.value = null;
   }
 }
 
@@ -197,6 +222,14 @@ onMounted(fetchCatalogs);
                   title="Edit"
                 >
                   Edit
+                </button>
+                <button
+                  class="px-3 py-1 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                  :disabled="syncingCatalogId === c.id"
+                  @click="syncCatalogSchema(c.id)"
+                  title="Sync schema"
+                >
+                  {{ syncingCatalogId === c.id ? "Syncing..." : "Sync schema" }}
                 </button>
                 <button
                   class="px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700"

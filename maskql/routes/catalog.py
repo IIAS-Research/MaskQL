@@ -1,7 +1,14 @@
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from maskql.schemas.catalog import CatalogCreate, CatalogPatch, CatalogRead, CatalogConnectionStatusRead
+from maskql.schemas.catalog import (
+    CatalogConnectionStatusRead,
+    CatalogCreate,
+    CatalogPatch,
+    CatalogRead,
+    CatalogSchemaEntryRead,
+    CatalogSchemaSyncRead,
+)
 from maskql.services.catalog_service import CatalogService
 from maskql.core import require_admin_token
 
@@ -20,6 +27,27 @@ async def list_catalogs():
 @router.get("/status", response_model=list[CatalogConnectionStatusRead])
 async def list_catalog_statuses():
     return await CatalogService.list_connection_statuses()
+
+
+@router.get("/{catalog_id}/schema", response_model=list[CatalogSchemaEntryRead])
+async def list_catalog_schema(catalog_id: int):
+    obj = await CatalogService.get(catalog_id)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Catalog not found")
+    return await CatalogService.list_schema_entries(catalog_id)
+
+
+@router.post("/{catalog_id}/schema/sync", response_model=CatalogSchemaSyncRead)
+async def sync_catalog_schema(catalog_id: int):
+    obj = await CatalogService.get(catalog_id)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Catalog not found")
+    try:
+        return await CatalogService.sync_schema(catalog_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 @router.get("/{catalog_id}", response_model=CatalogRead)
 async def get_catalog(catalog_id: int):

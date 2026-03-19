@@ -24,6 +24,7 @@ if config.config_file_name is not None:
 # Import models so Alembic sees them
 # (Side effect only; names are unused.)
 from maskql.models import catalog as _catalog
+from maskql.models import catalog_schema as _catalog_schema
 from maskql.models import user as _user
 from maskql.models import rule as _rule
 

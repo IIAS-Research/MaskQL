@@ -145,9 +145,6 @@ const jdbcPlaceholder = computed(() =>
         <p v-if="errors.sgbd" class="text-sm text-red-600 mt-1">
           {{ errors.sgbd }}
         </p>
-        <p v-else class="text-sm text-gray-500 mt-1">
-          Connecteurs Trino pris en charge par ce formulaire JDBC.
-        </p>
       </div>
 
       <div>

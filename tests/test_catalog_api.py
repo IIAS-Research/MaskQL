@@ -20,6 +20,8 @@ AUTH = HTTPBasicAuth(ADMIN_USER, ADMIN_PASSWORD)
 
 CATALOG_ENDPOINT = f"{API_BASE_URL}/catalogs"
 CATALOG_STATUS_ENDPOINT = f"{CATALOG_ENDPOINT}/status"
+USERS_ENDPOINT = f"{API_BASE_URL}/users"
+RULES_ENDPOINT = f"{API_BASE_URL}/rules"
 LOGIN_ENDPOINT = f"{API_BASE_URL}/admin/login"
 LOGOUT_ENDPOINT = f"{API_BASE_URL}/admin/logout"
 
@@ -34,6 +36,8 @@ def _rand_name(prefix: str = "ut") -> str:
 class CatalogApiTests(unittest.TestCase):
     def setUp(self):
         self._created_ids: List[int] = []
+        self._created_user_ids: List[int] = []
+        self._created_rule_ids: List[int] = []
         # Session avec cookie admin_token
         self.http = requests.Session()
         self.http.verify = API_VERIFY_SSL
@@ -50,6 +54,16 @@ class CatalogApiTests(unittest.TestCase):
                 self.http.delete(f"{CATALOG_ENDPOINT}/{cid}", timeout=API_TIMEOUT)
             except Exception:
                 pass
+        for rid in list(self._created_rule_ids):
+            try:
+                self.http.delete(f"{RULES_ENDPOINT}/{rid}", timeout=API_TIMEOUT)
+            except Exception:
+                pass
+        for uid in list(self._created_user_ids):
+            try:
+                self.http.delete(f"{USERS_ENDPOINT}/{uid}", timeout=API_TIMEOUT)
+            except Exception:
+                pass
         # Logout (cookie supprimé)
         try:
             self.http.post(LOGOUT_ENDPOINT, timeout=API_TIMEOUT)
@@ -57,10 +71,10 @@ class CatalogApiTests(unittest.TestCase):
             pass
 
     # Helpers
-    def _payload(self, *, name: Optional[str] = None) -> Dict[str, Any]:
+    def _payload(self, *, name: Optional[str] = None, url: Optional[str] = None) -> Dict[str, Any]:
         return {
             "name": name or _rand_name(),
-            "url": "jdbc:postgresql://postgres:5432/appdb",
+            "url": url or "jdbc:postgresql://postgres:5432/appdb",
             "sgbd": "postgresql",
             "username": "postgres",
             "password": "postgres",
@@ -193,3 +207,89 @@ class CatalogApiTests(unittest.TestCase):
         status = by_id[item["id"]]
         self.assertIn(status["state"], {"ok", "error"})
         self.assertIsInstance(status["message"], str)
+
+    def test_catalog_schema_is_scanned_on_create(self):
+        item = self._post_catalog_with_assert(
+            self._payload(url="jdbc:postgresql://postgres:5432/maskqltest")
+        )
+
+        r = self._get(f"/catalogs/{item['id']}/schema")
+        self.assertEqual(r.status_code, 200, f"GET /catalogs/{{id}}/schema failed: {r.status_code} {r.text}")
+
+        entries = r.json()
+        self.assertIsInstance(entries, list)
+        self.assertTrue(entries, "Expected scanned schema entries right after catalog creation")
+        self.assertIn(
+            ("public", "client", "name"),
+            {
+                (it["schema_name"], it["table_name"], it["column_name"])
+                for it in entries
+            },
+        )
+
+    def test_sync_catalog_schema_keeps_valid_rules_and_drops_stale_ones(self):
+        catalog = self._post_catalog_with_assert(
+            self._payload(url="jdbc:postgresql://postgres:5432/maskqltest")
+        )
+
+        user_resp = self.http.post(
+            USERS_ENDPOINT,
+            json={"username": _rand_name("user"), "password": "password!"},
+            timeout=API_TIMEOUT,
+        )
+        self.assertEqual(user_resp.status_code, 201, f"POST /users failed: {user_resp.status_code} {user_resp.text}")
+        user = user_resp.json()
+        self._created_user_ids.append(user["id"])
+
+        valid_rule = self.http.post(
+            RULES_ENDPOINT,
+            json={
+                "catalog_id": catalog["id"],
+                "user_id": user["id"],
+                "schema_name": "public",
+                "table_name": "client",
+                "column_name": "name",
+                "allow": False,
+                "effect": "",
+            },
+            timeout=API_TIMEOUT,
+        )
+        self.assertEqual(valid_rule.status_code, 201, f"POST /rules valid failed: {valid_rule.status_code} {valid_rule.text}")
+        self._created_rule_ids.append(valid_rule.json()["id"])
+
+        stale_rule = self.http.post(
+            RULES_ENDPOINT,
+            json={
+                "catalog_id": catalog["id"],
+                "user_id": user["id"],
+                "schema_name": "public",
+                "table_name": "missing_table",
+                "column_name": "ghost_column",
+                "allow": True,
+                "effect": "",
+            },
+            timeout=API_TIMEOUT,
+        )
+        self.assertEqual(stale_rule.status_code, 201, f"POST /rules stale failed: {stale_rule.status_code} {stale_rule.text}")
+        self._created_rule_ids.append(stale_rule.json()["id"])
+
+        sync = self.http.post(
+            f"{CATALOG_ENDPOINT}/{catalog['id']}/schema/sync",
+            timeout=API_TIMEOUT,
+        )
+        self.assertEqual(sync.status_code, 200, f"POST /catalogs/{{id}}/schema/sync failed: {sync.status_code} {sync.text}")
+        body = sync.json()
+        self.assertGreaterEqual(body["deleted_rules"], 1)
+
+        rules = self.http.get(
+            RULES_ENDPOINT,
+            params={"catalog_id": catalog["id"], "user_id": user["id"]},
+            timeout=API_TIMEOUT,
+        )
+        self.assertEqual(rules.status_code, 200, f"GET /rules failed: {rules.status_code} {rules.text}")
+        tuples = {
+            (it["schema_name"], it["table_name"], it["column_name"])
+            for it in rules.json()
+        }
+        self.assertIn(("public", "client", "name"), tuples)
+        self.assertNotIn(("public", "missing_table", "ghost_column"), tuples)

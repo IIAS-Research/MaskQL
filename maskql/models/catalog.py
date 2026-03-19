@@ -25,4 +25,11 @@ class Catalog(SQLModel, table=True):
             lazy="selectin",
         )
     )
-
+    schema_entries: list["CatalogSchemaEntry"] = Relationship(
+        sa_relationship=sa_relationship(
+            "CatalogSchemaEntry",
+            back_populates="catalog",
+            cascade="all, delete-orphan",
+            lazy="selectin",
+        )
+    )
