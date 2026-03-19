@@ -94,6 +94,12 @@ const sgbdOptions = computed(() => {
 const jdbcPlaceholder = computed(() =>
   getTrinoDbmsJdbcExample((local.value as any)?.sgbd),
 );
+
+const passwordPlaceholder = computed(() =>
+  props.mode === "edit"
+    ? "Leave blank to keep the current password"
+    : undefined,
+);
 </script>
 
 <template>
@@ -163,6 +169,7 @@ const jdbcPlaceholder = computed(() =>
           <input
             v-model="(local as any).password"
             :type="showPwd ? 'text' : 'password'"
+            :placeholder="passwordPlaceholder"
             class="w-full px-3 py-2 border rounded-l-lg focus:ring focus:outline-none"
             :disabled="saving"
           />

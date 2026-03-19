@@ -165,15 +165,15 @@ onMounted(fetchCatalogs);
     </div>
 
     <div class="overflow-x-auto bg-white rounded-2xl shadow">
-      <table class="min-w-full text-sm">
+      <table class="catalog-table w-full text-sm">
         <thead>
           <tr class="text-left border-b">
             <th class="px-4 py-3">Name</th>
-            <th class="px-4 py-3">URL</th>
+            <th class="px-4 py-3 w-[34%]">URL</th>
             <th class="px-4 py-3">SGBD</th>
             <th class="px-4 py-3">Status</th>
             <th class="px-4 py-3">Username</th>
-            <th class="px-4 py-3 w-40">Actions</th>
+            <th class="px-4 py-3 w-52">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -196,7 +196,8 @@ onMounted(fetchCatalogs);
                 :href="c.url"
                 target="_blank"
                 rel="noopener"
-                class="text-indigo-600 hover:underline"
+                :title="c.url"
+                class="catalog-table__url text-indigo-600 hover:underline"
                 >{{ c.url }}</a
               >
             </td>
@@ -215,7 +216,7 @@ onMounted(fetchCatalogs);
             </td>
             <td class="px-4 py-3">{{ c.username }}</td>
             <td class="px-4 py-3">
-              <div class="flex gap-2">
+              <div class="flex flex-wrap gap-2">
                 <button
                   class="px-3 py-1 rounded-lg bg-gray-800 text-white hover:bg-gray-700"
                   @click="goEdit(c.id)"
@@ -247,4 +248,15 @@ onMounted(fetchCatalogs);
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.catalog-table {
+  table-layout: fixed;
+}
+
+.catalog-table__url {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+</style>

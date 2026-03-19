@@ -17,7 +17,8 @@ const model = ref<Catalog | null>(null);
 
 async function load() {
   try {
-    model.value = await CatalogAPI.getById(id);
+    const catalog = await CatalogAPI.getById(id);
+    model.value = { ...catalog, password: "" } as Catalog;
   } catch (e) {
     console.error(e);
     toast.add({ severity: "error", summary: "Erreur", detail: "Enable to load database", life: 3000 });
@@ -28,11 +29,16 @@ async function load() {
   }
 }
 
-async function handleSubmit(payload: Catalog) {
+async function handleSubmit(payload: Catalog | CatalogUpdate) {
+  if (!("id" in payload) || payload.id == null) return;
   saving.value = true;
   try {
-    const { id: payloadId, ...rest } = payload;
-    await CatalogAPI.update(Number(payloadId), rest as CatalogUpdate);
+    const { id: payloadId, name, url, sgbd, username, password } = payload;
+    const update: CatalogUpdate = { name, url, sgbd, username };
+    if (password && password.trim() !== "") {
+      update.password = password;
+    }
+    await CatalogAPI.update(Number(payloadId), update);
     toast.add({ severity: "success", summary: "Saved", detail: "Database updated", life: 2000 });
     router.push({ name: "catalogs" });
   } catch (e) {
@@ -56,7 +62,7 @@ onMounted(load);
     <div v-if="loading" class="text-gray-500">Loading...</div>
 
     <CatalogForm
-      v-else
+      v-else-if="model"
       v-model="model"
       :saving="saving"
       mode="edit"

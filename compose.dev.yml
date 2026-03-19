@@ -209,6 +209,7 @@ services:
         - HF_TOKEN
     image: docker.io/rudymerieux/maskql-trino:${MASKQL_IMAGE_TAG:-latest}
     networks: [private, public]
+    dns_search: ["${MASKQL_TRINO_DNS_SEARCH:-.}"]
     volumes:
       - trino_data:/data/trino
     environment:
