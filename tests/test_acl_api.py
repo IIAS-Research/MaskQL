@@ -44,7 +44,9 @@ def _unauth_kwargs() -> Dict[str, Any]:
 class AclAndRulesTests(unittest.TestCase):
     """
     Integration tests for /acl and /rules.
-        - A direct rule with allow == false blocks only the focused element.
+        - A direct rule with allow == false blocks inherited access on catalogs/schemas/tables.
+        - A more specific allow can carve out an exception inside a denied parent scope.
+        - A direct deny on a column keeps it selectable but masks values as NULL.
         - A parent allow makes the child allowed (catalog -> schema -> table -> column).
         - A direct rule with allow == true allows the element even without parent allow.
         - effect carries a row filter (table-level) or a mask (column-level).
@@ -212,7 +214,7 @@ class AclAndRulesTests(unittest.TestCase):
         self.assertEqual(acc.json(), {"allowed": False})
 
     def test_parent_allow_and_direct_deny(self):
-        """Parent allow should propagate; direct deny should block only the focused element."""
+        """Parent allow should propagate; a direct column deny should turn into a NULL mask."""
         u = self.test_username
         uid = self.test_user_id
 
@@ -247,10 +249,14 @@ class AclAndRulesTests(unittest.TestCase):
             table_name=self.demo_table, column_name="email"
         ))
 
-        # now "email" must be filtered out while "name" remains
+        # the denied column must stay visible, but its values will be NULL-masked
         rc2 = self.acl_columns(u, self.demo_catalog, self.demo_table, self.demo_schema, cols)
         self.assertEqual(rc2.status_code, 200, rc2.text)
-        self.assertEqual(rc2.json(), ["name"])
+        self.assertEqual(sorted(rc2.json()), sorted(cols))
+
+        mk = self.acl_mask(u, self.demo_catalog, self.demo_table, "email", self.demo_schema)
+        self.assertEqual(mk.status_code, 200, mk.text)
+        self.assertEqual(mk.json(), {"mask": "NULL"})
 
     def test_direct_allow_without_parent(self):
         """A direct allow on a table should allow it even with no parent allow."""
@@ -269,6 +275,44 @@ class AclAndRulesTests(unittest.TestCase):
         rt = self.acl_tables(u, self.demo_catalog, self.demo_schema, [allowed_table, other_table])
         self.assertEqual(rt.status_code, 200, rt.text)
         self.assertEqual(rt.json(), [allowed_table])
+
+    def test_table_deny_with_explicit_allowed_column_keeps_table_selectable(self):
+        """A denied table must stay reachable when a child column is explicitly allowed."""
+        u = self.test_username
+        uid = self.test_user_id
+
+        self._create_rule(self._rule_payload(
+            user_id=uid,
+            allow=False,
+            catalog=self.demo_catalog,
+            schema_name=self.demo_schema,
+            table_name=self.demo_table,
+        ))
+        self._create_rule(self._rule_payload(
+            user_id=uid,
+            allow=True,
+            catalog=self.demo_catalog,
+            schema_name=self.demo_schema,
+            table_name=self.demo_table,
+            column_name="name",
+        ))
+
+        rt = self.acl_tables(u, self.demo_catalog, self.demo_schema, [self.demo_table, "x"])
+        self.assertEqual(rt.status_code, 200, rt.text)
+        self.assertEqual(rt.json(), [self.demo_table])
+
+        cols = ["name", "email"]
+        rc = self.acl_columns(u, self.demo_catalog, self.demo_table, self.demo_schema, cols)
+        self.assertEqual(rc.status_code, 200, rc.text)
+        self.assertEqual(sorted(rc.json()), sorted(cols))
+
+        allowed_mask = self.acl_mask(u, self.demo_catalog, self.demo_table, "name", self.demo_schema)
+        self.assertEqual(allowed_mask.status_code, 200, allowed_mask.text)
+        self.assertEqual(allowed_mask.json(), {"mask": ""})
+
+        denied_mask = self.acl_mask(u, self.demo_catalog, self.demo_table, "email", self.demo_schema)
+        self.assertEqual(denied_mask.status_code, 200, denied_mask.text)
+        self.assertEqual(denied_mask.json(), {"mask": "NULL"})
 
     def test_row_filter_and_mask_via_effect(self):
         """
@@ -326,7 +370,11 @@ class AclAndRulesTests(unittest.TestCase):
 
         r1 = self.acl_columns(u, self.demo_catalog, self.demo_table, self.demo_schema, ["name", "phone"])
         self.assertEqual(r1.status_code, 200, r1.text)
-        self.assertEqual(r1.json(), ["name"])
+        self.assertEqual(sorted(r1.json()), sorted(["name", "phone"]))
+
+        m1 = self.acl_mask(u, self.demo_catalog, self.demo_table, "phone", self.demo_schema)
+        self.assertEqual(m1.status_code, 200, m1.text)
+        self.assertEqual(m1.json(), {"mask": "NULL"})
 
         # flip allow to True (auth via session)
         rp = self.http.patch(f"{RULES_ENDPOINT}/{rule['id']}", json={"allow": True}, timeout=API_TIMEOUT)
@@ -335,6 +383,10 @@ class AclAndRulesTests(unittest.TestCase):
         r2 = self.acl_columns(u, self.demo_catalog, self.demo_table, self.demo_schema, ["name", "phone"])
         self.assertEqual(r2.status_code, 200, r2.text)
         self.assertEqual(sorted(r2.json()), sorted(["name", "phone"]))
+
+        m2 = self.acl_mask(u, self.demo_catalog, self.demo_table, "phone", self.demo_schema)
+        self.assertEqual(m2.status_code, 200, m2.text)
+        self.assertEqual(m2.json(), {"mask": ""})
 
         # delete the rule
         rd = self.http.delete(f"{RULES_ENDPOINT}/{rule['id']}", timeout=API_TIMEOUT)

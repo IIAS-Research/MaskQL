@@ -2,6 +2,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from maskql.schemas.catalog import (
+    CatalogTablePreviewRead,
+    CatalogTablePreviewRequest,
     CatalogConnectionStatusRead,
     CatalogCreate,
     CatalogPatch,
@@ -74,6 +76,22 @@ async def sync_catalog_schema(catalog_id: int):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.post("/{catalog_id}/schema/preview", response_model=CatalogTablePreviewRead)
+async def preview_catalog_table(catalog_id: int, payload: CatalogTablePreviewRequest):
+    try:
+        return await CatalogService.preview_table(
+            catalog_id,
+            payload.user_id,
+            payload.schema_name,
+            payload.table_name,
+            limit=payload.limit,
+        )
+    except ValueError as e:
+        detail = str(e)
+        status_code = 404 if detail in {"Catalog not found", "User not found"} else 400
+        raise HTTPException(status_code=status_code, detail=detail)
 
 @router.get("/{catalog_id}", response_model=CatalogRead)
 async def get_catalog(catalog_id: int):

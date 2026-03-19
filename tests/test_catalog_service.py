@@ -1,4 +1,5 @@
 import unittest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from maskql.models.catalog import Catalog
@@ -84,3 +85,89 @@ class CatalogSchemaSkipTests(unittest.TestCase):
         self.assertTrue(_should_skip_schema(catalog, "db_owner"))
         self.assertFalse(_should_skip_schema(catalog, "dbo"))
         self.assertFalse(_should_skip_schema(catalog, "agenda"))
+
+
+class CatalogPreviewTests(unittest.IsolatedAsyncioTestCase):
+    async def test_preview_table_runs_raw_and_masked_queries(self):
+        catalog = _catalog(sgbd="postgresql")
+        catalog.id = 7
+        mocked_trino_sql = AsyncMock(
+            side_effect=[
+                {
+                    "columns": ["id", "secret"],
+                    "rows": [{"id": 1, "secret": "alpha"}],
+                },
+                {
+                    "columns": ["id"],
+                    "rows": [{"id": 1}],
+                },
+            ]
+        )
+
+        with (
+            patch.object(CatalogService, "get", AsyncMock(return_value=catalog)),
+            patch(
+                "maskql.services.catalog_service.UserService.get",
+                AsyncMock(return_value=SimpleNamespace(username="alice")),
+            ),
+            patch("maskql.services.catalog_service.trino_sql", mocked_trino_sql),
+        ):
+            preview = await CatalogService.preview_table(
+                7,
+                11,
+                "public",
+                'people"table',
+                limit=10,
+            )
+
+        self.assertEqual(preview.before_maskql.columns, ["id", "secret"])
+        self.assertEqual(preview.after_maskql.columns, ["id"])
+        self.assertEqual(preview.before_maskql.rows, [{"id": 1, "secret": "alpha"}])
+        self.assertEqual(preview.after_maskql.rows, [{"id": 1}])
+        self.assertIsNone(preview.before_maskql.error)
+        self.assertIsNone(preview.after_maskql.error)
+
+        statements = [call.args[0] for call in mocked_trino_sql.await_args_list]
+        self.assertEqual(
+            statements,
+            [
+                'SELECT * FROM "sample"."public"."people""table" LIMIT 10',
+                'SELECT * FROM "sample"."public"."people""table" LIMIT 10',
+            ],
+        )
+        self.assertIsNone(mocked_trino_sql.await_args_list[0].kwargs.get("user"))
+        self.assertEqual(mocked_trino_sql.await_args_list[1].kwargs.get("user"), "alice")
+
+    async def test_preview_table_returns_error_payload_when_masked_query_fails(self):
+        catalog = _catalog(sgbd="postgresql")
+        catalog.id = 7
+        mocked_trino_sql = AsyncMock(
+            side_effect=[
+                {
+                    "columns": ["id"],
+                    "rows": [{"id": 1}],
+                },
+                RuntimeError("Access denied for preview"),
+            ]
+        )
+
+        with (
+            patch.object(CatalogService, "get", AsyncMock(return_value=catalog)),
+            patch(
+                "maskql.services.catalog_service.UserService.get",
+                AsyncMock(return_value=SimpleNamespace(username="alice")),
+            ),
+            patch("maskql.services.catalog_service.trino_sql", mocked_trino_sql),
+        ):
+            preview = await CatalogService.preview_table(
+                7,
+                11,
+                "public",
+                "people",
+                limit=10,
+            )
+
+        self.assertEqual(preview.before_maskql.rows, [{"id": 1}])
+        self.assertEqual(preview.after_maskql.columns, [])
+        self.assertEqual(preview.after_maskql.rows, [])
+        self.assertIn("Access denied for preview", preview.after_maskql.error)

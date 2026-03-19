@@ -4,19 +4,22 @@ import asyncio
 import logging
 import secrets
 import string
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 from sqlmodel import select
 from maskql.db import AsyncSessionLocal
 from maskql.models.catalog import Catalog
 from maskql.models.catalog_schema import CatalogSchemaEntry
 from maskql.schemas.catalog import (
+    CatalogPreviewDatasetRead,
     CatalogConnectionStatusRead,
     CatalogCreate,
     CatalogPatch,
     CatalogSchemaEntryCreate,
     CatalogSchemaEntryRead,
     CatalogSchemaSyncRead,
+    CatalogTablePreviewRead,
 )
+from maskql.services.user_service import UserService
 from maskql.utils.trino import trino_sql, trino_ddl
 log = logging.getLogger(__name__)
 
@@ -391,6 +394,56 @@ class CatalogService:
         )
 
     @staticmethod
+    async def preview_table(
+        catalog_id: int,
+        user_id: int,
+        schema_name: str,
+        table_name: str,
+        *,
+        limit: int = 5,
+        timeout: float = 30.0,
+    ) -> CatalogTablePreviewRead:
+        catalog = await CatalogService.get(catalog_id)
+        if not catalog:
+            raise ValueError("Catalog not found")
+
+        user = await UserService.get(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        normalized_schema = (schema_name or "").strip()
+        normalized_table = (table_name or "").strip()
+        if not normalized_schema or not normalized_table:
+            raise ValueError("Schema and table names are required")
+
+        safe_limit = max(1, min(int(limit), 50))
+        sql = CatalogService._build_preview_sql(
+            catalog.name,
+            normalized_schema,
+            normalized_table,
+            limit=safe_limit,
+        )
+
+        before_maskql = await CatalogService._run_preview_query(
+            sql,
+            timeout=timeout,
+        )
+        after_maskql = await CatalogService._run_preview_query(
+            sql,
+            user=user.username,
+            timeout=timeout,
+        )
+
+        return CatalogTablePreviewRead(
+            catalog_id=catalog_id,
+            schema_name=normalized_schema,
+            table_name=normalized_table,
+            limit=safe_limit,
+            before_maskql=before_maskql,
+            after_maskql=after_maskql,
+        )
+
+    @staticmethod
     async def _scan_schema_paths(catalog: Catalog, *, timeout: float = 30.0) -> set[SchemaPath]:
         try:
             return await CatalogService._scan_schema_paths_via_information_schema(
@@ -531,3 +584,50 @@ class CatalogService:
             f"(\n  {', '.join(_catalog_connection_parts(catalog))}\n)",
             timeout=timeout,
         )
+
+    @staticmethod
+    def _build_preview_sql(
+        catalog_name: str,
+        schema_name: str,
+        table_name: str,
+        *,
+        limit: int,
+    ) -> str:
+        return (
+            f"SELECT * FROM {_sql_identifier(catalog_name)}."
+            f"{_sql_identifier(schema_name)}.{_sql_identifier(table_name)} "
+            f"LIMIT {int(limit)}"
+        )
+
+    @staticmethod
+    async def _run_preview_query(
+        sql: str,
+        *,
+        user: Optional[str] = None,
+        timeout: float = 30.0,
+    ) -> CatalogPreviewDatasetRead:
+        try:
+            result = await trino_sql(
+                sql,
+                user=user,
+                timeout=timeout,
+                as_dicts=True,
+            )
+            rows = result.get("rows") or []
+            normalized_rows: list[dict[str, Any]] = []
+            for row in rows:
+                if isinstance(row, dict):
+                    normalized_rows.append(row)
+
+            return CatalogPreviewDatasetRead(
+                columns=result.get("columns") or [],
+                rows=normalized_rows,
+                error=None,
+            )
+        except Exception as exc:
+            message = str(exc).strip() or "Preview query failed"
+            return CatalogPreviewDatasetRead(
+                columns=[],
+                rows=[],
+                error=message[:500],
+            )

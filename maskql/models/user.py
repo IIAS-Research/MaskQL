@@ -54,6 +54,7 @@ class User(SQLModel, table=True):
             
         columns = [Catalog.name, Rule.schema_name, Rule.table_name, Rule.column_name]
         looking_for_column = columns[len(path)]
+        is_column_scope = looking_for_column is Rule.column_name
         
         if looking_for_column is Catalog.name:
             to_select = select(Catalog.name).select_from(Catalog).join(Rule, Rule.catalog_id == Catalog.id)
@@ -79,14 +80,18 @@ class User(SQLModel, table=True):
                     
             return clauses
         
-        # Disable directly ?
-        async with AsyncSessionLocal() as s:
-            direct_disable = (await s.exec(
-                to_select.where(
-                    Rule.allow.is_(False),
-                    Rule.user == self,
-                    *where_clause(True)
-                ).distinct())).all()
+        direct_disable = []
+        if not is_column_scope:
+            # Direct denies only block inheritance from a parent scope.
+            # A more specific explicit allow must still be able to carve out
+            # an exception inside a denied catalog/schema/table.
+            async with AsyncSessionLocal() as s:
+                direct_disable = (await s.exec(
+                    to_select.where(
+                        Rule.allow.is_(False),
+                        Rule.user == self,
+                        *where_clause(True)
+                    ).distinct())).all()
         
         # If not, allowed directly or by children ?
         async with AsyncSessionLocal() as s:
@@ -97,17 +102,32 @@ class User(SQLModel, table=True):
                     *where_clause(strict)
                 ).distinct())).all()
             
-        values = list(set(values) - set(enabled) - set(direct_disable))
+        requested_values = list(dict.fromkeys(values))
+        enabled_set = set(enabled)
+        direct_disable_set = set(direct_disable)
+        remaining_values = [
+            value for value in requested_values if value not in enabled_set
+        ]
+        inheritable_values = [
+            value for value in remaining_values if value not in direct_disable_set
+        ]
         
         # If not, allowed by parent ?
-        if path and values:
+        if path and inheritable_values:
             parent_value = path[-1]
             parent_path = path[0:-1]
+            parent_strict = not is_column_scope
             
-            if parent_value in (await self.is_allowed([parent_value], path=parent_path, strict=True)):
-                enabled = list(set(values) | set(enabled))
+            if parent_value in (
+                await self.is_allowed(
+                    [parent_value],
+                    path=parent_path,
+                    strict=parent_strict,
+                )
+            ):
+                enabled_set.update(inheritable_values)
         
-        return enabled
+        return [value for value in requested_values if value in enabled_set]
         
     async def row_filter(self, catalog, table, schema:str=None):
         schema_where = (Rule.schema_name == schema) if schema else True
@@ -124,14 +144,58 @@ class User(SQLModel, table=True):
                 ))).one_or_none()
     
     async def mask(self, catalog, table, column, schema:str=None):
-        schema_where = (Rule.schema_name == schema) if schema else True
+        def scope_where(scope_schema, scope_table, scope_column):
+            clauses = [Rule.user == self, Catalog.name == catalog]
+
+            if scope_schema is None:
+                clauses.append(Rule.schema_name.is_(None))
+            else:
+                clauses.append(Rule.schema_name == scope_schema)
+
+            if scope_table is None:
+                clauses.append(Rule.table_name.is_(None))
+            else:
+                clauses.append(Rule.table_name == scope_table)
+
+            if scope_column is None:
+                clauses.append(Rule.column_name.is_(None))
+            else:
+                clauses.append(Rule.column_name == scope_column)
+
+            return clauses
+
         async with AsyncSessionLocal() as s:
-            return (await s.exec(
-                select(Rule.effect).select_from(Rule).join(Catalog, Rule.catalog_id == Catalog.id)
-                .where(
-                    Rule.user == self,
-                    Catalog.name == catalog,
-                    Rule.table_name == table,
-                    Rule.column_name == column,
-                    schema_where
-                ))).one_or_none()
+            column_rule = (await s.exec(
+                select(Rule.allow, Rule.effect)
+                .select_from(Rule)
+                .join(Catalog, Rule.catalog_id == Catalog.id)
+                .where(*scope_where(schema, table, column))
+            )).one_or_none()
+
+            if column_rule is not None:
+                allow, effect = column_rule
+                if allow is False:
+                    return "NULL"
+                return effect
+
+            for scope_schema, scope_table in (
+                (schema, table),
+                (schema, None),
+                (None, None),
+            ):
+                inherited_rule = (await s.exec(
+                    select(Rule.allow)
+                    .select_from(Rule)
+                    .join(Catalog, Rule.catalog_id == Catalog.id)
+                    .where(*scope_where(scope_schema, scope_table, None))
+                )).one_or_none()
+
+                if inherited_rule is None:
+                    continue
+
+                if inherited_rule is False:
+                    return "NULL"
+
+                return None
+
+        return None

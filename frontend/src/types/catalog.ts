@@ -45,6 +45,28 @@ export interface CatalogSchemaSyncResult {
   deleted_rules: number;
 }
 
+export interface CatalogTablePreviewRequest {
+  user_id: number;
+  schema_name: string;
+  table_name: string;
+  limit?: number;
+}
+
+export interface CatalogPreviewDataset {
+  columns: string[];
+  rows: Record<string, unknown>[];
+  error?: string | null;
+}
+
+export interface CatalogTablePreview {
+  catalog_id: number;
+  schema_name: string;
+  table_name: string;
+  limit: number;
+  before_maskql: CatalogPreviewDataset;
+  after_maskql: CatalogPreviewDataset;
+}
+
 export class Catalogs extends BaseResource<
   Catalog,
   CatalogCreate,
@@ -86,6 +108,17 @@ export class Catalogs extends BaseResource<
   async syncSchema(catalogId: number): Promise<CatalogSchemaSyncResult> {
     const { data } = await http.post<CatalogSchemaSyncResult>(
       `${this.endpoint}/${catalogId}/schema/sync`,
+    );
+    return data;
+  }
+
+  async previewTable(
+    catalogId: number,
+    payload: CatalogTablePreviewRequest,
+  ): Promise<CatalogTablePreview> {
+    const { data } = await http.post<CatalogTablePreview>(
+      `${this.endpoint}/${catalogId}/schema/preview`,
+      payload,
     );
     return data;
   }
