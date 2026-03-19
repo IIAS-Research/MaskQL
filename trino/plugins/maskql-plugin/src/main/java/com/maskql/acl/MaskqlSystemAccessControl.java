@@ -50,6 +50,24 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         return isSuperAdmin(user) || isSystem(catalog);
     }
 
+    private static String wrapMaskExpression(String expression, ColumnSchema column) {
+        if (expression == null) {
+            return null;
+        }
+
+        String trimmed = expression.trim();
+        if (trimmed.isEmpty()) {
+            return trimmed;
+        }
+
+        String typeSql = column.getType().toString();
+        if (typeSql == null || typeSql.isBlank()) {
+            return trimmed;
+        }
+
+        return "CAST((" + trimmed + ") AS " + typeSql + ")";
+    }
+
     @Override
     public void checkCanCreateCatalog(SystemSecurityContext context, String catalog) {
         String user = context.getIdentity().getUser();
@@ -279,9 +297,9 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         try {
             for (ColumnSchema col : columns) {
                 String colName = col.getName();
-                String expr = aclApi.mask(user, catalog, tbl, colName, schema).orElse(null);;
-                if(expr != null && !expr.equals("")) {
-                    out.put(col, ViewExpression.builder().expression(expr).build());
+                String expr = aclApi.mask(user, catalog, tbl, colName, schema).orElse(null);
+                if (expr != null && !expr.equals("")) {
+                    out.put(col, ViewExpression.builder().expression(wrapMaskExpression(expr, col)).build());
                 }
             }
         } catch (Exception e) {
