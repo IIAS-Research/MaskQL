@@ -131,9 +131,9 @@ class CatalogService:
             session.add(obj)
             await session.commit()
             await session.refresh(obj)
-            await CatalogService.refresh_in_trino()
+            await CatalogService._upsert_catalog_in_trino(obj)
             try:
-                await CatalogService.sync_schema(obj.id)
+                await CatalogService.sync_schema(obj.id, ensure_catalog_in_trino=False)
             except Exception:
                 log.exception("Unable to scan schema for catalog %s after creation", obj.name)
             return obj
@@ -144,14 +144,17 @@ class CatalogService:
             obj = await session.get(Catalog, catalog_id)
             if not obj:
                 return None
+            previous_name = obj.name
             data = patch.model_dump(exclude_unset=True)
             for k, v in data.items():
                 setattr(obj, k, v)
             await session.commit()
             await session.refresh(obj)
-            await CatalogService.refresh_in_trino()
+            if previous_name != obj.name:
+                await CatalogService._drop_catalog_in_trino(previous_name)
+            await CatalogService._upsert_catalog_in_trino(obj)
             try:
-                await CatalogService.sync_schema(obj.id)
+                await CatalogService.sync_schema(obj.id, ensure_catalog_in_trino=False)
             except Exception:
                 log.exception("Unable to scan schema for catalog %s after update", obj.name)
             return obj
@@ -162,9 +165,10 @@ class CatalogService:
             obj = await session.get(Catalog, catalog_id)
             if not obj:
                 return False
+            catalog_name = obj.name
             await session.delete(obj)
             await session.commit()
-            await CatalogService.refresh_in_trino()
+            await CatalogService._drop_catalog_in_trino(catalog_name)
             return True
 
     @staticmethod
@@ -317,12 +321,18 @@ class CatalogService:
             return True
 
     @staticmethod
-    async def sync_schema(catalog_id: int, *, timeout: float = 30.0) -> CatalogSchemaSyncRead:
+    async def sync_schema(
+        catalog_id: int,
+        *,
+        timeout: float = 30.0,
+        ensure_catalog_in_trino: bool = True,
+    ) -> CatalogSchemaSyncRead:
         catalog = await CatalogService.get(catalog_id)
         if not catalog:
             raise ValueError("Catalog not found")
 
-        await CatalogService._upsert_catalog_in_trino(catalog, timeout=timeout)
+        if ensure_catalog_in_trino:
+            await CatalogService._upsert_catalog_in_trino(catalog, timeout=timeout)
         desired_paths = await CatalogService._scan_schema_paths(catalog, timeout=timeout)
         desired_schemas = {schema_name for schema_name, table_name, column_name in desired_paths if not table_name and not column_name}
         desired_tables = {
@@ -573,11 +583,15 @@ class CatalogService:
         await trino_ddl(f"DROP CATALOG {temp_catalog}", timeout=timeout)
 
     @staticmethod
-    async def _upsert_catalog_in_trino(catalog: Catalog, *, timeout: float = 30.0) -> None:
+    async def _drop_catalog_in_trino(catalog_name: str, *, timeout: float = 30.0) -> None:
         try:
-            await trino_ddl(f"DROP CATALOG {catalog.name}", timeout=timeout)
+            await trino_ddl(f"DROP CATALOG {catalog_name}", timeout=timeout)
         except Exception:
             pass
+
+    @staticmethod
+    async def _upsert_catalog_in_trino(catalog: Catalog, *, timeout: float = 30.0) -> None:
+        await CatalogService._drop_catalog_in_trino(catalog.name, timeout=timeout)
 
         await trino_ddl(
             f"CREATE CATALOG {catalog.name} USING {catalog.sgbd} WITH "

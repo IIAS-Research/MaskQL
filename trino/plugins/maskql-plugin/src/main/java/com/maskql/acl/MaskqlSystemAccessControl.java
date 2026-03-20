@@ -60,9 +60,9 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
             return trimmed;
         }
 
-        String typeSql = column.getType().getTypeSignature().toString();
+        String typeSql = column.getType().getDisplayName();
         if (typeSql == null || typeSql.isBlank()) {
-            typeSql = column.getType().getDisplayName();
+            typeSql = column.getType().getTypeSignature().toString();
         }
         if (typeSql == null || typeSql.isBlank()) {
             return trimmed;

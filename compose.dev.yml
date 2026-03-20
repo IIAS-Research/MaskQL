@@ -212,6 +212,8 @@ services:
     dns_search: ["${MASKQL_TRINO_DNS_SEARCH:-.}"]
     volumes:
       - trino_data:/data/trino
+      - ./trino/plugins/maskql-plugin/target/maskql-acl-0.1.0-plugin.jar:/usr/lib/trino/plugin/maskql-plugin/maskql-acl-0.1.0-plugin.jar:ro
+      - ./trino/plugins/maskql-plugin/target/maskql-acl-0.1.0.jar:/usr/lib/trino/plugin/maskql-plugin/maskql-acl-0.1.0.jar:ro
     environment:
       TRINO_SHARED_SECRET: ${MASKQL_TRINO_SHARED_SECRET}
       MASKQL_ENCRYPT_PASSWORD: ${MASKQL_ENCRYPT_PASSWORD}

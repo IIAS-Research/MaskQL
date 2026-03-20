@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      COMPOSE_PROJECT_NAME: maskql-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Build Trino plugin
+        run: mvn -f trino/plugins/maskql-plugin/pom.xml -DskipTests package
+
+      - name: Prepare test environment
+        run: |
+          cp ./.env.example ./.env
+          echo "HOST_UID=$(id -u)" >> "$GITHUB_ENV"
+          echo "HOST_GID=$(id -g)" >> "$GITHUB_ENV"
+
+      - name: Pre-pull published images
+        run: |
+          docker pull docker.io/rudymerieux/maskql:latest
+          docker pull docker.io/rudymerieux/maskql-trino:latest
+
+      - name: Run tests
+        run: uv run tox
+
+      - name: Upload tox logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tox-logs
+          path: .tox/**/log/**
+          if-no-files-found: ignore
+          retention-days: 7

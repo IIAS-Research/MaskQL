@@ -5,6 +5,10 @@ import time
 from trino.auth import BasicAuthentication
 
 
+def _env_ssl_verify(name: str, default: str = "true") -> bool:
+    return os.getenv(name, default).lower() not in {"0", "false", "no"}
+
+
 def _connect():
     # Build a secure connection to Trino
     auth = BasicAuthentication("demo", "demo")
@@ -15,6 +19,7 @@ def _connect():
         schema=os.getenv("MASKQL_SCHEMA", "public"),
         http_scheme="https",
         auth=auth,
+        verify=_env_ssl_verify("TRINO_VERIFY_SSL", os.getenv("API_VERIFY_SSL", "true")),
     )
     
 ENCRYPT_PASSWORD = os.getenv("MASKQL_ENCRYPT_PASSWORD", "something")

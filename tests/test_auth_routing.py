@@ -5,6 +5,9 @@ import requests
 import trino
 from trino.auth import BasicAuthentication
 
+def _env_ssl_verify(name: str, default: str = "true") -> bool:
+    return os.getenv(name, default).lower() not in {"0", "false", "no"}
+
 MASKQL_HOST = os.getenv("MASKQL_HOST", "localhost")
 MASKQL_HTTP_PORT = int(os.getenv("MASKQL_HTTP_PORT", "80"))
 MASKQL_HTTPS_PORT = int(os.getenv("MASKQL_HTTPS_PORT", "443"))
@@ -16,6 +19,8 @@ MASKQL_USER = os.getenv("MASKQL_USER", "demo")
 MASKQL_PASSWORD = os.getenv("MASKQL_PASSWORD", "demo")
 MASKQL_CATALOG = os.getenv("MASKQL_CATALOG", "demo")
 MASKQL_SCHEMA = os.getenv("MASKQL_SCHEMA", "public")
+API_VERIFY_SSL = _env_ssl_verify("API_VERIFY_SSL")
+TRINO_VERIFY_SSL = _env_ssl_verify("TRINO_VERIFY_SSL", os.getenv("API_VERIFY_SSL", "true"))
 
 HEADERS = {
     "X-Trino-Catalog": MASKQL_CATALOG,
@@ -42,7 +47,7 @@ class TestAuthRouting(unittest.TestCase):
         """
         r = requests.post(
             f"https://{MASKQL_HOST}:{MASKQL_HTTPS_PORT}/v1/statement",
-            headers=HEADERS, data="SELECT 1", timeout=3.0,
+            headers=HEADERS, data="SELECT 1", timeout=3.0, verify=API_VERIFY_SSL,
         )
         self.assertEqual(r.status_code, 401, f"Must be 401 without auth, received {r.status_code}")
 
@@ -58,6 +63,7 @@ class TestAuthRouting(unittest.TestCase):
             schema=MASKQL_SCHEMA,
             http_scheme="https",
             auth=BasicAuthentication(MASKQL_USER, MASKQL_PASSWORD),
+            verify=TRINO_VERIFY_SSL,
         )
         try:
             with conn.cursor() as cur:
@@ -73,7 +79,7 @@ class TestAuthRouting(unittest.TestCase):
         # Ping /healthz with HTTPS
         try:
             r = requests.get(f"https://{MASKQL_HOST}:{MASKQL_HTTPS_PORT}/api/healthz",
-                            timeout=3.0, verify=False)
+                            timeout=3.0, verify=API_VERIFY_SSL)
         except requests.RequestException as e:
             self.fail(f"No HTTPS access to MaskQL: {e}")
 
@@ -88,6 +94,7 @@ class TestAuthRouting(unittest.TestCase):
             schema=MASKQL_SCHEMA,
             http_scheme="https",
             auth=BasicAuthentication(MASKQL_USER, MASKQL_PASSWORD),
+            verify=TRINO_VERIFY_SSL,
         )
         try:
             with conn.cursor() as cur:
