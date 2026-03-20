@@ -54,6 +54,7 @@ If you already cloned the repository, you can follow the same approach with the 
 ## For contributors
 
 Use the repository root and the development stack from `compose.dev.yml`.
+See `CONTRIBUTING.md` for contribution notes and `docs/QUICKSTART.md` for a short local walkthrough.
 
 ### Requirements
 
@@ -64,14 +65,16 @@ Use the repository root and the development stack from `compose.dev.yml`.
 
 ### Start the development stack
 
-Copy the example environment file, then start the dev profile:
+Copy the example environment file, build the Trino plugin once, then start the dev profile:
 
 ```bash
 cp .env.example .env
+bash ./scripts/build-trino-plugin.sh
 make local
 ```
 
 This starts the full development stack with Docker Compose.
+On a fresh clone, the extra build step is needed because `compose.dev.yml` mounts the plugin jars from the local workspace.
 
 ### Rebuild services locally
 
@@ -247,6 +250,34 @@ Admin endpoints:
 * `GET /admin/health` (guard for protected routes)
 
 The frontend redirects to `/login` if not authenticated.
+
+---
+
+## Support and maintenance
+
+Please use the repository issue tracker for:
+
+* bug reports,
+* installation and local setup problems,
+* documentation gaps,
+* feature requests,
+* usage questions about catalogs, rules, and MaskQL SQL access.
+
+If you are working from a mirror of the repository, please use the issue tracker on that mirror.
+When you open an issue, a small reproducer helps a lot. Please also redact credentials, patient data, and other sensitive information.
+
+I maintain MaskQL on a best-effort basis.
+I can usually help with reproducible bugs, setup problems, documentation gaps, and small focused contributions, but I do not offer a guaranteed response time.
+
+Out of scope:
+
+* emergency or on-call production support,
+* private consulting or custom integration work,
+* review of confidential datasets or credentials,
+* legal, regulatory, or compliance advice,
+* guaranteed compatibility with every third-party database, connector, or deployment setup.
+
+See `CONTRIBUTING.md` for the contribution workflow and issue reporting details.
 
 ---
 
