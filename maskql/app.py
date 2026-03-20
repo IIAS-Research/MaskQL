@@ -16,7 +16,9 @@ from maskql.services.catalog_service import CatalogService
 import logging, sys
 logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)])
 
-app = FastAPI(title="MaskQL Gateway", version="0.1")
+APP_VERSION = "1.0.2"
+
+app = FastAPI(title="MaskQL Gateway", version=APP_VERSION)
 
 @app.on_event("startup")
 async def _startup():
@@ -41,5 +43,4 @@ app.include_router(trino_proxy.router)
 app.include_router(catalog.router)
 app.include_router(user.router)
 app.include_router(rule.router)
-
 
