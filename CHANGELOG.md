@@ -2,6 +2,7 @@
 
 <!-- version list -->
 
+
 ## v1.1.0 (2026-03-20)
 
 ### Bug Fixes
@@ -38,13 +39,12 @@
 - Versionning
   ([`ca83a81`](https://github.com/IIAS-Research/MaskQL/commit/ca83a81bacd57bdded6b57905dcf4de5764b3b8a))
 
-
 ## v1.0.2 (2025-09-15)
 
 ### Bug Fixes
 
 - Rules logic & typo
-  ([`11b8fa5`](https://gitlab.domchurs.ad/eds/maskql/-/commit/11b8fa5475059c52ebfa95dc2be2f75185de1970))
+  (`11b8fa5`)
 
 
 ## v1.0.1 (2025-09-09)
@@ -52,10 +52,10 @@
 ### Bug Fixes
 
 - Catalog From
-  ([`1081af4`](https://gitlab.domchurs.ad/eds/maskql/-/commit/1081af406e81d47e6c3396d19dc63ccb24cb31bc))
+  (`1081af4`)
 
 - Must have public network to access database
-  ([`6679c21`](https://gitlab.domchurs.ad/eds/maskql/-/commit/6679c21f7498cdb96f7579361fdf3200229eb3d0))
+  (`6679c21`)
 
 
 ## v1.0.0 (2025-09-08)
@@ -63,7 +63,7 @@
 ### Features
 
 - Here is the v1
-  ([`0bee3cf`](https://gitlab.domchurs.ad/eds/maskql/-/commit/0bee3cf1a712ce18d7a1b22e43a12c05e0f8a5d6))
+  (`0bee3cf`)
 
 
 ## v0.6.0 (2025-09-02)
@@ -71,50 +71,50 @@
 ### Bug Fixes
 
 - Always allow system catalogs
-  ([`8938691`](https://gitlab.domchurs.ad/eds/maskql/-/commit/8938691a4fe94105e0ff65c7c2ba77f17dbc7ef5))
+  (`8938691`)
 
 - Ci
-  ([`14378e6`](https://gitlab.domchurs.ad/eds/maskql/-/commit/14378e63a47a37014b628357ee36618ac4a671d4))
+  (`14378e6`)
 
 - Ci
-  ([`80c98a1`](https://gitlab.domchurs.ad/eds/maskql/-/commit/80c98a12eeceae392f4056da16fde39cf8fbec54))
+  (`80c98a1`)
 
 - Get submodules in cicd
-  ([`56c843f`](https://gitlab.domchurs.ad/eds/maskql/-/commit/56c843faa4b6bcafc0919b5164465d22dea1d9a9))
+  (`56c843f`)
 
 - Pass HF_TOKEN with tox
-  ([`9f14fe4`](https://gitlab.domchurs.ad/eds/maskql/-/commit/9f14fe47109dfc3cacad1a4ae5f94f933f6f0e25))
+  (`9f14fe4`)
 
 - Quicker Dockerfile, avoid crash when apply mask on empty string
-  ([`b90e6f9`](https://gitlab.domchurs.ad/eds/maskql/-/commit/b90e6f94ad8a45d04f63d7dcdee0d8bee7a5d277))
+  (`b90e6f9`)
 
 - Tests
-  ([`e357750`](https://gitlab.domchurs.ad/eds/maskql/-/commit/e357750c378327bb6234d5047b27f12db30e6710))
+  (`e357750`)
 
 - Tests
-  ([`dc94e1a`](https://gitlab.domchurs.ad/eds/maskql/-/commit/dc94e1a5c5c1503743759f9eb46eaf67d7ad4aad))
+  (`dc94e1a`)
 
 ### Features
 
 - Basic basis for the Mask plugin
-  ([`7149941`](https://gitlab.domchurs.ad/eds/maskql/-/commit/7149941244f469ca017bf55bf725b589519309aa))
+  (`7149941`)
 
 - Configuration with front interface
-  ([`77074a5`](https://gitlab.domchurs.ad/eds/maskql/-/commit/77074a56f0ff8db090e945a967c4d7857fc105e2))
+  (`77074a5`)
 
 - Mask to encrypt with AES256
-  ([`f982723`](https://gitlab.domchurs.ad/eds/maskql/-/commit/f982723af6388a45da6f11eebb0298f31785d9cb))
+  (`f982723`)
 
 - Use IIAS pseudo package, extract text from pdf, fixes
-  ([`79e9b80`](https://gitlab.domchurs.ad/eds/maskql/-/commit/79e9b8003093b923e9afdd3ce3bf57a87e34546c))
+  (`79e9b80`)
 
 - We can now encrypt any type
-  ([`f0cfd1a`](https://gitlab.domchurs.ad/eds/maskql/-/commit/f0cfd1ad072d53243568bb2f7cd15828de7c7cce))
+  (`f0cfd1a`)
 
 ### Testing
 
 - Crypt and decrypt all types + fixes
-  ([`f501af8`](https://gitlab.domchurs.ad/eds/maskql/-/commit/f501af85c236a8f08fa381acace06600f69b6385))
+  (`f501af8`)
 
 
 ## v0.5.0 (2025-08-20)
@@ -122,32 +122,32 @@
 ### Bug Fixes
 
 - Force trino to scan catalog. Dirty..
-  ([`770be3c`](https://gitlab.domchurs.ad/eds/maskql/-/commit/770be3c16062fbf8363218527de9f2240854643d))
+  (`770be3c`)
 
 ### Features
 
 - Access control with API fully working
-  ([`69c336f`](https://gitlab.domchurs.ad/eds/maskql/-/commit/69c336fe29391f4ab7aa06619f09231eaffbbff7))
+  (`69c336f`)
 
 - Add rules in seed
-  ([`55b53eb`](https://gitlab.domchurs.ad/eds/maskql/-/commit/55b53ebc15ece7a72717d2a4a46dbae3da6200d1))
+  (`55b53eb`)
 
 - Full ACL with API
-  ([`27c4139`](https://gitlab.domchurs.ad/eds/maskql/-/commit/27c413981162540b1e1b90202dd9df0d01ece27d))
+  (`27c4139`)
 
 - Gateway user and admin user working with policies on routes
-  ([`6055959`](https://gitlab.domchurs.ad/eds/maskql/-/commit/6055959345c7d1955d9a7bdf7bfb1a974200ce19))
+  (`6055959`)
 
 - Models etc for users
-  ([`b7fd18c`](https://gitlab.domchurs.ad/eds/maskql/-/commit/b7fd18c180876e66e15a6e74da5c67f2969e3823))
+  (`b7fd18c`)
 
 - Rules models, routes, schema, db and test
-  ([`9a85da7`](https://gitlab.domchurs.ad/eds/maskql/-/commit/9a85da7d19e61a1d6403915c57e604f0e4c2c3b3))
+  (`9a85da7`)
 
 ### Testing
 
 - Test User API and adapt old ones to new policies
-  ([`7ff13e5`](https://gitlab.domchurs.ad/eds/maskql/-/commit/7ff13e58a971ba9bcac32724749a6c980ff100f2))
+  (`7ff13e5`)
 
 
 ## v0.4.0 (2025-08-17)
@@ -155,15 +155,15 @@
 ### Features
 
 - Catalog CRUD, catalog sync with Trino
-  ([`8d2f747`](https://gitlab.domchurs.ad/eds/maskql/-/commit/8d2f7476d7db17375e0f7a47acd7905846ee3314))
+  (`8d2f747`)
 
 - Init alembic for migrations
-  ([`1f6dfe2`](https://gitlab.domchurs.ad/eds/maskql/-/commit/1f6dfe2ac37c18ad0f384488d3cfe593ce7dd6a9))
+  (`1f6dfe2`)
 
 ### Testing
 
 - Adding seeds and Catalog API tests
-  ([`179bd9c`](https://gitlab.domchurs.ad/eds/maskql/-/commit/179bd9cb62d0f117b648f53f4ab06a6747e32beb))
+  (`179bd9c`)
 
 
 ## v0.3.0 (2025-08-17)
@@ -171,15 +171,15 @@
 ### Features
 
 - ACL Java Plugin now ask MaskQL API for user permissions and masks
-  ([`065db12`](https://gitlab.domchurs.ad/eds/maskql/-/commit/065db12d52bae2a641b0b3ce611d7d0960de0b2c))
+  (`065db12`)
 
 - ACL routes
-  ([`4b0f63a`](https://gitlab.domchurs.ad/eds/maskql/-/commit/4b0f63a0a481cd3edfa106e13417f2f904657d24))
+  (`4b0f63a`)
 
 ### Testing
 
 - Arbitrary rule on client table
-  ([`37e4876`](https://gitlab.domchurs.ad/eds/maskql/-/commit/37e4876dbbcf37d0836cb1f647f8b66babf25b58))
+  (`37e4876`)
 
 
 ## v0.2.0 (2025-08-16)
