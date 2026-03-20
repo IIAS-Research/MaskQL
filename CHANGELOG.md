@@ -2,7 +2,42 @@
 
 <!-- version list -->
 
-> Historical entries predate the GitHub release migration. Private GitLab commit links were removed; future releases are generated from GitHub.
+
+## v1.1.0 (2026-03-20)
+
+### Bug Fixes
+
+- Align prod compose target and Trino Dockerfile naming
+  ([`ea7e6ef`](https://github.com/IIAS-Research/MaskQL/commit/ea7e6ef90d894af48595d6b7be4fa29567e5bae9))
+
+- Align Trino plugin build with Java 24
+  ([`ab1cc86`](https://github.com/IIAS-Research/MaskQL/commit/ab1cc86c98ac2f20595dd70aceed82964d37c645))
+
+- Allow table if one columns is directly allowed
+  ([`7ef7276`](https://github.com/IIAS-Research/MaskQL/commit/7ef7276f94f03b1b128522f6e08daef23e408522))
+
+- Auto cast
+  ([`14c31a5`](https://github.com/IIAS-Research/MaskQL/commit/14c31a5648a9ade5b2b430112d0ce5a6747610e8))
+
+- Scan sql server schema + ability to add schema item
+  ([`41eb9a2`](https://github.com/IIAS-Research/MaskQL/commit/41eb9a2200add77df1be8e15da334d798bcdf6de))
+
+- Tests
+  ([`970c6a9`](https://github.com/IIAS-Research/MaskQL/commit/970c6a95cf2168e5f199ab89f72f63fb178fdbda))
+
+### Features
+
+- Connexion status
+  ([`6fa399b`](https://github.com/IIAS-Research/MaskQL/commit/6fa399becbae1039f022cfe64a48d68a512a4ad5))
+
+- Rework of config UI
+  ([`0f6be97`](https://github.com/IIAS-Research/MaskQL/commit/0f6be97926904f57e2b930bc99c6578d8b0a1273))
+
+- Sync schema, with refa of catalog objects
+  ([`9d34e3b`](https://github.com/IIAS-Research/MaskQL/commit/9d34e3b869138bbcbebf7dbae43235ba48b92aa2))
+
+- Versionning
+  ([`ca83a81`](https://github.com/IIAS-Research/MaskQL/commit/ca83a81bacd57bdded6b57905dcf4de5764b3b8a))
 
 ## v1.0.2 (2025-09-15)
 

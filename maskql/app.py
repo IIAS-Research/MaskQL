@@ -16,7 +16,7 @@ from maskql.services.catalog_service import CatalogService
 import logging, sys
 logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)])
 
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.1.0"
 
 app = FastAPI(title="MaskQL Gateway", version=APP_VERSION)
 
