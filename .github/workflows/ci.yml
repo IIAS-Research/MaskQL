@@ -29,7 +29,8 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "24"
+          cache: maven
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v6
@@ -37,7 +38,7 @@ jobs:
           enable-cache: true
 
       - name: Build Trino plugin
-        run: mvn -f trino/plugins/maskql-plugin/pom.xml -DskipTests package
+        run: bash ./scripts/build-trino-plugin.sh
 
       - name: Prepare test environment
         run: |
