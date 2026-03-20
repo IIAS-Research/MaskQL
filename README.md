@@ -28,42 +28,63 @@ This is especially useful when you can read a database but cannot change it, and
 
 ---
 
-## Requirements
+## For users
 
-* [Docker](https://docs.docker.com/get-docker/)
-* [uv](https://docs.astral.sh/uv/) for Python environment management
-* `make` (GNU Make)
+If you only want to run MaskQL, use the published Docker images.
+You do not need to clone the repository, set `HF_TOKEN`, or build anything locally.
 
---
+The smallest deployment bundle is in `install/`:
 
-## Deploy MaskQL in production
-
-All the necessary resources are included in the Docker images, so there is no need to clone this repository.
-You will only need three files, available at the root of this repository:
-1. `compose.yml` – Docker description of the containers to deploy and their interactions. This file must not be modified.
-2. `.env.example` (to be renamed as `.env`) – Configuration of environment variables for deployment. MaskQL will work with the default values, but it is strongly recommended to set your own passwords and encryption keys.
-3. `tls.yml` – Paths to the certificates required by MaskQL, which only works with HTTPS for security reasons. You will need to generate certificates and set their paths in this file.
-
-Once these three files are copied and configured in your directory, you are almost done!
-Simply run the following command:
+1. Create a working directory on your server.
+2. Copy `install/compose.yml`, `install/.env`, and `install/tls.yml` into it.
+3. Edit `.env` with your host, admin credentials, and secrets.
+4. Edit `tls.yml` with the paths to your TLS certificate and key.
+5. Start the stack:
 
 ```bash
 docker compose up -d
 ```
 
-MaskQL should be deployed within a few minutes. You can then access the interface via HTTPS at the address you defined in the `.env`.
+MaskQL should be available within a few minutes at the HTTPS address defined by `MASKQL_HOST` and `MASKQL_PORT`.
+
+If you already cloned the repository, you can follow the same approach with the root `compose.yml`, `.env.example` (renamed to `.env`), and `tls.yml`.
 
 ---
 
-## Run locally in development mode
+## For contributors
 
-### Start
-Git clone the project and in the root dir run the following command.
+Use the repository root and the development stack from `compose.dev.yml`.
+
+### Requirements
+
+* [Docker](https://docs.docker.com/get-docker/)
+* `make` (GNU Make)
+* [uv](https://docs.astral.sh/uv/) to run the Python test suite
+* `HF_TOKEN` only if you rebuild the `trino` image locally
+
+### Start the development stack
+
+Copy the example environment file, then start the dev profile:
+
 ```bash
+cp .env.example .env
 make local
 ```
 
-This starts the full stack with Docker Compose.
+This starts the full development stack with Docker Compose.
+
+### Rebuild services locally
+
+Use these targets only when you need to rebuild images from source:
+
+```bash
+make local-build
+make rebuild-backend
+make rebuild-frontend
+make rebuild-trino
+```
+
+`HF_TOKEN` is only required for `trino` rebuilds because the Docker build downloads the Hugging Face model used by the pseudonymization pipeline.
 
 ### Stop and clean
 
@@ -91,7 +112,7 @@ Here is the list of environment variables you can configure in the `.env` file:
 
 ---
 
-## Create a self-signed certificat for testing
+## Create a self-signed certificate for testing
 
 ```bash
 openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 3650 -nodes -subj "/C=FR/ST=Grand-Est/L=Reims/O=CHU de Reims/OU=Institut de l'Intelligence Artificielle en Santé/CN=maskql" -addext "subjectAltName=DNS:localhost"
@@ -104,7 +125,7 @@ DNS must match the MaskQL host.
 
 ```
 .
-├── Makefile          # Targets: local, local-dev, down
+├── Makefile          # Targets: local, local-build, down, clean, logs, ps
 ├── compose.yml       # Docker stack (Traefik, Backend, Trino, PostgreSQL, Frontend)
 ├── trino/            # Trino custom code (UDF, access control)
 ├── maskql/           # Backend (FastAPI): users, catalogs, rules, auth
@@ -137,7 +158,7 @@ uv run tox
 
 This will:
 
-1. Build and start the stack (`make local`)
+1. Start the stack (`make local`)
 2. Health check
 3. Run `unittest` tests
 4. Stop and clean the stack (`make down`)
