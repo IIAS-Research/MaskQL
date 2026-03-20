@@ -1,5 +1,5 @@
 COMPOSE_DEV = docker compose --file ./compose.dev.yml --profile dev --env-file ./.env
-COMPOSE_PROD = docker compose --file ./compose.dev.yml --profile prod --env-file ./.env
+COMPOSE_PROD = docker compose --file ./compose.yml --env-file ./.env
 
 .PHONY: local local-build local-prod local-prod-build rebuild-backend rebuild-frontend rebuild-trino restart-backend restart-frontend restart-trino down clean logs ps
 

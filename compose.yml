@@ -1,5 +1,3 @@
-version: "3.9"
-
 networks:
   public:
     name: "${COMPOSE_PROJECT_NAME:-maskql}_public"
