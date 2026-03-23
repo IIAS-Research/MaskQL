@@ -1,6 +1,6 @@
 import os, sys, importlib, pkgutil, json, traceback
 from pathlib import Path
-from pseudocare.model.pseudo_faker import Pseudonymization
+from pseudocare import PseudoCare
 
 try:
     # PIPE variable must be loaded
@@ -27,7 +27,7 @@ try:
 
     import edsnlp
 
-    nlp_model = Pseudonymization(model=edsnlp.load(str(model_dir), auto_update=False))
+    nlp_model = PseudoCare(model=edsnlp.load(str(model_dir), auto_update=False))
 
     def _process_text(text, seed):
         return nlp_model.run(text, seed)

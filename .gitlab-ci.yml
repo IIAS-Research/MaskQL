@@ -12,9 +12,6 @@ tests:
   tags:
     - unix
     - test
-  variables:
-    GIT_SUBMODULE_STRATEGY: recursive
-    GIT_SUBMODULE_FORCE_HTTPS: "true"
 
   before_script:
     - export HOST_UID="$(id -u)"
