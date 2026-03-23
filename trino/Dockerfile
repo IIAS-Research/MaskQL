@@ -16,6 +16,8 @@ RUN mkdir -p /out && find target -maxdepth 1 -type f -name "*.jar" \
 FROM rockylinux:8 AS pyenv
 USER root
 
+ARG PSEUDOCARE_VERSION=0.1.6
+
 # Outils + JDK + OpenMP + Git
 RUN dnf -y install \
         gcc gcc-c++ make \
@@ -53,8 +55,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip wheel setuptools \
         "edsnlp[ml]" \
         "huggingface_hub>=0.23"
 
-COPY python/pseudonymization_package /app/pseudonymization_package
-RUN python -m pip install --no-cache-dir /app/pseudonymization_package
+RUN python -m pip install --no-cache-dir "pseudocare==${PSEUDOCARE_VERSION}"
 
 # Download EDS NLP Model
 WORKDIR /app
@@ -96,6 +97,8 @@ RUN ln -s /opt/python/lib/libpython3.11.so.1.0 /opt/python/lib/libpython3.11.so 
 COPY --from=pyenv /opt/cpython311/lib/python3.11/ /opt/python/lib/python3.11/
 COPY --from=pyenv /usr/lib64/libgomp.so.1 /opt/python/lib/
 COPY --from=pyenv /usr/lib64/libffi.so.6* /opt/python/lib/
+COPY --from=pyenv /usr/lib64/libssl.so.1.1* /opt/python/lib/
+COPY --from=pyenv /usr/lib64/libcrypto.so.1.1* /opt/python/lib/
 
 # Python executable
 RUN mkdir -p /opt/python/bin
