@@ -2,6 +2,18 @@
 
 <!-- version list -->
 
+## v1.2.0 (2026-03-23)
+
+### Documentation
+
+- Quickstart with fronted usage
+  ([`5f1c035`](https://github.com/IIAS-Research/MaskQL/commit/5f1c035cd47d448214f349ad87714966df1ceb24))
+
+### Features
+
+- Use Pip PseudoCare instead of local one
+  ([`a6040d6`](https://github.com/IIAS-Research/MaskQL/commit/a6040d6e0ce2d894cbca64357c0101a733f880b8))
+
 
 ## v1.1.0 (2026-03-20)
 
