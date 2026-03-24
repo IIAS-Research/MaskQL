@@ -1,0 +1,32 @@
+{
+    "title": "MaskQL: query-time masking, filtering, and pseudonymization for governed access to live databases",
+    "description": "MaskQL is an open-source middleware for governed access to live databases in sensitive environments such as healthcare. Built on top of Trino, it applies masking, filtering, encryption, and pseudonymization rules at query time without modifying source systems. It supports per-user access control across schemas, tables, and columns, and includes transformations for structured and unstructured clinical data, including text extracted from PDF documents.",
+    "creators": [
+    {
+        "name": "MERIEUX, Rudy",
+        "affiliation": "IIAS – Institute of Artificial Intelligence in Health, CHU de Reims, Université de Reims Champagne-Ardenne, Reims, France",
+        "orcid": "0009-0004-6643-8555"
+    },
+    {
+        "name": "VUIBLET, Vincent",
+        "affiliation": "IIAS – Institute of Artificial Intelligence in Health, CHU de Reims, Université de Reims Champagne-Ardenne, Reims, France",
+        "orcid": "0000-0002-1959-326X"
+    }
+    ],
+    "license": "GPL-3.0",
+    "upload_type": "software",
+    "access_right": "open",
+    "keywords": [
+        "data governance",
+        "clinical data warehouses",
+        "pseudonymization",
+        "data masking",
+        "sql",
+        "trino",
+        "privacy-preserving data access",
+        "health data",
+        "middleware"
+    ],
+    "notes": "This software is described in a JOSS submission.",
+    "version": "1.1.0"
+}
