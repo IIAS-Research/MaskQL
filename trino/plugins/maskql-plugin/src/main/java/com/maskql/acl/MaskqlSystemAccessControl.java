@@ -36,10 +36,40 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         "memory",
         "blackhole"
     );
+    // Catalog `system` is already fully allowed above, which also covers
+    // Trino metadata schemas such as `system.jdbc` and `system.metadata`.
+    private static final Set<String> METADATA_SCHEMAS = Set.of(
+        "information_schema",
+        "pg_catalog",
+        "sys",
+        "performance_schema",
+        "sqlite_master",
+        "sqlite_schema"
+    );
+
+    private static String normalizeName(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim().toLowerCase(Locale.ROOT);
+    }
 
     private boolean isSystem(String catalog) {
         // System catalogs must by accessible
-        return SYSTEM_CATALOGS.contains(catalog.toLowerCase(Locale.ROOT));
+        return SYSTEM_CATALOGS.contains(normalizeName(catalog));
+    }
+
+    private boolean isMetadataSchema(String schemaName) {
+        String normalized = normalizeName(schemaName);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+
+        return METADATA_SCHEMAS.contains(normalized);
+    }
+
+    private boolean isMetadataTable(SchemaTableName table) {
+        return table != null && isMetadataSchema(table.getSchemaName());
     }
 
     private boolean isSuperAdmin(String user) {
@@ -128,24 +158,31 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         
         try {
             List<String> allowed = aclApi.schemas(user, catalogName, schemaNames);
-            return new LinkedHashSet<>(allowed);
+            Set<String> allowedSet = new HashSet<>(allowed);
+            Set<String> out = new LinkedHashSet<>();
+            for (String schemaName : schemaNames) {
+                if (isMetadataSchema(schemaName) || allowedSet.contains(schemaName)) {
+                    out.add(schemaName);
+                }
+            }
+            return out;
         } catch (Exception e) {
             System.err.println("[MaskQL ACL] filterSchemas error: " + e.getClass().getName() + ": " + e.getMessage());
-            return Collections.emptySet();
+            Set<String> out = new LinkedHashSet<>();
+            for (String schemaName : schemaNames) {
+                if (isMetadataSchema(schemaName)) {
+                    out.add(schemaName);
+                }
+            }
+            return out;
         }
     }
 
     @Override
     public void checkCanShowSchemas(SystemSecurityContext context, String catalogName) {
-        String user = context.getIdentity().getUser();
-        if (isAllowedByDefault(user, catalogName)) return;
-
-        try {
-            if (aclApi.canAccessCatalog(user, catalogName)) return;
-        } catch (Exception e) {
-            System.err.println("[MaskQL ACL] checkCanShowSchemas error: " + e.getClass().getName() + ": " + e.getMessage());
-        }
-        throw new AccessDeniedException("Access Denied: Cannot show schemas");
+        if (isAllowedByDefault(context.getIdentity().getUser(), catalogName)) return;
+        // Schema listing is metadata-only. Business schemas are still filtered in filterSchemas().
+        return;
     }
 
     @Override
@@ -165,6 +202,12 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
             for (Map.Entry<String, List<String>> e : bySchema.entrySet()) {
                 String schema = e.getKey();
                 List<String> tables = e.getValue();
+                if (isMetadataSchema(schema)) {
+                    for (String tbl : tables) {
+                        out.add(new SchemaTableName(schema, tbl));
+                    }
+                    continue;
+                }
                 List<String> allowed = aclApi.tables(user, catalogName, schema, tables);
                 for (String tbl : allowed) {
                     out.add(new SchemaTableName(schema, tbl));
@@ -173,7 +216,13 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
             return out;
         } catch (Exception e) {
             System.err.println("[MaskQL ACL] filterTables error: " + e.getClass().getName() + ": " + e.getMessage());
-            return Collections.emptySet();
+            Set<SchemaTableName> out = new LinkedHashSet<>();
+            for (SchemaTableName tableName : tableNames) {
+                if (isMetadataTable(tableName)) {
+                    out.add(tableName);
+                }
+            }
+            return out;
         }
     }
 
@@ -182,6 +231,7 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         String user = context.getIdentity().getUser();
         String catalog = schema.getCatalogName();
         if (isAllowedByDefault(user, catalog)) return;
+        if (isMetadataSchema(schema.getSchemaName())) return;
 
         try {
             List<String> allowed = aclApi.schemas(user, catalog, List.of(schema.getSchemaName()));
@@ -200,6 +250,7 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         String schema = table.getSchemaTableName().getSchemaName();
         String tbl = table.getSchemaTableName().getTableName();
         if (isAllowedByDefault(user, catalog)) return;
+        if (isMetadataSchema(schema)) return;
 
         try {
             List<String> allowed = aclApi.tables(user, catalog, schema, List.of(tbl));
@@ -218,6 +269,7 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         String schema = table.getSchemaTableName().getSchemaName();
         String tbl = table.getSchemaTableName().getTableName();
         if (isAllowedByDefault(user, catalog)) return columns;
+        if (isMetadataSchema(schema)) return columns;
 
         try {
             return new LinkedHashSet<>(aclApi.columns(user, catalog, tbl, schema, columns));
@@ -251,6 +303,7 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         String tbl     = table.getSchemaTableName().getTableName();
 
         if (isAllowedByDefault(user, catalog)) return;
+        if (isMetadataSchema(schema)) return;
 
 
         try {
@@ -274,6 +327,7 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         String tbl     = table.getSchemaTableName().getTableName();
 
         if (isAllowedByDefault(user, catalog)) return List.of();
+        if (isMetadataSchema(schema)) return List.of();
 
         try {
             String expr = aclApi.rowFilter(user, catalog, tbl, schema);
@@ -297,6 +351,7 @@ public class MaskqlSystemAccessControl implements SystemAccessControl {
         String tbl     = table.getSchemaTableName().getTableName();
 
         if (isAllowedByDefault(user, catalog)) return new LinkedHashMap<>();
+        if (isMetadataSchema(schema)) return new LinkedHashMap<>();
 
         Map<ColumnSchema, ViewExpression> out = new LinkedHashMap<>();
         try {
