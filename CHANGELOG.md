@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.3.0 (2026-04-02)
+
+### Features
+
+- Allow technical schemas
+  ([`a2612f2`](https://github.com/IIAS-Research/MaskQL/commit/a2612f2b5608abb412ea065154ec6a247bf94778))
+
+
 ## v1.2.0 (2026-03-23)
 
 ### Documentation
