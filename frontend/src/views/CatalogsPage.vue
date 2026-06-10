@@ -12,6 +12,7 @@ const toast = useToast();
 const loading = ref(false);
 const loadingStatuses = ref(false);
 const syncingCatalogId = ref<number | null>(null);
+const duplicatingCatalogId = ref<number | null>(null);
 const catalogs = ref<Catalog[]>([]);
 const statusByCatalogId = ref<Record<number, CatalogConnectionStatus>>({});
 const q = ref("");
@@ -117,6 +118,33 @@ async function syncCatalogSchema(id: number) {
   }
 }
 
+async function duplicateCatalog(catalog: Catalog) {
+  duplicatingCatalogId.value = catalog.id;
+  try {
+    const duplicate = await CatalogAPI.duplicate(catalog.id);
+    catalogs.value = [...catalogs.value, duplicate].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+    toast.add({
+      severity: "success",
+      summary: "Duplicated",
+      detail: `Database connection copied as ${duplicate.name}`,
+      life: 3000,
+    });
+    router.push({ name: "catalog", params: { id: duplicate.id } });
+  } catch (e: any) {
+    console.error(e);
+    toast.add({
+      severity: "error",
+      summary: "Error",
+      detail: e?.response?.data?.detail || "Unable to duplicate database connection",
+      life: 4000,
+    });
+  } finally {
+    duplicatingCatalogId.value = null;
+  }
+}
+
 function connectionStatusLabel(catalogId: number) {
   const status = statusByCatalogId.value[catalogId];
   if (!status) return loadingStatuses.value ? "Checking" : "Unknown";
@@ -173,7 +201,7 @@ onMounted(fetchCatalogs);
             <th class="px-4 py-3">SGBD</th>
             <th class="px-4 py-3">Status</th>
             <th class="px-4 py-3">Username</th>
-            <th class="px-4 py-3 w-52">Actions</th>
+            <th class="px-4 py-3 w-40">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -216,28 +244,58 @@ onMounted(fetchCatalogs);
             </td>
             <td class="px-4 py-3">{{ c.username }}</td>
             <td class="px-4 py-3">
-              <div class="flex flex-wrap gap-2">
+              <div class="flex items-center gap-2 whitespace-nowrap">
                 <button
-                  class="px-3 py-1 rounded-lg bg-gray-800 text-white hover:bg-gray-700"
+                  class="action-button bg-gray-800 text-white hover:bg-gray-700"
                   @click="goEdit(c.id)"
                   title="Edit"
+                  aria-label="Edit"
+                  data-tooltip="Edit"
                 >
-                  Edit
+                  <i class="pi pi-pencil text-xs"></i>
                 </button>
                 <button
-                  class="px-3 py-1 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                  class="action-button bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
                   :disabled="syncingCatalogId === c.id"
                   @click="syncCatalogSchema(c.id)"
                   title="Sync schema"
+                  aria-label="Sync schema"
+                  data-tooltip="Sync schema"
                 >
-                  {{ syncingCatalogId === c.id ? "Syncing..." : "Sync schema" }}
+                  <i
+                    class="pi text-xs"
+                    :class="
+                      syncingCatalogId === c.id
+                        ? 'pi-spinner pi-spin'
+                        : 'pi-refresh'
+                    "
+                  ></i>
                 </button>
                 <button
-                  class="px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700"
-                  @click="removeCatalog(c.id)"
-                  title="Deleted"
+                  class="action-button bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                  :disabled="duplicatingCatalogId === c.id"
+                  @click="duplicateCatalog(c)"
+                  title="Duplicate"
+                  aria-label="Duplicate"
+                  data-tooltip="Duplicate"
                 >
-                  Delete
+                  <i
+                    class="pi text-xs"
+                    :class="
+                      duplicatingCatalogId === c.id
+                        ? 'pi-spinner pi-spin'
+                        : 'pi-copy'
+                    "
+                  ></i>
+                </button>
+                <button
+                  class="action-button bg-red-600 text-white hover:bg-red-700"
+                  @click="removeCatalog(c.id)"
+                  title="Delete"
+                  aria-label="Delete"
+                  data-tooltip="Delete"
+                >
+                  <i class="pi pi-trash text-xs"></i>
                 </button>
               </div>
             </td>
@@ -258,5 +316,66 @@ onMounted(fetchCatalogs);
   max-width: 100%;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.action-button {
+  position: relative;
+  display: inline-flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  transition:
+    background-color 120ms ease,
+    transform 120ms ease,
+    opacity 120ms ease;
+}
+
+.action-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.action-button::before,
+.action-button::after {
+  position: absolute;
+  left: 50%;
+  z-index: 30;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%) translateY(2px);
+  transition:
+    opacity 80ms ease,
+    transform 80ms ease;
+}
+
+.action-button::before {
+  content: attr(data-tooltip);
+  bottom: calc(100% + 0.5rem);
+  max-width: 9rem;
+  white-space: nowrap;
+  border-radius: 0.375rem;
+  background: #111827;
+  padding: 0.25rem 0.5rem;
+  color: white;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  box-shadow: 0 8px 20px rgb(15 23 42 / 0.18);
+}
+
+.action-button::after {
+  content: "";
+  bottom: calc(100% + 0.25rem);
+  border-width: 0.25rem 0.25rem 0;
+  border-style: solid;
+  border-color: #111827 transparent transparent;
+}
+
+.action-button:hover::before,
+.action-button:hover::after,
+.action-button:focus-visible::before,
+.action-button:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 </style>

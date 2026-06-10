@@ -3,7 +3,10 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from maskql.models.catalog import Catalog
-from maskql.services.catalog_service import CatalogService, _should_skip_schema
+from maskql.services.catalog_service import (
+    CatalogService,
+    _should_skip_schema,
+)
 
 
 def _catalog(*, sgbd: str) -> Catalog:
@@ -193,6 +196,44 @@ class CatalogReplacementTests(unittest.IsolatedAsyncioTestCase):
 
         create.assert_awaited_once_with(current, timeout=9)
         drop.assert_awaited_once_with("sample", timeout=9)
+
+
+class CatalogDuplicateTests(unittest.IsolatedAsyncioTestCase):
+    async def test_duplicate_copies_connection_fields_and_secret(self):
+        source = _catalog(sgbd="postgresql")
+        source.id = 7
+        existing_copy = _catalog(sgbd="postgresql")
+        existing_copy.id = 8
+        existing_copy.name = "samplecopy"
+        created = _catalog(sgbd="postgresql")
+        created.id = 9
+        created.name = "samplecopycopy"
+
+        with (
+            patch.object(CatalogService, "get", AsyncMock(return_value=source)),
+            patch.object(
+                CatalogService,
+                "list_all",
+                AsyncMock(return_value=[source, existing_copy]),
+            ),
+            patch.object(CatalogService, "create", AsyncMock(return_value=created)) as create,
+        ):
+            duplicate = await CatalogService.duplicate(7)
+
+        self.assertIs(duplicate, created)
+        create.assert_awaited_once()
+        payload = create.await_args.args[0]
+        self.assertEqual(payload.name, "samplecopycopy")
+        self.assertEqual(payload.url, source.url)
+        self.assertEqual(payload.sgbd, source.sgbd)
+        self.assertEqual(payload.username, source.username)
+        self.assertEqual(payload.password, source.password)
+
+    async def test_duplicate_returns_none_when_source_catalog_is_missing(self):
+        with patch.object(CatalogService, "get", AsyncMock(return_value=None)):
+            duplicate = await CatalogService.duplicate(404)
+
+        self.assertIsNone(duplicate)
 
 
 class CatalogSchemaSkipTests(unittest.TestCase):

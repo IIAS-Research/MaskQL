@@ -144,6 +144,27 @@ class CatalogService:
             return obj
 
     @staticmethod
+    async def duplicate(catalog_id: int) -> Catalog | None:
+        source = await CatalogService.get(catalog_id)
+        if not source:
+            return None
+
+        existing_names = {catalog.name for catalog in await CatalogService.list_all()}
+        name = f"{source.name}copy"
+        while name in existing_names:
+            name = f"{name}copy"
+
+        return await CatalogService.create(
+            CatalogCreate(
+                name=name,
+                url=source.url,
+                sgbd=source.sgbd,
+                username=source.username,
+                password=source.password,
+            )
+        )
+
+    @staticmethod
     async def patch(catalog_id: int, patch: CatalogPatch) -> Catalog | None:
         async with AsyncSessionLocal() as session:
             obj = await session.get(Catalog, catalog_id)

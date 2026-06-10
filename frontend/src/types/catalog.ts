@@ -112,6 +112,13 @@ export class Catalogs extends BaseResource<
     return data;
   }
 
+  async duplicate(catalogId: number): Promise<Catalog> {
+    const { data } = await http.post<Catalog>(
+      `${this.endpoint}/${catalogId}/duplicate`,
+    );
+    return data;
+  }
+
   async previewTable(
     catalogId: number,
     payload: CatalogTablePreviewRequest,
