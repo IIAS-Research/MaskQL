@@ -6,6 +6,7 @@ import { createPinia } from 'pinia';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
+import Tooltip from 'primevue/tooltip';
 
 import App from './App.vue';
 import router from './router';
@@ -42,6 +43,7 @@ app.component("Button", Button)
 app.component("Toast", Toast)
 app.component('Sidebar', Sidebar)
 app.component("InputText", InputText)
+app.directive('tooltip', Tooltip)
 app.use(router)
 
 app.mount('#app')

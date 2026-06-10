@@ -247,18 +247,18 @@ onMounted(fetchCatalogs);
               <div class="flex items-center gap-2 whitespace-nowrap">
                 <button
                   class="action-button bg-gray-800 text-white hover:bg-gray-700"
+                  v-tooltip.top="'Edit'"
                   @click="goEdit(c.id)"
                   aria-label="Edit"
-                  data-tooltip="Edit"
                 >
                   <i class="pi pi-pencil text-xs"></i>
                 </button>
                 <button
                   class="action-button bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                  v-tooltip.top="'Sync schema'"
                   :disabled="syncingCatalogId === c.id"
                   @click="syncCatalogSchema(c.id)"
                   aria-label="Sync schema"
-                  data-tooltip="Sync schema"
                 >
                   <i
                     class="pi text-xs"
@@ -271,10 +271,10 @@ onMounted(fetchCatalogs);
                 </button>
                 <button
                   class="action-button bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                  v-tooltip.top="'Duplicate'"
                   :disabled="duplicatingCatalogId === c.id"
                   @click="duplicateCatalog(c)"
                   aria-label="Duplicate"
-                  data-tooltip="Duplicate"
                 >
                   <i
                     class="pi text-xs"
@@ -287,9 +287,9 @@ onMounted(fetchCatalogs);
                 </button>
                 <button
                   class="action-button bg-red-600 text-white hover:bg-red-700"
+                  v-tooltip.top="'Delete'"
                   @click="removeCatalog(c.id)"
                   aria-label="Delete"
-                  data-tooltip="Delete"
                 >
                   <i class="pi pi-trash text-xs"></i>
                 </button>
@@ -330,48 +330,5 @@ onMounted(fetchCatalogs);
 
 .action-button:hover:not(:disabled) {
   transform: translateY(-1px);
-}
-
-.action-button::before,
-.action-button::after {
-  position: absolute;
-  left: 50%;
-  z-index: 30;
-  pointer-events: none;
-  opacity: 0;
-  transform: translateX(-50%) translateY(2px);
-  transition:
-    opacity 80ms ease,
-    transform 80ms ease;
-}
-
-.action-button::before {
-  content: attr(data-tooltip);
-  bottom: calc(100% + 0.5rem);
-  max-width: 9rem;
-  white-space: nowrap;
-  border-radius: 0.375rem;
-  background: #111827;
-  padding: 0.25rem 0.5rem;
-  color: white;
-  font-size: 0.75rem;
-  line-height: 1rem;
-  box-shadow: 0 8px 20px rgb(15 23 42 / 0.18);
-}
-
-.action-button::after {
-  content: "";
-  bottom: calc(100% + 0.25rem);
-  border-width: 0.25rem 0.25rem 0;
-  border-style: solid;
-  border-color: #111827 transparent transparent;
-}
-
-.action-button:hover::before,
-.action-button:hover::after,
-.action-button:focus-visible::before,
-.action-button:focus-visible::after {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
 }
 </style>
