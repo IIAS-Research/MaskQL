@@ -2,6 +2,31 @@
 
 <!-- version list -->
 
+## v1.4.0 (2026-06-10)
+
+### Bug Fixes
+
+- Able to crypt char
+  ([`1ea43ca`](https://github.com/IIAS-Research/MaskQL/commit/1ea43caf9b1e31c2b84c7892ab43a3b96ff2d1cc))
+
+- Better catalog handling
+  ([`2baf444`](https://github.com/IIAS-Research/MaskQL/commit/2baf444446f88cdb8aab6ca964bdbcb8a89c97df))
+
+### Features
+
+- Button better tooltip
+  ([`e25b2cd`](https://github.com/IIAS-Research/MaskQL/commit/e25b2cd817cbc54821b36479a45b59b67135e740))
+
+- Button title
+  ([`2913a2f`](https://github.com/IIAS-Research/MaskQL/commit/2913a2f6233e4e7acfabbe4ecfd31053ccce841a))
+
+- Duplicate database + button icons
+  ([`e3d25fc`](https://github.com/IIAS-Research/MaskQL/commit/e3d25fc5be43fd7a5e6f04f92f663a1873886a29))
+
+- Focused preview
+  ([`2a52a5e`](https://github.com/IIAS-Research/MaskQL/commit/2a52a5e1aab65462ab3f92308e0e178bcedf5a65))
+
+
 ## v1.3.0 (2026-04-02)
 
 ### Features
