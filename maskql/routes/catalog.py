@@ -86,12 +86,27 @@ async def preview_catalog_table(catalog_id: int, payload: CatalogTablePreviewReq
             payload.user_id,
             payload.schema_name,
             payload.table_name,
+            column_name=payload.column_name,
             limit=payload.limit,
         )
     except ValueError as e:
         detail = str(e)
         status_code = 404 if detail in {"Catalog not found", "User not found"} else 400
         raise HTTPException(status_code=status_code, detail=detail)
+
+@router.post("/{catalog_id}/duplicate", response_model=CatalogRead, status_code=status.HTTP_201_CREATED)
+async def duplicate_catalog(catalog_id: int):
+    try:
+        obj = await CatalogService.duplicate(catalog_id)
+        if not obj:
+            raise HTTPException(status_code=404, detail="Catalog not found")
+        return CatalogRead.model_validate(obj)
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 @router.get("/{catalog_id}", response_model=CatalogRead)
 async def get_catalog(catalog_id: int):

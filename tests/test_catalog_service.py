@@ -3,7 +3,10 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from maskql.models.catalog import Catalog
-from maskql.services.catalog_service import CatalogService, _should_skip_schema
+from maskql.services.catalog_service import (
+    CatalogService,
+    _should_skip_schema,
+)
 
 
 def _catalog(*, sgbd: str) -> Catalog:
@@ -195,6 +198,44 @@ class CatalogReplacementTests(unittest.IsolatedAsyncioTestCase):
         drop.assert_awaited_once_with("sample", timeout=9)
 
 
+class CatalogDuplicateTests(unittest.IsolatedAsyncioTestCase):
+    async def test_duplicate_copies_connection_fields_and_secret(self):
+        source = _catalog(sgbd="postgresql")
+        source.id = 7
+        existing_copy = _catalog(sgbd="postgresql")
+        existing_copy.id = 8
+        existing_copy.name = "samplecopy"
+        created = _catalog(sgbd="postgresql")
+        created.id = 9
+        created.name = "samplecopycopy"
+
+        with (
+            patch.object(CatalogService, "get", AsyncMock(return_value=source)),
+            patch.object(
+                CatalogService,
+                "list_all",
+                AsyncMock(return_value=[source, existing_copy]),
+            ),
+            patch.object(CatalogService, "create", AsyncMock(return_value=created)) as create,
+        ):
+            duplicate = await CatalogService.duplicate(7)
+
+        self.assertIs(duplicate, created)
+        create.assert_awaited_once()
+        payload = create.await_args.args[0]
+        self.assertEqual(payload.name, "samplecopycopy")
+        self.assertEqual(payload.url, source.url)
+        self.assertEqual(payload.sgbd, source.sgbd)
+        self.assertEqual(payload.username, source.username)
+        self.assertEqual(payload.password, source.password)
+
+    async def test_duplicate_returns_none_when_source_catalog_is_missing(self):
+        with patch.object(CatalogService, "get", AsyncMock(return_value=None)):
+            duplicate = await CatalogService.duplicate(404)
+
+        self.assertIsNone(duplicate)
+
+
 class CatalogSchemaSkipTests(unittest.TestCase):
     def test_should_skip_sqlserver_system_schemas_case_insensitively(self):
         catalog = _catalog(sgbd="sqlserver")
@@ -293,3 +334,118 @@ class CatalogPreviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(preview.after_maskql.columns, [])
         self.assertEqual(preview.after_maskql.rows, [])
         self.assertIn("Access denied for preview", preview.after_maskql.error)
+
+    async def test_preview_table_prefers_rows_with_focused_column_values(self):
+        catalog = _catalog(sgbd="postgresql")
+        catalog.id = 7
+        mocked_trino_sql = AsyncMock(
+            side_effect=[
+                {
+                    "columns": ["id", "middle_name"],
+                    "rows": [{"id": 2, "middle_name": "Anne"}],
+                },
+                {
+                    "columns": ["id", "middle_name"],
+                    "rows": [{"id": 2, "middle_name": "masked"}],
+                },
+            ]
+        )
+
+        with (
+            patch.object(CatalogService, "get", AsyncMock(return_value=catalog)),
+            patch(
+                "maskql.services.catalog_service.UserService.get",
+                AsyncMock(return_value=SimpleNamespace(username="alice")),
+            ),
+            patch("maskql.services.catalog_service.trino_sql", mocked_trino_sql),
+        ):
+            preview = await CatalogService.preview_table(
+                7,
+                11,
+                "public",
+                "people",
+                column_name='middle"name',
+            )
+
+        self.assertEqual(
+            preview.before_maskql.rows,
+            [{"id": 2, "middle_name": "Anne"}],
+        )
+        self.assertEqual(
+            preview.after_maskql.rows,
+            [{"id": 2, "middle_name": "masked"}],
+        )
+
+        statements = [call.args[0] for call in mocked_trino_sql.await_args_list]
+        self.assertEqual(
+            statements,
+            [
+                'SELECT * FROM "sample"."public"."people" WHERE "middle""name" IS NOT NULL LIMIT 5',
+                'SELECT * FROM "sample"."public"."people" WHERE "middle""name" IS NOT NULL LIMIT 5',
+            ],
+        )
+        self.assertIsNone(mocked_trino_sql.await_args_list[0].kwargs.get("user"))
+        self.assertEqual(
+            mocked_trino_sql.await_args_list[1].kwargs.get("user"),
+            "alice",
+        )
+
+    async def test_preview_table_falls_back_when_focused_column_has_no_rows(self):
+        catalog = _catalog(sgbd="postgresql")
+        catalog.id = 7
+        mocked_trino_sql = AsyncMock(
+            side_effect=[
+                {
+                    "columns": ["id", "middle_name"],
+                    "rows": [],
+                },
+                {
+                    "columns": ["id", "middle_name"],
+                    "rows": [{"id": 1, "middle_name": None}],
+                },
+                {
+                    "columns": ["id", "middle_name"],
+                    "rows": [],
+                },
+                {
+                    "columns": ["id", "middle_name"],
+                    "rows": [{"id": 1, "middle_name": None}],
+                },
+            ]
+        )
+
+        with (
+            patch.object(CatalogService, "get", AsyncMock(return_value=catalog)),
+            patch(
+                "maskql.services.catalog_service.UserService.get",
+                AsyncMock(return_value=SimpleNamespace(username="alice")),
+            ),
+            patch("maskql.services.catalog_service.trino_sql", mocked_trino_sql),
+        ):
+            preview = await CatalogService.preview_table(
+                7,
+                11,
+                "public",
+                "people",
+                column_name="middle_name",
+            )
+
+        self.assertEqual(
+            preview.before_maskql.rows,
+            [{"id": 1, "middle_name": None}],
+        )
+        self.assertEqual(
+            preview.after_maskql.rows,
+            [{"id": 1, "middle_name": None}],
+        )
+
+        statements = [call.args[0] for call in mocked_trino_sql.await_args_list]
+        self.assertEqual(
+            statements,
+            [
+                'SELECT * FROM "sample"."public"."people" WHERE "middle_name" IS NOT NULL LIMIT 5',
+                'SELECT * FROM "sample"."public"."people" LIMIT 5',
+                'SELECT * FROM "sample"."public"."people" WHERE "middle_name" IS NOT NULL LIMIT 5',
+                'SELECT * FROM "sample"."public"."people" LIMIT 5',
+            ],
+        )

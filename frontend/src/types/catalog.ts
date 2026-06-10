@@ -49,6 +49,7 @@ export interface CatalogTablePreviewRequest {
   user_id: number;
   schema_name: string;
   table_name: string;
+  column_name?: string | null;
   limit?: number;
 }
 
@@ -108,6 +109,13 @@ export class Catalogs extends BaseResource<
   async syncSchema(catalogId: number): Promise<CatalogSchemaSyncResult> {
     const { data } = await http.post<CatalogSchemaSyncResult>(
       `${this.endpoint}/${catalogId}/schema/sync`,
+    );
+    return data;
+  }
+
+  async duplicate(catalogId: number): Promise<Catalog> {
+    const { data } = await http.post<Catalog>(
+      `${this.endpoint}/${catalogId}/duplicate`,
     );
     return data;
   }

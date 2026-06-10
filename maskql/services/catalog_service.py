@@ -144,6 +144,27 @@ class CatalogService:
             return obj
 
     @staticmethod
+    async def duplicate(catalog_id: int) -> Catalog | None:
+        source = await CatalogService.get(catalog_id)
+        if not source:
+            return None
+
+        existing_names = {catalog.name for catalog in await CatalogService.list_all()}
+        name = f"{source.name}copy"
+        while name in existing_names:
+            name = f"{name}copy"
+
+        return await CatalogService.create(
+            CatalogCreate(
+                name=name,
+                url=source.url,
+                sgbd=source.sgbd,
+                username=source.username,
+                password=source.password,
+            )
+        )
+
+    @staticmethod
     async def patch(catalog_id: int, patch: CatalogPatch) -> Catalog | None:
         async with AsyncSessionLocal() as session:
             obj = await session.get(Catalog, catalog_id)
@@ -425,6 +446,7 @@ class CatalogService:
         schema_name: str,
         table_name: str,
         *,
+        column_name: Optional[str] = None,
         limit: int = 5,
         timeout: float = 30.0,
     ) -> CatalogTablePreviewRead:
@@ -441,20 +463,34 @@ class CatalogService:
         if not normalized_schema or not normalized_table:
             raise ValueError("Schema and table names are required")
 
+        normalized_column = (column_name or "").strip() or None
         safe_limit = max(1, min(int(limit), 50))
-        sql = CatalogService._build_preview_sql(
+        base_sql = CatalogService._build_preview_sql(
             catalog.name,
             normalized_schema,
             normalized_table,
             limit=safe_limit,
         )
+        focused_sql = (
+            CatalogService._build_preview_sql(
+                catalog.name,
+                normalized_schema,
+                normalized_table,
+                limit=safe_limit,
+                non_null_column=normalized_column,
+            )
+            if normalized_column
+            else None
+        )
 
-        before_maskql = await CatalogService._run_preview_query(
-            sql,
+        before_maskql = await CatalogService._run_preview_query_with_fallback(
+            base_sql,
+            focused_sql=focused_sql,
             timeout=timeout,
         )
-        after_maskql = await CatalogService._run_preview_query(
-            sql,
+        after_maskql = await CatalogService._run_preview_query_with_fallback(
+            base_sql,
+            focused_sql=focused_sql,
             user=user.username,
             timeout=timeout,
         )
@@ -649,11 +685,47 @@ class CatalogService:
         table_name: str,
         *,
         limit: int,
+        non_null_column: Optional[str] = None,
     ) -> str:
+        where_clause = (
+            f"WHERE {_sql_identifier(non_null_column)} IS NOT NULL "
+            if non_null_column
+            else ""
+        )
         return (
             f"SELECT * FROM {_sql_identifier(catalog_name)}."
             f"{_sql_identifier(schema_name)}.{_sql_identifier(table_name)} "
+            f"{where_clause}"
             f"LIMIT {int(limit)}"
+        )
+
+    @staticmethod
+    async def _run_preview_query_with_fallback(
+        base_sql: str,
+        *,
+        focused_sql: Optional[str] = None,
+        user: Optional[str] = None,
+        timeout: float = 30.0,
+    ) -> CatalogPreviewDatasetRead:
+        if not focused_sql:
+            return await CatalogService._run_preview_query(
+                base_sql,
+                user=user,
+                timeout=timeout,
+            )
+
+        focused = await CatalogService._run_preview_query(
+            focused_sql,
+            user=user,
+            timeout=timeout,
+        )
+        if not focused.error and focused.rows:
+            return focused
+
+        return await CatalogService._run_preview_query(
+            base_sql,
+            user=user,
+            timeout=timeout,
         )
 
     @staticmethod

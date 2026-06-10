@@ -73,6 +73,7 @@ const tableConfig = ref<TableConfigScope | null>(null);
 const preview = ref<CatalogTablePreview | null>(null);
 const previewLoading = ref(false);
 const previewRequestError = ref("");
+const previewColumnName = ref<string | null>(null);
 
 const missingPathHint = "Possibly not present in the database";
 
@@ -371,6 +372,33 @@ function queuePreviewRefresh(delay = 250) {
   }, delay);
 }
 
+function focusPreviewColumn(
+  catalogId: number,
+  schema: string,
+  table: string,
+  column: string,
+  refresh = true,
+) {
+  if (!previewMatchesScope(catalogId, schema, table)) return;
+
+  const normalizedColumn = column.trim() || null;
+  if (previewColumnName.value === normalizedColumn) return;
+
+  previewColumnName.value = normalizedColumn;
+  if (refresh) queuePreviewRefresh(0);
+}
+
+function focusPreviewColumnKey(key: string, refresh = true) {
+  const [, cId, schema, table, column] = key.split(":");
+  focusPreviewColumn(Number(cId), schema, table, column, refresh);
+}
+
+function clearPreviewColumn() {
+  if (!previewColumnName.value) return;
+  previewColumnName.value = null;
+  queuePreviewRefresh(0);
+}
+
 async function refreshTablePreview() {
   const scope = tableConfig.value;
   if (!scope) return;
@@ -384,6 +412,7 @@ async function refreshTablePreview() {
       user_id: props.userId,
       schema_name: scope.schema,
       table_name: scope.table,
+      column_name: previewColumnName.value,
       limit: 5,
     });
 
@@ -642,6 +671,7 @@ function closeTableConfig() {
   preview.value = null;
   previewLoading.value = false;
   previewRequestError.value = "";
+  previewColumnName.value = null;
   draftColumnName.value = "";
   previewRequestSequence += 1;
 
@@ -663,6 +693,7 @@ function openTableConfig(key: string) {
   tableConfigVisible.value = true;
   preview.value = null;
   previewRequestError.value = "";
+  previewColumnName.value = null;
   void refreshTablePreview();
 }
 
@@ -1109,6 +1140,7 @@ async function addManualColumn() {
   if (!created) return;
 
   draftColumnName.value = "";
+  focusPreviewColumn(scope.catalogId, scope.schema, scope.table, column);
   toast.add({
     severity: "success",
     summary: "Added",
@@ -1137,20 +1169,38 @@ function cardClassOfColumnKey(key: string) {
   return cardClassOf(Number(cId), schema, table, column);
 }
 
+function isPreviewColumnKey(key: string) {
+  const [, cId, schema, table, column] = key.split(":");
+  const scope = tableConfig.value;
+  return (
+    !!scope &&
+    scope.catalogId === Number(cId) &&
+    scope.schema === schema &&
+    scope.table === table &&
+    previewColumnName.value === column
+  );
+}
+
 const allowColumnKey = (key: string) => {
   const [, cId, schema, table, column] = key.split(":");
+  focusPreviewColumn(Number(cId), schema, table, column, false);
   return setAllow(Number(cId), schema, table, column);
 };
 const denyColumnKey = (key: string) => {
   const [, cId, schema, table, column] = key.split(":");
+  focusPreviewColumn(Number(cId), schema, table, column, false);
   return setDeny(Number(cId), schema, table, column);
 };
 const inheritColumnKey = (key: string) => {
   const [, cId, schema, table, column] = key.split(":");
+  focusPreviewColumn(Number(cId), schema, table, column, false);
   return setInherit(Number(cId), schema, table, column);
 };
 const removeColumnKey = (key: string) => {
   const [, cId, schema, table, column] = key.split(":");
+  if (previewMatchesScope(Number(cId), schema, table)) {
+    previewColumnName.value = null;
+  }
   return removeMissingPath(Number(cId), schema, table, column);
 };
 const getEffectColumnKey = (key: string) => {
@@ -1159,6 +1209,7 @@ const getEffectColumnKey = (key: string) => {
 };
 const setEffectColumnKey = (key: string, value: string) => {
   const [, cId, schema, table, column] = key.split(":");
+  focusPreviewColumn(Number(cId), schema, table, column, false);
   return setEffectScope(Number(cId), schema, table, column, value);
 };
 
@@ -1737,7 +1788,7 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
           class="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.35fr)]"
         >
           <section class="rounded-2xl border bg-white p-4">
-            <div class="flex items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h4 class="text-sm font-semibold text-gray-900">Columns</h4>
                 <p class="text-xs text-gray-500">
@@ -1758,7 +1809,12 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
                 v-for="it in activeColumnItems"
                 :key="it.key"
                 class="rounded-xl p-2 transition-colors"
-                :class="cardClassOfColumnKey(it.key)"
+                :class="[
+                  cardClassOfColumnKey(it.key),
+                  isPreviewColumnKey(it.key) ? 'ring-2 ring-indigo-200' : '',
+                ]"
+                @click="focusPreviewColumnKey(it.key)"
+                @focusin="focusPreviewColumnKey(it.key)"
               >
                 <div class="flex items-start justify-between gap-2">
                   <div class="min-w-0 flex-1">
@@ -1788,21 +1844,21 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
                     <div class="inline-flex border rounded-lg">
                       <button
                         :class="segBtn(statusOfColumnKey(it.key) === 'allow')"
-                        @click="allowColumnKey(it.key)"
+                        @click.stop="allowColumnKey(it.key)"
                         title="Autoriser"
                       >
                         <i class="pi pi-check text-xs"></i>
                       </button>
                       <button
                         :class="segBtn(statusOfColumnKey(it.key) === 'deny')"
-                        @click="denyColumnKey(it.key)"
+                        @click.stop="denyColumnKey(it.key)"
                         title="Refuser"
                       >
                         <i class="pi pi-ban text-xs"></i>
                       </button>
                       <button
                         :class="segBtn(statusOfColumnKey(it.key) === 'inherit')"
-                        @click="inheritColumnKey(it.key)"
+                        @click.stop="inheritColumnKey(it.key)"
                         title="Hériter"
                       >
                         <i class="pi pi-undo text-xs"></i>
@@ -1813,7 +1869,7 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
                       v-if="it.removable"
                       class="inline-flex items-center justify-center h-7 w-7 border rounded-lg text-amber-600 hover:bg-amber-50"
                       title="Remove missing column item"
-                      @click="removeColumnKey(it.key)"
+                      @click.stop="removeColumnKey(it.key)"
                     >
                       <i class="pi pi-trash text-xs"></i>
                     </button>
@@ -1877,18 +1933,36 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
               <div>
                 <h4 class="text-sm font-semibold text-gray-900">Preview</h4>
                 <p class="text-xs text-gray-500">
-                  First 5 rows before and after MaskQL.
+                  Rows before and after MaskQL.
                 </p>
               </div>
 
-              <button
-                class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                :disabled="previewLoading"
-                @click="refreshTablePreview"
-              >
-                <i class="pi pi-refresh mr-2 text-xs"></i>
-                Refresh preview
-              </button>
+              <div class="flex flex-wrap items-center justify-end gap-2">
+                <span
+                  v-if="previewColumnName"
+                  class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs text-indigo-700"
+                >
+                  <span class="max-w-[14rem] truncate">
+                    Focus: {{ previewColumnName }}
+                  </span>
+                  <button
+                    class="inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-indigo-100"
+                    type="button"
+                    aria-label="Clear preview focus"
+                    @click="clearPreviewColumn"
+                  >
+                    <i class="pi pi-times text-[9px]"></i>
+                  </button>
+                </span>
+                <button
+                  class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                  :disabled="previewLoading"
+                  @click="refreshTablePreview"
+                >
+                  <i class="pi pi-refresh mr-2 text-xs"></i>
+                  Refresh preview
+                </button>
+              </div>
             </div>
 
             <div
