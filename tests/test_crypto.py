@@ -72,6 +72,25 @@ class TestCryptoFunctions(unittest.TestCase):
         self.assertEqual(dec, original, "Decrypt must restore original VARCHAR")
         self.assertEqual(dec_type, "varchar", "Type must stay VARCHAR after decrypt")
 
+    def test_encrypt_decrypt_char(self):
+        original = "Hello MaskQL"
+        row = self._row(
+            """
+            SELECT
+                encrypt(CAST(? AS CHAR(20))) AS enc,
+                typeof(encrypt(CAST(? AS CHAR(20)))) AS enc_type,
+                decrypt(encrypt(CAST(? AS CHAR(20))), ?) AS dec,
+                typeof(decrypt(encrypt(CAST(? AS CHAR(20))), ?)) AS dec_type
+            """,
+            (original, original, original, ENCRYPT_PASSWORD, original, ENCRYPT_PASSWORD),
+        )
+        enc, enc_type, dec, dec_type = row
+        self.assertIsInstance(enc, str, "Encrypted CHAR must be a string")
+        self.assertNotEqual(enc, original, "Encrypted CHAR must be different")
+        self.assertEqual(enc_type, "varchar", "CHAR encryption must return encrypted VARCHAR")
+        self.assertEqual(dec, original, "Decrypt must restore original CHAR payload")
+        self.assertEqual(dec_type, "varchar", "Decrypt of encrypted CHAR returns VARCHAR")
+
     # VARBINARY
     def test_encrypt_decrypt_varbinary(self):
         original_hex = "00010241FF"
