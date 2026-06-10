@@ -22,6 +22,16 @@ public final class MaskStructured {
         return Slices.utf8Slice(Base64.getEncoder().encodeToString(ct));
     }
 
+    @ScalarFunction("encrypt")
+    @LiteralParameters("x")
+    @Description("Encrypt CHAR with env password; returns base64(nonce||ciphertext)")
+    @SqlType(StandardTypes.VARCHAR)
+    public static Slice encryptChar(@SqlType("char(x)") Slice value) {
+        if (value == null) return null;
+        byte[] ct = MaskCrypto.encryptDeterministicBytes(value.getBytes(), MaskCrypto.DOMAIN_VARCHAR);
+        return Slices.utf8Slice(Base64.getEncoder().encodeToString(ct));
+    }
+
     @ScalarFunction("decrypt")
     @Description("Decrypt VARCHAR produced by encrypt(VARCHAR)")
     @SqlType(StandardTypes.VARCHAR)

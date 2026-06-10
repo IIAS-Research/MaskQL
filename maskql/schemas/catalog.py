@@ -69,6 +69,7 @@ class CatalogTablePreviewRequest(SQLModel):
     user_id: int
     schema_name: str
     table_name: str
+    column_name: Optional[str] = None
     limit: int = 5
 
     @field_validator("schema_name", "table_name", mode="before")
@@ -76,6 +77,14 @@ class CatalogTablePreviewRequest(SQLModel):
     def strip_required_names(cls, value):
         if isinstance(value, str):
             return value.strip()
+        return value
+
+    @field_validator("column_name", mode="before")
+    @classmethod
+    def empty_column_name_to_none(cls, value):
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
         return value
 
     @field_validator("limit")

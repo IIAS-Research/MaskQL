@@ -37,6 +37,22 @@ def seed_test_data(conn):
     """))
     conn.execute(text("""
         INSERT INTO rules(schema_name, table_name, column_name, allow, effect, catalog_id, user_id)
+        SELECT 'public', 'client', 'char_code', true, 'encrypt(char_code)', c.id, u.id
+        FROM catalogs c
+        JOIN users u ON u.username = 'demo'
+        WHERE c.name = 'demo'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM rules r
+              WHERE r.catalog_id = c.id
+                AND r.user_id = u.id
+                AND r.schema_name = 'public'
+                AND r.table_name = 'client'
+                AND r.column_name = 'char_code'
+          )
+    """))
+    conn.execute(text("""
+        INSERT INTO rules(schema_name, table_name, column_name, allow, effect, catalog_id, user_id)
         SELECT 'public', 'client', NULL, true, 'email like ''a%''', c.id, u.id
         FROM catalogs c
         JOIN users u ON u.username = 'demo'
