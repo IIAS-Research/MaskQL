@@ -99,6 +99,11 @@ def _catalog_connection_parts(catalog: Catalog) -> list[str]:
     ]
 
 
+def _catalog_probe_sql(catalog: Catalog) -> str:
+    catalog_ident = _sql_identifier(catalog.name)
+    return f"SELECT schema_name FROM {catalog_ident}.information_schema.schemata LIMIT 1"
+
+
 def _temp_catalog_name(prefix: str = "healthcheck") -> str:
     suffix = "".join(secrets.choice(string.ascii_lowercase) for _ in range(10))
     return f"{prefix}{suffix}"
@@ -144,15 +149,39 @@ class CatalogService:
             obj = await session.get(Catalog, catalog_id)
             if not obj:
                 return None
-            previous_name = obj.name
             data = patch.model_dump(exclude_unset=True)
+            if not data:
+                return obj
+
+            if "name" in data and data["name"] != obj.name:
+                exists = await session.exec(
+                    select(Catalog)
+                    .where(Catalog.name == data["name"])
+                    .where(Catalog.id != catalog_id)
+                )
+                if exists.first():
+                    raise ValueError("Catalog name already exists")
+
+            previous = Catalog(
+                id=obj.id,
+                name=obj.name,
+                url=obj.url,
+                sgbd=obj.sgbd,
+                username=obj.username,
+                password=obj.password,
+            )
             for k, v in data.items():
                 setattr(obj, k, v)
+
+            catalog_changed = any(
+                getattr(previous, field) != getattr(obj, field)
+                for field in ("name", "url", "sgbd", "username", "password")
+            )
+            if catalog_changed:
+                await CatalogService._replace_catalog_in_trino(previous, obj)
+
             await session.commit()
             await session.refresh(obj)
-            if previous_name != obj.name:
-                await CatalogService._drop_catalog_in_trino(previous_name)
-            await CatalogService._upsert_catalog_in_trino(obj)
             try:
                 await CatalogService.sync_schema(obj.id, ensure_catalog_in_trino=False)
             except Exception:
@@ -173,14 +202,6 @@ class CatalogService:
 
     @staticmethod
     async def refresh_in_trino() -> dict:
-            
-        # Force Trino to scan catalogs, it will crash but that's ok
-        # TODO -> It must have something better to do...
-        try: 
-            await trino_ddl("CREATE CATALOG _noop USING tpch")
-            await trino_ddl("DROP CATALOG _noop")
-        except:
-            pass
         try:     
             # Drop old catalogs
             protected_catalogs = {'jmx', 'memory', 'system', 'tpcds', 'tpch'}
@@ -211,11 +232,10 @@ class CatalogService:
             raise ValueError("Catalog ID is required to compute connection status")
 
         try:
-            temp_catalog = await CatalogService._create_temp_catalog(catalog, prefix="healthcheck", timeout=timeout)
             # `SHOW SCHEMAS` is blocked by the current Trino ACL plugin.
             # Querying information_schema still proves the connector can load metadata.
             await trino_sql(
-                f"SELECT schema_name FROM {temp_catalog}.information_schema.schemata LIMIT 1",
+                _catalog_probe_sql(catalog),
                 timeout=timeout,
             )
             return CatalogConnectionStatusRead(
@@ -230,11 +250,6 @@ class CatalogService:
                 state="error",
                 message=detail[:300],
             )
-        finally:
-            try:
-                await CatalogService._drop_temp_catalog(temp_catalog, timeout=timeout)
-            except UnboundLocalError:
-                pass
 
     @staticmethod
     async def list_connection_statuses() -> list[CatalogConnectionStatusRead]:
@@ -325,7 +340,7 @@ class CatalogService:
         catalog_id: int,
         *,
         timeout: float = 30.0,
-        ensure_catalog_in_trino: bool = True,
+        ensure_catalog_in_trino: bool = False,
     ) -> CatalogSchemaSyncRead:
         catalog = await CatalogService.get(catalog_id)
         if not catalog:
@@ -590,14 +605,42 @@ class CatalogService:
             pass
 
     @staticmethod
-    async def _upsert_catalog_in_trino(catalog: Catalog, *, timeout: float = 30.0) -> None:
-        await CatalogService._drop_catalog_in_trino(catalog.name, timeout=timeout)
-
+    async def _create_catalog_in_trino(catalog: Catalog, *, timeout: float = 30.0) -> None:
         await trino_ddl(
             f"CREATE CATALOG {catalog.name} USING {catalog.sgbd} WITH "
             f"(\n  {', '.join(_catalog_connection_parts(catalog))}\n)",
             timeout=timeout,
         )
+
+    @staticmethod
+    async def _upsert_catalog_in_trino(catalog: Catalog, *, timeout: float = 30.0) -> None:
+        await CatalogService._drop_catalog_in_trino(catalog.name, timeout=timeout)
+        await CatalogService._create_catalog_in_trino(catalog, timeout=timeout)
+
+    @staticmethod
+    async def _replace_catalog_in_trino(
+        previous: Catalog,
+        current: Catalog,
+        *,
+        timeout: float = 30.0,
+    ) -> None:
+        if previous.name != current.name:
+            try:
+                await CatalogService._create_catalog_in_trino(current, timeout=timeout)
+            except Exception:
+                raise
+            await CatalogService._drop_catalog_in_trino(previous.name, timeout=timeout)
+            return
+
+        await CatalogService._drop_catalog_in_trino(current.name, timeout=timeout)
+        try:
+            await CatalogService._create_catalog_in_trino(current, timeout=timeout)
+        except Exception:
+            try:
+                await CatalogService._create_catalog_in_trino(previous, timeout=timeout)
+            except Exception:
+                log.exception("Unable to restore previous Trino catalog %s", previous.name)
+            raise
 
     @staticmethod
     def _build_preview_sql(

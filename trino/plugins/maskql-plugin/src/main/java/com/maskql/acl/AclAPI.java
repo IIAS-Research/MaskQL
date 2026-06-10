@@ -4,6 +4,7 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.*;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.*;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,12 +17,28 @@ public class AclAPI {
     private final URI baseUri;
     private final HttpClient client;
     private final ObjectMapper mapper;
+    private final Duration requestTimeout;
 
     public AclAPI() { this("http://maskql:8081"); }
     public AclAPI(String baseUrl) {
         this.baseUri = URI.create(Objects.requireNonNull(baseUrl));
-        this.client = HttpClient.newHttpClient();
+        this.client = HttpClient.newBuilder()
+                .connectTimeout(timeoutFromEnv("MASKQL_ACL_CONNECT_TIMEOUT_SECONDS", 3))
+                .build();
+        this.requestTimeout = timeoutFromEnv("MASKQL_ACL_REQUEST_TIMEOUT_SECONDS", 10);
         this.mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
+    }
+
+    private static Duration timeoutFromEnv(String name, int defaultSeconds) {
+        String raw = System.getenv(name);
+        if (raw == null || raw.isBlank()) {
+            return Duration.ofSeconds(defaultSeconds);
+        }
+        try {
+            return Duration.ofSeconds(Math.max(1, Integer.parseInt(raw.trim())));
+        } catch (NumberFormatException e) {
+            return Duration.ofSeconds(defaultSeconds);
+        }
     }
 
     // ---- helpers
@@ -35,6 +52,7 @@ public class AclAPI {
     private HttpResponse<String> postJson(URI uri, Object body) throws Exception {
         String json = mapper.writeValueAsString(body);
         HttpRequest req = HttpRequest.newBuilder(uri)
+                .timeout(requestTimeout)
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json))
@@ -43,6 +61,7 @@ public class AclAPI {
     }
     private HttpResponse<String> postNoBody(URI uri) throws Exception {
         HttpRequest req = HttpRequest.newBuilder(uri)
+                .timeout(requestTimeout)
                 .header("Accept", "application/json")
                 .POST(HttpRequest.BodyPublishers.noBody())
                 .build();

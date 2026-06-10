@@ -116,9 +116,12 @@ async def patch_catalog(catalog_id: int, payload: CatalogPatch):
         if not obj:
             raise HTTPException(status_code=404, detail="Catalog not found")
         return CatalogRead.model_validate(obj)
-    except Exception as e:
-        # ex: nom déjà utilisé
+    except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 @router.delete("/{catalog_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_catalog(catalog_id: int):

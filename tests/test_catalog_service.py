@@ -72,6 +72,128 @@ class CatalogServiceScanTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("lower(table_schema) <> 'sys'", statements[1])
         self.assertIn("lower(table_schema) NOT LIKE 'db_%'", statements[2])
 
+    async def test_sync_schema_does_not_recreate_catalog_by_default(self):
+        catalog = _catalog(sgbd="postgresql")
+        catalog.id = 7
+
+        with (
+            patch.object(CatalogService, "get", AsyncMock(return_value=catalog)),
+            patch.object(
+                CatalogService,
+                "_scan_schema_paths",
+                AsyncMock(side_effect=RuntimeError("scan failed")),
+            ),
+            patch.object(
+                CatalogService,
+                "_upsert_catalog_in_trino",
+                AsyncMock(),
+            ) as mocked_upsert,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "scan failed"):
+                await CatalogService.sync_schema(7)
+
+        mocked_upsert.assert_not_awaited()
+
+    async def test_sync_schema_can_still_force_catalog_registration(self):
+        catalog = _catalog(sgbd="postgresql")
+        catalog.id = 7
+
+        with (
+            patch.object(CatalogService, "get", AsyncMock(return_value=catalog)),
+            patch.object(
+                CatalogService,
+                "_scan_schema_paths",
+                AsyncMock(side_effect=RuntimeError("scan failed")),
+            ),
+            patch.object(
+                CatalogService,
+                "_upsert_catalog_in_trino",
+                AsyncMock(),
+            ) as mocked_upsert,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "scan failed"):
+                await CatalogService.sync_schema(7, ensure_catalog_in_trino=True)
+
+        mocked_upsert.assert_awaited_once_with(catalog, timeout=30.0)
+
+
+class CatalogConnectionStatusTests(unittest.IsolatedAsyncioTestCase):
+    async def test_connection_status_queries_existing_catalog_without_temp_catalog(self):
+        catalog = _catalog(sgbd="postgresql")
+        catalog.id = 7
+        mocked_trino_sql = AsyncMock(return_value={"rows": [["public"]]})
+
+        with (
+            patch("maskql.services.catalog_service.trino_sql", mocked_trino_sql),
+            patch.object(
+                CatalogService,
+                "_create_temp_catalog",
+                AsyncMock(side_effect=AssertionError("temp catalog must not be created")),
+            ),
+            patch.object(
+                CatalogService,
+                "_drop_temp_catalog",
+                AsyncMock(side_effect=AssertionError("temp catalog must not be dropped")),
+            ),
+        ):
+            status = await CatalogService.connection_status(catalog, timeout=5)
+
+        self.assertEqual(status.catalog_id, 7)
+        self.assertEqual(status.state, "ok")
+        mocked_trino_sql.assert_awaited_once()
+        statement = mocked_trino_sql.await_args.args[0]
+        self.assertEqual(
+            statement,
+            'SELECT schema_name FROM "sample".information_schema.schemata LIMIT 1',
+        )
+        self.assertEqual(mocked_trino_sql.await_args.kwargs["timeout"], 5)
+
+
+class CatalogReplacementTests(unittest.IsolatedAsyncioTestCase):
+    async def test_replace_catalog_restores_previous_catalog_when_same_name_create_fails(self):
+        previous = _catalog(sgbd="postgresql")
+        current = Catalog(
+            id=previous.id,
+            name=previous.name,
+            url="jdbc:placeholder://new-host/db",
+            sgbd=previous.sgbd,
+            username=previous.username,
+            password=previous.password,
+        )
+        create = AsyncMock(side_effect=[RuntimeError("create failed"), None])
+
+        with (
+            patch.object(CatalogService, "_drop_catalog_in_trino", AsyncMock()) as drop,
+            patch.object(CatalogService, "_create_catalog_in_trino", create),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "create failed"):
+                await CatalogService._replace_catalog_in_trino(previous, current, timeout=9)
+
+        drop.assert_awaited_once_with("sample", timeout=9)
+        self.assertEqual(create.await_count, 2)
+        self.assertIs(create.await_args_list[0].args[0], current)
+        self.assertIs(create.await_args_list[1].args[0], previous)
+
+    async def test_replace_catalog_creates_new_name_before_dropping_previous_name(self):
+        previous = _catalog(sgbd="postgresql")
+        current = Catalog(
+            id=previous.id,
+            name="sampletwo",
+            url=previous.url,
+            sgbd=previous.sgbd,
+            username=previous.username,
+            password=previous.password,
+        )
+
+        with (
+            patch.object(CatalogService, "_drop_catalog_in_trino", AsyncMock()) as drop,
+            patch.object(CatalogService, "_create_catalog_in_trino", AsyncMock()) as create,
+        ):
+            await CatalogService._replace_catalog_in_trino(previous, current, timeout=9)
+
+        create.assert_awaited_once_with(current, timeout=9)
+        drop.assert_awaited_once_with("sample", timeout=9)
+
 
 class CatalogSchemaSkipTests(unittest.TestCase):
     def test_should_skip_sqlserver_system_schemas_case_insensitively(self):
