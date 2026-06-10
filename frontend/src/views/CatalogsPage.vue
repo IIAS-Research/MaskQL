@@ -201,7 +201,7 @@ onMounted(fetchCatalogs);
             <th class="px-4 py-3">SGBD</th>
             <th class="px-4 py-3">Status</th>
             <th class="px-4 py-3">Username</th>
-            <th class="px-4 py-3 w-40">Actions</th>
+            <th class="px-4 py-3 w-48">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -243,12 +243,11 @@ onMounted(fetchCatalogs);
               </span>
             </td>
             <td class="px-4 py-3">{{ c.username }}</td>
-            <td class="px-4 py-3">
+            <td class="px-4 py-3 w-48 whitespace-nowrap">
               <div class="flex items-center gap-2 whitespace-nowrap">
                 <button
                   class="action-button bg-gray-800 text-white hover:bg-gray-700"
                   @click="goEdit(c.id)"
-                  title="Edit"
                   aria-label="Edit"
                   data-tooltip="Edit"
                 >
@@ -258,7 +257,6 @@ onMounted(fetchCatalogs);
                   class="action-button bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
                   :disabled="syncingCatalogId === c.id"
                   @click="syncCatalogSchema(c.id)"
-                  title="Sync schema"
                   aria-label="Sync schema"
                   data-tooltip="Sync schema"
                 >
@@ -275,7 +273,6 @@ onMounted(fetchCatalogs);
                   class="action-button bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
                   :disabled="duplicatingCatalogId === c.id"
                   @click="duplicateCatalog(c)"
-                  title="Duplicate"
                   aria-label="Duplicate"
                   data-tooltip="Duplicate"
                 >
@@ -291,7 +288,6 @@ onMounted(fetchCatalogs);
                 <button
                   class="action-button bg-red-600 text-white hover:bg-red-700"
                   @click="removeCatalog(c.id)"
-                  title="Delete"
                   aria-label="Delete"
                   data-tooltip="Delete"
                 >
