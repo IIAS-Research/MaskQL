@@ -49,6 +49,7 @@ export interface CatalogTablePreviewRequest {
   user_id: number;
   schema_name: string;
   table_name: string;
+  column_name?: string | null;
   limit?: number;
 }
 

@@ -86,6 +86,7 @@ async def preview_catalog_table(catalog_id: int, payload: CatalogTablePreviewReq
             payload.user_id,
             payload.schema_name,
             payload.table_name,
+            column_name=payload.column_name,
             limit=payload.limit,
         )
     except ValueError as e:
