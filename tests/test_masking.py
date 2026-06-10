@@ -74,10 +74,12 @@ class TestMasking(unittest.TestCase):
 
         cls.demo_user_id = demo_user["id"]
         cls.varchar_table = f"masking_varchar_{uuid.uuid4().hex[:8]}"
+        cls.char_table = f"masking_char_{uuid.uuid4().hex[:8]}"
         cls.partial_table = f"masking_partial_{uuid.uuid4().hex[:8]}"
         cls._created_rule_ids = []
 
         cls._setup_varchar_fixture()
+        cls._setup_char_fixture()
         cls._setup_partial_access_fixture()
         time.sleep(2)
         cls.conn = _connect()
@@ -100,6 +102,7 @@ class TestMasking(unittest.TestCase):
             ) as conn:
                 with conn.cursor() as cur:
                     cur.execute(f"DROP TABLE IF EXISTS {cls.varchar_table}")
+                    cur.execute(f"DROP TABLE IF EXISTS {cls.char_table}")
                     cur.execute(f"DROP TABLE IF EXISTS {cls.partial_table}")
         except Exception:
             pass
@@ -176,6 +179,52 @@ class TestMasking(unittest.TestCase):
                 "column_name": "blocked_value",
                 "allow": False,
                 "effect": "",
+            }
+        )
+
+    @classmethod
+    def _setup_char_fixture(cls):
+        with psycopg.connect(
+            host=PG_HOST,
+            port=PG_PORT,
+            dbname=PG_DB,
+            user=PG_USER,
+            password=PG_PASSWORD,
+        ) as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"DROP TABLE IF EXISTS {cls.char_table}")
+                cur.execute(
+                    f"""
+                    CREATE TABLE {cls.char_table} (
+                        id integer PRIMARY KEY,
+                        code char(100) NOT NULL
+                    )
+                    """
+                )
+                cur.execute(
+                    f"INSERT INTO {cls.char_table} (id, code) VALUES (%s, %s)",
+                    (1, "CharSecret42"),
+                )
+
+        cls._create_rule(
+            {
+                "user_id": cls.demo_user_id,
+                "catalog": "demo",
+                "schema_name": "public",
+                "table_name": cls.char_table,
+                "allow": True,
+                "effect": "",
+            }
+        )
+        cls._create_rule(
+            {
+                "user_id": cls.demo_user_id,
+                "catalog": "demo",
+                "schema_name": "public",
+                "table_name": cls.char_table,
+                "column_name": "code",
+                "allow": True,
+                "effect": "encrypt(code)",
             }
         )
 
@@ -297,6 +346,17 @@ class TestMasking(unittest.TestCase):
         self.assertIsInstance(masked, str, "Masked VARCHAR must stay queryable as a string")
         self.assertNotEqual(masked, "Alpha42", "Masked value must differ from the clear text")
         self.assertEqual(masked_type, "varchar(100)", "Mask must preserve the bounded VARCHAR type")
+
+    def test_encrypt_mask_supports_char_column(self):
+        """A masked char(n) column must resolve encrypt(char(n)) and stay queryable."""
+        row = self._row(
+            f"SELECT code, typeof(code) FROM {self.char_table} LIMIT 1"
+        )
+        masked, masked_type = row
+
+        self.assertIsInstance(masked, str, "Masked CHAR must stay queryable as a string")
+        self.assertNotEqual(masked.strip(), "CharSecret42", "Masked value must differ from the clear text")
+        self.assertEqual(masked_type, "char(100)", "Mask must preserve the CHAR type")
 
     def test_deny_mask_returns_null_without_hiding_column(self):
         """A denied column must stay selectable, but every value must be replaced by NULL."""

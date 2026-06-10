@@ -7,13 +7,24 @@ CREATE DATABASE maskqltest;
 CREATE TABLE IF NOT EXISTS client (
   id serial PRIMARY KEY,
   name text NOT NULL,
-  email text
+  email text,
+  char_code char(100) NOT NULL DEFAULT 'CHAR-SEED-DEFAULT'
 );
-INSERT INTO client (name, email) VALUES
-  ('Alice Dupont', 'alice@example.com'),
-  ('Bob Martin', 'bob@example.com'),
-  ('Amandine Durant', 'amandine@example.com')
+ALTER TABLE client
+  ADD COLUMN IF NOT EXISTS char_code char(100) NOT NULL DEFAULT 'CHAR-SEED-DEFAULT';
+INSERT INTO client (name, email, char_code) VALUES
+  ('Alice Dupont', 'alice@example.com', 'ALICE-CHAR-CODE'),
+  ('Bob Martin', 'bob@example.com', 'BOB-CHAR-CODE'),
+  ('Amandine Durant', 'amandine@example.com', 'AMANDINE-CHAR-CODE')
 ON CONFLICT DO NOTHING;
+UPDATE client
+SET char_code = CASE email
+  WHEN 'alice@example.com' THEN 'ALICE-CHAR-CODE'
+  WHEN 'bob@example.com' THEN 'BOB-CHAR-CODE'
+  WHEN 'amandine@example.com' THEN 'AMANDINE-CHAR-CODE'
+  ELSE char_code
+END
+WHERE email IN ('alice@example.com', 'bob@example.com', 'amandine@example.com');
 
 
 CREATE TABLE IF NOT EXISTS documents (
