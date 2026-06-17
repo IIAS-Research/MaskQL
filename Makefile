@@ -1,7 +1,27 @@
-COMPOSE_DEV = docker compose --file ./compose.dev.yml --profile dev --env-file ./.env
-COMPOSE_PROD = docker compose --file ./compose.yml --env-file ./.env
+ENV_FILE ?= ./.env
 
-.PHONY: local local-build local-prod local-prod-build rebuild-backend rebuild-frontend rebuild-trino restart-backend restart-frontend restart-trino down clean logs ps
+ifneq (,$(wildcard $(ENV_FILE)))
+include $(ENV_FILE)
+endif
+
+REGISTRY ?= docker.io/rudymerieux
+REGISTRY_HOST ?= docker.io
+PLATFORM ?= linux/amd64
+GIT_SHA ?= $(shell git rev-parse --short HEAD)
+IMAGE_TAG ?= $(GIT_SHA)
+LATEST_TAG ?= latest
+
+BACKEND_IMAGE = $(REGISTRY)/maskql
+FRONTEND_IMAGE = $(REGISTRY)/maskql-frontend
+TRINO_IMAGE = $(REGISTRY)/maskql-trino
+
+COMPOSE_DEV = docker compose --file ./compose.dev.yml --profile dev --env-file $(ENV_FILE)
+COMPOSE_PROD = docker compose --file ./compose.yml --env-file $(ENV_FILE)
+
+export HF_TOKEN
+export DOCKER_BUILDKIT ?= 1
+
+.PHONY: local local-build local-prod local-prod-build rebuild-backend rebuild-frontend rebuild-trino restart-backend restart-frontend restart-trino down clean logs ps registry-info registry-login push push-app push-backend push-frontend push-trino check-registry check-hf-token
 
 local:
 	$(COMPOSE_DEV) up -d
@@ -46,3 +66,47 @@ down:
 clean:
 	$(COMPOSE_DEV) down --volumes --remove-orphans
 	$(COMPOSE_PROD) down --volumes --remove-orphans
+
+registry-info:
+	@echo "REGISTRY=$(REGISTRY)"
+	@echo "REGISTRY_HOST=$(REGISTRY_HOST)"
+	@echo "PLATFORM=$(PLATFORM)"
+	@echo "IMAGE_TAG=$(IMAGE_TAG)"
+	@echo "LATEST_TAG=$(LATEST_TAG)"
+
+registry-login:
+	docker login $(REGISTRY_HOST)
+
+check-registry:
+	@test -n "$(REGISTRY)" || (echo "REGISTRY is required in $(ENV_FILE)" >&2; exit 1)
+	@test -n "$(PLATFORM)" || (echo "PLATFORM is required in $(ENV_FILE)" >&2; exit 1)
+	@test -n "$(IMAGE_TAG)" || (echo "IMAGE_TAG is required" >&2; exit 1)
+
+check-hf-token:
+	@test -n "$$HF_TOKEN" || (echo "HF_TOKEN is required for push-trino" >&2; exit 1)
+
+push: push-app push-trino
+
+push-app: push-backend push-frontend
+
+push-backend: check-registry
+	docker buildx build --platform "$(PLATFORM)" \
+		-f maskql/dockerfile \
+		-t "$(BACKEND_IMAGE):$(IMAGE_TAG)" \
+		-t "$(BACKEND_IMAGE):$(LATEST_TAG)" \
+		--push ./maskql
+
+push-frontend: check-registry
+	docker buildx build --platform "$(PLATFORM)" \
+		-f frontend/dockerfile \
+		-t "$(FRONTEND_IMAGE):$(IMAGE_TAG)" \
+		-t "$(FRONTEND_IMAGE):$(LATEST_TAG)" \
+		--push ./frontend
+
+push-trino: check-registry check-hf-token
+	docker buildx build --platform "$(PLATFORM)" \
+		-f trino/Dockerfile \
+		--secret id=HF_TOKEN,env=HF_TOKEN \
+		-t "$(TRINO_IMAGE):$(IMAGE_TAG)" \
+		-t "$(TRINO_IMAGE):$(LATEST_TAG)" \
+		--push ./trino

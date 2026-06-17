@@ -18,6 +18,7 @@ const props = defineProps<{ userId: number }>();
 const toast = useToast();
 
 type Status = "allow" | "deny" | "inherit";
+type AccessFilter = "all" | "allow" | "deny";
 
 type ScopeItem = {
   key: string;
@@ -52,6 +53,15 @@ type EffectiveAccess = {
   sourceLabel: string;
 };
 
+type PendingRemoval = {
+  catalogId: number;
+  schema: string;
+  table: string;
+  column: string;
+  kind: "schema" | "table" | "column";
+  label: string;
+};
+
 const loading = ref(true);
 const loadingSchema = ref(false);
 const syncingSchema = ref(false);
@@ -74,6 +84,9 @@ const preview = ref<CatalogTablePreview | null>(null);
 const previewLoading = ref(false);
 const previewRequestError = ref("");
 const previewColumnName = ref<string | null>(null);
+const pendingRemoval = ref<PendingRemoval | null>(null);
+const removeConfirmationVisible = ref(false);
+const accessFilter = ref<AccessFilter>("all");
 
 const missingPathHint = "Possibly not present in the database";
 
@@ -101,6 +114,32 @@ let previewTimer: number | null = null;
 let previewRequestSequence = 0;
 
 const TABLE_CARD_COLUMN_LIMIT_PER_STATUS = 6;
+
+const accessFilterOptions: {
+  value: AccessFilter;
+  label: string;
+  icon: string;
+  title: string;
+}[] = [
+  {
+    value: "all",
+    label: "All",
+    icon: "pi pi-list",
+    title: "Show all items",
+  },
+  {
+    value: "allow",
+    label: "Allowed",
+    icon: "pi pi-check",
+    title: "Show allowed items",
+  },
+  {
+    value: "deny",
+    label: "Denied",
+    icon: "pi pi-ban",
+    title: "Show denied items",
+  },
+];
 
 function ensureSet<K>(map: Map<K, Set<string>>, key: K) {
   if (!map.has(key)) map.set(key, new Set());
@@ -130,6 +169,14 @@ function segBtn(active: boolean) {
     active
       ? "bg-gray-800 text-white"
       : "bg-white text-gray-700 hover:bg-gray-50"
+  }`;
+}
+
+function accessFilterButtonClass(filter: AccessFilter) {
+  return `inline-flex h-8 items-center gap-1.5 px-2.5 text-xs leading-none transition-colors ${
+    accessFilter.value === filter
+      ? "bg-gray-800 text-white"
+      : "text-gray-700 hover:bg-gray-50"
   }`;
 }
 
@@ -226,6 +273,52 @@ function effectiveStatusOf(
   column = "",
 ): "allow" | "deny" {
   return resolveEffectiveAccess(cId, schema, table, column).status;
+}
+
+function matchesAccessFilter(
+  cId: number,
+  schema = "",
+  table = "",
+  column = "",
+) {
+  if (accessFilter.value === "all") return true;
+  return effectiveStatusOf(cId, schema, table, column) === accessFilter.value;
+}
+
+function tableMatchesAccessFilter(
+  cId: number,
+  schema: string,
+  table: string,
+) {
+  if (matchesAccessFilter(cId, schema, table)) return true;
+
+  const columns =
+    colsByScope.value.get(`${cId}|${schema}|${table}`) ?? new Set<string>();
+  for (const column of columns) {
+    if (matchesAccessFilter(cId, schema, table, column)) return true;
+  }
+  return false;
+}
+
+function schemaMatchesAccessFilter(cId: number, schema: string) {
+  if (matchesAccessFilter(cId, schema)) return true;
+
+  const tables =
+    tablesByScope.value.get(`${cId}|${schema}`) ?? new Set<string>();
+  for (const table of tables) {
+    if (tableMatchesAccessFilter(cId, schema, table)) return true;
+  }
+  return false;
+}
+
+function catalogMatchesAccessFilter(cId: number) {
+  if (matchesAccessFilter(cId)) return true;
+
+  const schemas = schemasByCatalog.value.get(cId) ?? new Set<string>();
+  for (const schema of schemas) {
+    if (schemaMatchesAccessFilter(cId, schema)) return true;
+  }
+  return false;
 }
 
 function badgeLabelOf(cId: number, schema = "", table = "", column = "") {
@@ -585,6 +678,110 @@ function canRemoveMissingPath(
   );
 }
 
+function ruleMatchesScope(
+  rule: Rule,
+  catalogId: number,
+  schema = "",
+  table = "",
+  column = "",
+) {
+  if (rule.catalog_id !== catalogId) return false;
+
+  const ruleSchema = rule.schema_name || "";
+  const ruleTable = rule.table_name || "";
+  const ruleColumn = rule.column_name || "";
+
+  if (!schema) return !ruleSchema && !ruleTable && !ruleColumn;
+  if (ruleSchema !== schema) return false;
+  if (!table) return true;
+  if (ruleTable !== table) return false;
+  if (!column) return true;
+  return ruleColumn === column;
+}
+
+function schemaEntryMatchesScope(
+  entry: CatalogSchemaEntry,
+  catalogId: number,
+  schema = "",
+  table = "",
+  column = "",
+) {
+  if (entry.catalog_id !== catalogId) return false;
+
+  const entryTable = entry.table_name ?? "";
+  const entryColumn = entry.column_name ?? "";
+
+  if (!schema) return !entry.schema_name && !entryTable && !entryColumn;
+  if (entry.schema_name !== schema) return false;
+  if (!table) return true;
+  if (entryTable !== table) return false;
+  if (!column) return true;
+  return entryColumn === column;
+}
+
+const pendingRemovalRuleCount = computed(() => {
+  const removal = pendingRemoval.value;
+  if (!removal) return 0;
+  return rules.value.filter((rule) =>
+    ruleMatchesScope(
+      rule,
+      removal.catalogId,
+      removal.schema,
+      removal.table,
+      removal.column,
+    ),
+  ).length;
+});
+
+function removalKind(table = "", column = ""): PendingRemoval["kind"] {
+  if (column) return "column";
+  if (table) return "table";
+  return "schema";
+}
+
+function removalLabel(schema = "", table = "", column = "") {
+  if (column) return `${schema}.${table}.${column}`;
+  if (table) return `${schema}.${table}`;
+  return schema;
+}
+
+function requestRemoveMissingPath(
+  catalogId: number,
+  schema = "",
+  table = "",
+  column = "",
+) {
+  pendingRemoval.value = {
+    catalogId,
+    schema,
+    table,
+    column,
+    kind: removalKind(table, column),
+    label: removalLabel(schema, table, column),
+  };
+  removeConfirmationVisible.value = true;
+}
+
+function closeRemoveConfirmation() {
+  if (mutatingSchemaEntry.value) return;
+  removeConfirmationVisible.value = false;
+  pendingRemoval.value = null;
+}
+
+async function confirmRemoveMissingPath() {
+  const removal = pendingRemoval.value;
+  if (!removal) return;
+
+  await removeMissingPath(
+    removal.catalogId,
+    removal.schema,
+    removal.table,
+    removal.column,
+  );
+  removeConfirmationVisible.value = false;
+  pendingRemoval.value = null;
+}
+
 async function refreshCatalogSchema(catalogId: number) {
   await loadCatalogSchema(catalogId, true);
 }
@@ -651,17 +848,77 @@ async function removeMissingPath(
   table = "",
   column = "",
 ) {
-  const hadRule = !!getRule(catalogId, schema, table, column);
-  const hadManualEntry = !!getSchemaEntry(catalogId, schema, table, column)
-    ?.manually_added;
+  const matchingRules = rules.value.filter((rule) =>
+    ruleMatchesScope(rule, catalogId, schema, table, column),
+  );
+  const matchingManualEntries = (
+    schemaEntriesByCatalog.value.get(catalogId) ?? []
+  ).filter(
+    (entry) =>
+      entry.manually_added &&
+      schemaEntryMatchesScope(entry, catalogId, schema, table, column),
+  );
 
-  if (!hadRule && !hadManualEntry) return;
+  if (!matchingRules.length && !matchingManualEntries.length) return;
 
-  if (hadRule) {
-    await deleteRule(catalogId, schema, table, column);
-  }
-  if (hadManualEntry) {
-    await deleteManualSchemaEntry(catalogId, schema, table, column);
+  mutatingSchemaEntry.value = true;
+  try {
+    await Promise.all([
+      ...matchingRules.map((rule) => RuleAPI.remove(rule.id)),
+      ...matchingManualEntries.map((entry) =>
+        CatalogAPI.deleteSchemaEntry(catalogId, entry.id),
+      ),
+    ]);
+
+    const removedRuleIds = new Set(matchingRules.map((rule) => rule.id));
+    rules.value = rules.value.filter((rule) => !removedRuleIds.has(rule.id));
+    rebuildRuleMap();
+
+    await refreshCatalogSchema(catalogId);
+
+    if (column && previewMatchesScope(catalogId, schema, table)) {
+      previewColumnName.value = null;
+    }
+
+    if (selectedSchema.value === schema && !table && !column) {
+      selectedSchema.value = null;
+    }
+    if (
+      selectedSchema.value === schema &&
+      selectedTable.value === table &&
+      table &&
+      !column
+    ) {
+      selectedTable.value = null;
+    }
+
+    if (tableConfig.value) {
+      const removedTable =
+        tableConfig.value.catalogId === catalogId &&
+        tableConfig.value.schema === schema &&
+        tableConfig.value.table === table &&
+        !column;
+      const removedSchema =
+        tableConfig.value.catalogId === catalogId &&
+        tableConfig.value.schema === schema &&
+        !table &&
+        !column;
+
+      if (removedTable || removedSchema) {
+        closeTableConfig();
+      } else if (previewMatchesScope(catalogId, schema, table)) {
+        queuePreviewRefresh();
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    let detail = "Unable to remove missing item";
+    if (axios.isAxiosError(error)) {
+      detail = error.response?.data?.detail || detail;
+    }
+    toast.add({ severity: "error", summary: "Error", detail, life: 4000 });
+  } finally {
+    mutatingSchemaEntry.value = false;
   }
 }
 
@@ -816,10 +1073,12 @@ watch(selectedSchema, () => {
 });
 
 const catalogItems = computed(() =>
-  catalogs.value.map((catalog) => ({
-    key: `cat:${catalog.id}`,
-    label: catalog.name,
-  })),
+  catalogs.value
+    .filter((catalog) => catalogMatchesAccessFilter(catalog.id))
+    .map((catalog) => ({
+      key: `cat:${catalog.id}`,
+      label: catalog.name,
+    })),
 );
 
 const selectedCatalogKey = computed(() =>
@@ -863,12 +1122,14 @@ const schemaItems = computed<ScopeItem[]>(() => {
   const schemas = Array.from(ensureSet(schemasByCatalog.value, catalogId)).sort(
     (a, b) => a.localeCompare(b),
   );
-  return schemas.map((schema) => ({
-    key: `sch:${catalogId}:${schema}`,
-    label: schema,
-    hint: hintForPath(catalogId, schema),
-    removable: canRemoveMissingPath(catalogId, schema),
-  }));
+  return schemas
+    .filter((schema) => schemaMatchesAccessFilter(catalogId, schema))
+    .map((schema) => ({
+      key: `sch:${catalogId}:${schema}`,
+      label: schema,
+      hint: hintForPath(catalogId, schema),
+      removable: canRemoveMissingPath(catalogId, schema),
+    }));
 });
 
 const selectedSchemaKey = computed(() =>
@@ -921,7 +1182,7 @@ const inheritSchemaKey = (key: string) => {
 };
 const removeSchemaKey = (key: string) => {
   const [, cId, schema] = key.split(":");
-  return removeMissingPath(Number(cId), schema);
+  return requestRemoveMissingPath(Number(cId), schema);
 };
 
 const tableItems = computed<ScopeItem[]>(() => {
@@ -931,12 +1192,14 @@ const tableItems = computed<ScopeItem[]>(() => {
   const tables = Array.from(
     ensureSet(tablesByScope.value, `${catalogId}|${schema}`),
   ).sort((a, b) => a.localeCompare(b));
-  return tables.map((table) => ({
-    key: `tbl:${catalogId}:${schema}:${table}`,
-    label: table,
-    hint: hintForPath(catalogId, schema, table),
-    removable: canRemoveMissingPath(catalogId, schema, table),
-  }));
+  return tables
+    .filter((table) => tableMatchesAccessFilter(catalogId, schema, table))
+    .map((table) => ({
+      key: `tbl:${catalogId}:${schema}:${table}`,
+      label: table,
+      hint: hintForPath(catalogId, schema, table),
+      removable: canRemoveMissingPath(catalogId, schema, table),
+    }));
 });
 
 const selectedTableKey = computed(() =>
@@ -990,7 +1253,7 @@ const inheritTableKey = (key: string) => {
 };
 const removeTableKey = (key: string) => {
   const [, cId, schema, table] = key.split(":");
-  return removeMissingPath(Number(cId), schema, table);
+  return requestRemoveMissingPath(Number(cId), schema, table);
 };
 
 function getColumnsForTable(catalogId: number, schema: string, table: string) {
@@ -998,12 +1261,14 @@ function getColumnsForTable(catalogId: number, schema: string, table: string) {
     ensureSet(colsByScope.value, `${catalogId}|${schema}|${table}`),
   ).sort((a, b) => a.localeCompare(b));
 
-  return columns.map((column) => ({
-    key: `col:${catalogId}:${schema}:${table}:${column}`,
-    label: column,
-    hint: hintForPath(catalogId, schema, table, column),
-    removable: canRemoveMissingPath(catalogId, schema, table, column),
-  }));
+  return columns
+    .filter((column) => matchesAccessFilter(catalogId, schema, table, column))
+    .map((column) => ({
+      key: `col:${catalogId}:${schema}:${table}:${column}`,
+      label: column,
+      hint: hintForPath(catalogId, schema, table, column),
+      removable: canRemoveMissingPath(catalogId, schema, table, column),
+    }));
 }
 
 const tableColumnIndicators = computed(() => {
@@ -1198,10 +1463,7 @@ const inheritColumnKey = (key: string) => {
 };
 const removeColumnKey = (key: string) => {
   const [, cId, schema, table, column] = key.split(":");
-  if (previewMatchesScope(Number(cId), schema, table)) {
-    previewColumnName.value = null;
-  }
-  return removeMissingPath(Number(cId), schema, table, column);
+  return requestRemoveMissingPath(Number(cId), schema, table, column);
 };
 const getEffectColumnKey = (key: string) => {
   const [, cId, schema, table, column] = key.split(":");
@@ -1356,7 +1618,24 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
 
 <template>
   <div class="space-y-3">
-    <div class="flex items-center justify-end gap-2">
+    <div class="flex flex-wrap items-center justify-end gap-2">
+      <div
+        class="mr-auto inline-flex overflow-hidden rounded-lg border bg-white"
+        aria-label="Filter displayed items by access"
+      >
+        <button
+          v-for="option in accessFilterOptions"
+          :key="option.value"
+          type="button"
+          :class="accessFilterButtonClass(option.value)"
+          :title="option.title"
+          @click="accessFilter = option.value"
+        >
+          <i :class="[option.icon, 'text-xs']"></i>
+          <span>{{ option.label }}</span>
+        </button>
+      </div>
+
       <button
         class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50"
         :disabled="
@@ -2135,6 +2414,64 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
               </div>
             </div>
           </section>
+        </div>
+      </div>
+    </Dialog>
+
+    <Dialog
+      v-model:visible="removeConfirmationVisible"
+      modal
+      header="Confirm removal"
+      :closable="!mutatingSchemaEntry"
+      :dismissable-mask="!mutatingSchemaEntry"
+      :style="{ width: 'min(460px, 92vw)' }"
+      @hide="closeRemoveConfirmation"
+    >
+      <div v-if="pendingRemoval" class="space-y-4">
+        <div class="flex items-start gap-3">
+          <div
+            class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-700"
+          >
+            <i class="pi pi-exclamation-triangle text-sm"></i>
+          </div>
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-900">
+              Remove {{ pendingRemoval.kind }} {{ pendingRemoval.label }}?
+            </p>
+            <p class="mt-1 text-sm text-gray-600">
+              Cette action supprimera aussi toutes les règles enfants
+              associées.
+            </p>
+          </div>
+        </div>
+
+        <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <div class="text-xs font-medium uppercase text-slate-500">
+            Impact
+          </div>
+          <div class="mt-1 text-sm text-slate-700">
+            {{ pendingRemovalRuleCount }} rule(s) will be deleted.
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2">
+          <button
+            class="h-9 px-3 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            type="button"
+            :disabled="mutatingSchemaEntry"
+            @click="closeRemoveConfirmation"
+          >
+            Cancel
+          </button>
+          <button
+            class="h-9 px-3 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+            type="button"
+            :disabled="mutatingSchemaEntry"
+            @click="confirmRemoveMissingPath"
+          >
+            <span v-if="mutatingSchemaEntry">Removing...</span>
+            <span v-else>Remove</span>
+          </button>
         </div>
       </div>
     </Dialog>
