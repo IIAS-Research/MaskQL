@@ -198,6 +198,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./tests/postgresql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./tests/fixtures:/docker-entrypoint-initdb.d/fixtures:ro
       - ./tests/example.pdf:/docker-entrypoint-initdb.d/example.pdf:ro
       - ./tests/example2.pdf:/docker-entrypoint-initdb.d/example2.pdf:ro
 

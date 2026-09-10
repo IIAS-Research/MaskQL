@@ -76,6 +76,10 @@ make local
 This starts the full development stack with Docker Compose.
 On a fresh clone, the extra build step is needed because `compose.dev.yml` mounts the plugin jars from the local workspace.
 
+The `demo` catalog includes a [synthetic healthcare dataset](docs/DEMO_DATA.md):
+200 patients and 3,729 rows across 10 tables. For an existing development database,
+run `make demo-data` to add it and refresh the schema.
+
 ### Rebuild services locally
 
 Use these targets only when you need to rebuild images from source:
@@ -161,10 +165,9 @@ uv run tox
 
 This will:
 
-1. Start the stack (`make local`)
+1. Start the development stack
 2. Health check
 3. Run `unittest` tests
-4. Stop and clean the stack (`make down`)
 
 ---
 

@@ -21,7 +21,7 @@ COMPOSE_PROD = docker compose --file ./compose.yml --env-file $(ENV_FILE)
 export HF_TOKEN
 export DOCKER_BUILDKIT ?= 1
 
-.PHONY: local local-build local-prod local-prod-build rebuild-backend rebuild-frontend rebuild-trino restart-backend restart-frontend restart-trino down clean logs ps registry-info registry-login push push-app push-backend push-frontend push-trino check-registry check-hf-token
+.PHONY: local local-build local-prod local-prod-build demo-data rebuild-backend rebuild-frontend rebuild-trino restart-backend restart-frontend restart-trino down clean logs ps registry-info registry-login push push-app push-backend push-frontend push-trino check-registry check-hf-token
 
 local:
 	$(COMPOSE_DEV) up -d
@@ -34,6 +34,10 @@ local-prod:
 
 local-prod-build:
 	$(COMPOSE_PROD) up -d --build
+
+demo-data:
+	$(COMPOSE_DEV) exec -T postgres sh -c 'psql -X -U "$$POSTGRES_USER" -d maskqltest -v ON_ERROR_STOP=1' < tests/fixtures/healthcare.sql
+	$(COMPOSE_DEV) exec -T maskql-dev python -m maskql.alembic.seeds
 
 rebuild-backend:
 	$(COMPOSE_DEV) up -d --build maskql-dev
