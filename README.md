@@ -209,6 +209,10 @@ Examples:
 
 The backend enforces a unique constraint on `(user_id, catalog_id, schema_name, table_name, column_name)`.
 
+Before saving or importing an effect, MaskQL checks its SQL types with Trino.
+Column masks must be compatible with the column type, and table filters must be
+boolean expressions.
+
 ---
 
 ## Admin UI

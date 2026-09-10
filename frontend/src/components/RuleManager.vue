@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import axios from "axios";
 import Dialog from "primevue/dialog";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useToast } from "primevue/usetoast";
 import type {
   Catalog,
@@ -106,6 +106,14 @@ const colsByScope = ref(new Map<string, Set<string>>());
 
 const effectDrafts = ref(new Map<string, string>());
 const effectTimers = ref(new Map<string, number>());
+type EffectFeedback = {
+  status: "saving" | "saved" | "error";
+  message: string;
+  requestId: number;
+};
+const effectFeedback = ref(new Map<string, EffectFeedback>());
+const effectSaves = new Map<string, Promise<void>>();
+let effectRequestSequence = 0;
 
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const busyImport = ref(false);
@@ -530,6 +538,7 @@ async function upsertRule(
   table = "",
   column = "",
   patch: Partial<Pick<Rule, "allow" | "effect">>,
+  onError?: (error: unknown) => void,
 ) {
   const key = keyFor(props.userId, cId, schema, table, column);
   const existing = ruleMap.value.get(key);
@@ -568,11 +577,19 @@ async function upsertRule(
     return created;
   } catch (error) {
     console.error(error);
+    if (onError) {
+      onError(error);
+      return;
+    }
+    const catalog = catalogs.value.find((item) => item.id === cId);
+    const path = [catalog?.name ?? cId, schema, table, column]
+      .filter(Boolean)
+      .join(".");
     toast.add({
       severity: "error",
       summary: "Error",
-      detail: "Unable to save rule.",
-      life: 3000,
+      detail: `${path}: ${effectErrorMessage(error)}`,
+      life: 6000,
     });
   }
 }
@@ -619,6 +636,49 @@ function getEffectScope(cId: number, schema = "", table = "", column = "") {
   return getRule(cId, schema, table, column)?.effect ?? "";
 }
 
+function restoreEffectScope(cId: number, schema = "", table = "", column = "") {
+  const key = keyFor(props.userId, cId, schema, table, column);
+  window.clearTimeout(effectTimers.value.get(key));
+  effectTimers.value.delete(key);
+  effectDrafts.value.delete(key);
+  effectFeedback.value.delete(key);
+}
+
+function effectErrorMessage(error: unknown) {
+  if (axios.isAxiosError(error)) {
+    const detail = String(error.response?.data?.detail ?? "");
+    if (error.response?.status === 401) {
+      return "Ta session a expiré. Reconnecte-toi pour enregistrer.";
+    }
+    if (/Unexpected parameters|Cannot cast|Cannot apply operator/i.test(detail)) {
+      return "Cette expression n’est pas compatible avec les données utilisées. Vérifie la fonction choisie.";
+    }
+    if (/WHERE clause must evaluate to a boolean/i.test(detail)) {
+      return "Le filtre doit être une condition, par exemple : age > 18.";
+    }
+    if (/not registered|Function .*not found/i.test(detail)) {
+      return "Cette fonction n’est pas reconnue. Vérifie son nom.";
+    }
+    if (/cannot be resolved|column not found/i.test(detail)) {
+      return "Une colonne utilisée est introuvable. Vérifie son nom.";
+    }
+    if (/mismatched input|extraneous input|aggregate|window function/i.test(detail)) {
+      return "Cette expression n’est pas valide ici. Vérifie sa saisie.";
+    }
+    if (detail.startsWith("Cannot validate effect")) {
+      return "Impossible de vérifier cette expression pour le moment. Réessaie.";
+    }
+  }
+  return "Impossible d’enregistrer la règle pour le moment. Réessaie.";
+}
+
+const tableEffectFeedback = computed(() => {
+  const scope = tableConfig.value;
+  return scope
+    ? effectFeedback.value.get(keyFor(props.userId, scope.catalogId, scope.schema, scope.table))
+    : undefined;
+});
+
 function setEffectScope(
   cId: number,
   schema = "",
@@ -628,24 +688,53 @@ function setEffectScope(
 ) {
   const key = keyFor(props.userId, cId, schema, table, column);
   effectDrafts.value.set(key, value);
+  const requestId = ++effectRequestSequence;
+  effectFeedback.value.set(key, {
+    status: "saving",
+    message: "Vérification en cours… Non sauvegardé.",
+    requestId,
+  });
 
   if (effectTimers.value.has(key)) {
     window.clearTimeout(effectTimers.value.get(key));
   }
 
-  const timer = window.setTimeout(async () => {
+  const timer = window.setTimeout(() => {
     effectTimers.value.delete(key);
-    await upsertRule(cId, schema, table, column, { effect: value });
-    toast.add({
-      severity: "success",
-      summary: "Saved",
-      detail: "Effect updated",
-      life: 1000,
+    const save = async () => {
+      if (effectFeedback.value.get(key)?.requestId !== requestId) return;
+      if (!getRule(cId, schema, table, column) && !value.trim()) {
+        effectDrafts.value.delete(key);
+        effectFeedback.value.delete(key);
+        return;
+      }
+      const saved = await upsertRule(cId, schema, table, column, { effect: value }, (error) => {
+        if (effectFeedback.value.get(key)?.requestId !== requestId) return;
+        effectFeedback.value.set(key, { status: "error", message: effectErrorMessage(error), requestId });
+      });
+      if (!saved || effectFeedback.value.get(key)?.requestId !== requestId) return;
+      effectDrafts.value.delete(key);
+      effectFeedback.value.set(key, { status: "saved", message: "Enregistré", requestId });
+    };
+    // Finish the previous save before sending the next draft of this field.
+    const pending = (effectSaves.get(key) ?? Promise.resolve()).then(save);
+    effectSaves.set(key, pending);
+    void pending.finally(() => {
+      if (effectSaves.get(key) === pending) effectSaves.delete(key);
     });
   }, 600);
 
   effectTimers.value.set(key, timer);
 }
+
+function clearEffectDrafts() {
+  effectDrafts.value.clear();
+  effectFeedback.value.clear();
+  effectTimers.value.forEach((timer) => window.clearTimeout(timer));
+  effectTimers.value.clear();
+}
+
+onBeforeUnmount(clearEffectDrafts);
 
 function hasScannedPath(
   catalogId: number,
@@ -968,9 +1057,7 @@ function resetState() {
   draftSchemaName.value = "";
   draftTableName.value = "";
   draftColumnName.value = "";
-  effectDrafts.value.clear();
-  effectTimers.value.forEach((timer) => window.clearTimeout(timer));
-  effectTimers.value.clear();
+  clearEffectDrafts();
   loadingSchema.value = false;
   syncingSchema.value = false;
   mutatingSchemaEntry.value = false;
@@ -1469,6 +1556,14 @@ const getEffectColumnKey = (key: string) => {
   const [, cId, schema, table, column] = key.split(":");
   return getEffectScope(Number(cId), schema, table, column);
 };
+const getEffectFeedbackColumnKey = (key: string) => {
+  const [, cId, schema, table, column] = key.split(":");
+  return effectFeedback.value.get(keyFor(props.userId, Number(cId), schema, table, column));
+};
+const restoreEffectColumnKey = (key: string) => {
+  const [, cId, schema, table, column] = key.split(":");
+  restoreEffectScope(Number(cId), schema, table, column);
+};
 const setEffectColumnKey = (key: string, value: string) => {
   const [, cId, schema, table, column] = key.split(":");
   focusPreviewColumn(Number(cId), schema, table, column, false);
@@ -1560,6 +1655,7 @@ async function handleImportFile(evt: Event) {
     const catalogId = selectedCatalogId.value;
     let created = 0;
     let updated = 0;
+    let rejected = 0;
     for (const raw of json.rules as ExportRule[]) {
       const schema = (raw.schema_name ?? "").trim();
       const table = (raw.table_name ?? "").trim();
@@ -1568,7 +1664,11 @@ async function handleImportFile(evt: Event) {
       const effect = table || column ? raw.effect ?? "" : "";
 
       const existed = !!getRule(catalogId, schema, table, column);
-      await upsertRule(catalogId, schema, table, column, { allow, effect });
+      const saved = await upsertRule(catalogId, schema, table, column, { allow, effect });
+      if (!saved) {
+        rejected++;
+        continue;
+      }
       if (existed) updated++;
       else created++;
     }
@@ -1576,10 +1676,10 @@ async function handleImportFile(evt: Event) {
     await loadAll();
 
     toast.add({
-      severity: "success",
-      summary: "Import terminé",
-      detail: `${created} créé(e)s, ${updated} mis(e)s à jour`,
-      life: 3000,
+      severity: rejected ? "warn" : "success",
+      summary: rejected ? "Import incomplet" : "Import terminé",
+      detail: `${created} créé(e)s, ${updated} mis(e)s à jour, ${rejected} refusée(s)`,
+      life: rejected ? 6000 : 3000,
     });
   } catch (error: unknown) {
     console.error(error);
@@ -2033,10 +2133,11 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
           </div>
 
           <div class="mt-4">
-            <label class="block text-sm font-medium text-slate-700">
+            <label for="row-filter" class="block text-sm font-medium text-slate-700">
               Row filter
             </label>
             <textarea
+              id="row-filter"
               :value="
                 getEffectScope(
                   tableConfig.catalogId,
@@ -2055,9 +2156,33 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
               "
               rows="3"
               class="mt-2 w-full rounded-xl border px-3 py-2 text-sm"
+              :class="{ 'border-red-500 bg-red-50': tableEffectFeedback?.status === 'error' }"
+              :aria-invalid="tableEffectFeedback?.status === 'error'"
+              :aria-describedby="tableEffectFeedback ? 'row-filter-feedback row-filter-help' : 'row-filter-help'"
               placeholder="country = 'FR'"
             ></textarea>
-            <p class="mt-1 text-xs text-slate-500">
+            <p
+              v-if="tableEffectFeedback"
+              id="row-filter-feedback"
+              role="status"
+              aria-live="polite"
+              class="mt-1 text-xs"
+              :class="tableEffectFeedback.status === 'error' ? 'text-red-700' : tableEffectFeedback.status === 'saved' ? 'text-green-700' : 'text-slate-500'"
+            >
+              <strong v-if="tableEffectFeedback.status === 'error'">Non sauvegardé. </strong>
+              {{ tableEffectFeedback.message }}
+              <button
+                v-if="tableEffectFeedback.status === 'error'"
+                type="button"
+                class="ml-2 inline-flex items-center gap-1 rounded px-1 text-xs text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                title="Revenir à la dernière version enregistrée"
+                @click.stop="restoreEffectScope(tableConfig.catalogId, tableConfig.schema, tableConfig.table)"
+              >
+                <i class="pi pi-undo text-[10px]" aria-hidden="true"></i>
+                Rétablir
+              </button>
+            </p>
+            <p id="row-filter-help" class="mt-1 text-xs text-slate-500">
               SQL WHERE clause applied by MaskQL on this table.
             </p>
           </div>
@@ -2157,11 +2282,13 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
 
                 <div class="mt-2">
                   <label
+                    :for="`effect-${encodeURIComponent(it.key)}`"
                     class="block text-[10px] font-medium uppercase tracking-wide text-gray-500"
                   >
                     Mask / transform
                   </label>
                   <input
+                    :id="`effect-${encodeURIComponent(it.key)}`"
                     :value="getEffectColumnKey(it.key)"
                     @input="
                       setEffectColumnKey(
@@ -2170,8 +2297,32 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
                       )
                     "
                     class="mt-1.5 h-8 w-full px-2 py-1 text-sm border rounded-lg"
+                    :class="{ 'border-red-500 bg-red-50': getEffectFeedbackColumnKey(it.key)?.status === 'error' }"
+                    :aria-invalid="getEffectFeedbackColumnKey(it.key)?.status === 'error'"
+                    :aria-describedby="getEffectFeedbackColumnKey(it.key) ? `effect-feedback-${encodeURIComponent(it.key)}` : undefined"
                     placeholder="lower(my_column)"
                   />
+                  <p
+                    v-if="getEffectFeedbackColumnKey(it.key)"
+                    :id="`effect-feedback-${encodeURIComponent(it.key)}`"
+                    role="status"
+                    aria-live="polite"
+                    class="mt-1 text-xs"
+                    :class="getEffectFeedbackColumnKey(it.key)?.status === 'error' ? 'text-red-700' : getEffectFeedbackColumnKey(it.key)?.status === 'saved' ? 'text-green-700' : 'text-slate-500'"
+                  >
+                    <strong v-if="getEffectFeedbackColumnKey(it.key)?.status === 'error'">Non sauvegardé. </strong>
+                    {{ getEffectFeedbackColumnKey(it.key)?.message }}
+                    <button
+                      v-if="getEffectFeedbackColumnKey(it.key)?.status === 'error'"
+                      type="button"
+                      class="ml-2 inline-flex items-center gap-1 rounded px-1 text-xs text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                      title="Revenir à la dernière version enregistrée"
+                      @click.stop="restoreEffectColumnKey(it.key)"
+                    >
+                      <i class="pi pi-undo text-[10px]" aria-hidden="true"></i>
+                      Rétablir
+                    </button>
+                  </p>
                 </div>
               </div>
             </div>
