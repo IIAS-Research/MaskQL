@@ -41,6 +41,12 @@ class CatalogSchemaEntryRead(SQLModel):
     present_in_database: bool
 
 
+class CatalogSchemaPathRead(SQLModel):
+    schema_name: str
+    table_name: Optional[str] = None
+    column_name: Optional[str] = None
+
+
 class CatalogSchemaEntryCreate(SQLModel):
     schema_name: str
     table_name: Optional[str] = None

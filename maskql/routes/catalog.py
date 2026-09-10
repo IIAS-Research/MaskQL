@@ -10,6 +10,7 @@ from maskql.schemas.catalog import (
     CatalogSchemaEntryCreate,
     CatalogRead,
     CatalogSchemaEntryRead,
+    CatalogSchemaPathRead,
     CatalogSchemaSyncRead,
 )
 from maskql.services.catalog_service import CatalogService
@@ -49,6 +50,17 @@ async def create_catalog_schema_entry(catalog_id: int, payload: CatalogSchemaEnt
         return await CatalogService.create_manual_schema_entry(catalog_id, payload)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{catalog_id}/schema/live", response_model=list[CatalogSchemaPathRead])
+async def inspect_catalog_schema(catalog_id: int):
+    try:
+        return await CatalogService.inspect_schema(catalog_id)
+    except ValueError as e:
+        status_code = 404 if str(e) == "Catalog not found" else 502
+        raise HTTPException(status_code=status_code, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 @router.delete("/{catalog_id}/schema/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)

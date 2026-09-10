@@ -16,6 +16,7 @@ from maskql.schemas.catalog import (
     CatalogPatch,
     CatalogSchemaEntryCreate,
     CatalogSchemaEntryRead,
+    CatalogSchemaPathRead,
     CatalogSchemaSyncRead,
     CatalogTablePreviewRead,
 )
@@ -285,6 +286,22 @@ class CatalogService:
                 return await CatalogService.connection_status(catalog)
 
         return await asyncio.gather(*(_check(catalog) for catalog in rows))
+
+    @staticmethod
+    async def inspect_schema(catalog_id: int) -> list[CatalogSchemaPathRead]:
+        catalog = await CatalogService.get(catalog_id)
+        if not catalog:
+            raise ValueError("Catalog not found")
+
+        paths = await CatalogService._scan_schema_paths(catalog)
+        return [
+            CatalogSchemaPathRead(
+                schema_name=schema_name,
+                table_name=table_name,
+                column_name=column_name,
+            )
+            for schema_name, table_name, column_name in sorted(paths, key=_schema_path_sort_key)
+        ]
 
     @staticmethod
     async def list_schema_entries(catalog_id: int) -> list[CatalogSchemaEntryRead]:

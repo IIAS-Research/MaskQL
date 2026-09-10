@@ -231,7 +231,9 @@ Export produces a file like this:
 {
   "version": 1,
   "user_id": 123,
+  "user_name": "analyst",
   "catalog_id": 7,
+  "catalog_name": "research",
   "exported_at": "2025-09-02T10:00:00Z",
   "rules": [
     { "schema_name": "public", "table_name": "", "column_name": "", "allow": true, "effect": "" },
@@ -241,7 +243,8 @@ Export produces a file like this:
 }
 ```
 
-On import, the UI ignores any `id`, `user_id`, and `catalog_id` inside the file. The rules are applied as upserts for the current user and the currently selected catalog.
+Import targets the current user and selected catalog, with a preview before confirmation.
+Source differences are flagged, missing paths are excluded by default, and invalid expressions are skipped and reported.
 
 ---
 

@@ -13,8 +13,9 @@ import { CatalogAPI } from "../types/catalog";
 import type { Rule } from "../types/rule";
 import { RuleAPI } from "../types/rule";
 import RuleScopePanel from "./RuleScopePanel.vue";
+import RuleImportDialog from "./RuleImportDialog.vue";
 
-const props = defineProps<{ userId: number }>();
+const props = defineProps<{ userId: number; userName?: string }>();
 const toast = useToast();
 
 type Status = "allow" | "deny" | "inherit";
@@ -115,8 +116,13 @@ const effectFeedback = ref(new Map<string, EffectFeedback>());
 const effectSaves = new Map<string, Promise<void>>();
 let effectRequestSequence = 0;
 
-const fileInputRef = ref<HTMLInputElement | null>(null);
-const busyImport = ref(false);
+const importDestination = ref<{
+  catalogId: number;
+  catalogName: string;
+  userId: number;
+  userName: string;
+} | null>(null);
+const savingEffects = computed(() => [...effectFeedback.value.values()].some(item => item.status === "saving"));
 
 let previewTimer: number | null = null;
 let previewRequestSequence = 0;
@@ -1044,6 +1050,7 @@ function openTableConfig(key: string) {
 }
 
 function resetState() {
+  importDestination.value = null;
   catalogs.value = [];
   rules.value = [];
   schemaEntriesByCatalog.value.clear();
@@ -1582,6 +1589,8 @@ type ExportBundle = {
   version: 1;
   user_id: number;
   catalog_id: number;
+  catalog_name?: string;
+  user_name?: string;
   exported_at: string;
   rules: ExportRule[];
 };
@@ -1604,6 +1613,8 @@ function exportSelectedCatalog() {
     version: 1,
     user_id: props.userId,
     catalog_id: catalogId,
+    catalog_name: catalogs.value.find(catalog => catalog.id === catalogId)?.name,
+    user_name: props.userName,
     exported_at: new Date().toISOString(),
     rules: toExport,
   };
@@ -1629,69 +1640,22 @@ function exportSelectedCatalog() {
 }
 
 function openImportDialog() {
-  fileInputRef.value?.click();
+  const catalog = catalogs.value.find(item => item.id === selectedCatalogId.value);
+  if (!catalog || savingEffects.value) return;
+  importDestination.value = {
+    catalogId: catalog.id,
+    catalogName: catalog.name,
+    userId: props.userId,
+    userName: props.userName || `Utilisateur ${props.userId}`,
+  };
 }
 
-async function handleImportFile(evt: Event) {
-  const input = evt.target as HTMLInputElement;
-  const file = input.files?.[0];
-  input.value = "";
-  if (!file) return;
-
-  busyImport.value = true;
-  try {
-    const text = await file.text();
-    const json = JSON.parse(text);
-
-    if (!selectedCatalogId.value) {
-      throw new Error("Sélectionne d'abord un catalog.");
-    }
-    if (!json || typeof json !== "object" || !Array.isArray(json.rules)) {
-      throw new Error(
-        "Fichier invalide : format attendu { version, user_id, catalog_id, rules: [] }",
-      );
-    }
-
-    const catalogId = selectedCatalogId.value;
-    let created = 0;
-    let updated = 0;
-    let rejected = 0;
-    for (const raw of json.rules as ExportRule[]) {
-      const schema = (raw.schema_name ?? "").trim();
-      const table = (raw.table_name ?? "").trim();
-      const column = (raw.column_name ?? "").trim();
-      const allow = !!raw.allow;
-      const effect = table || column ? raw.effect ?? "" : "";
-
-      const existed = !!getRule(catalogId, schema, table, column);
-      const saved = await upsertRule(catalogId, schema, table, column, { allow, effect });
-      if (!saved) {
-        rejected++;
-        continue;
-      }
-      if (existed) updated++;
-      else created++;
-    }
-
-    await loadAll();
-
-    toast.add({
-      severity: rejected ? "warn" : "success",
-      summary: rejected ? "Import incomplet" : "Import terminé",
-      detail: `${created} créé(e)s, ${updated} mis(e)s à jour, ${rejected} refusée(s)`,
-      life: rejected ? 6000 : 3000,
-    });
-  } catch (error: unknown) {
-    console.error(error);
-    toast.add({
-      severity: "error",
-      summary: "Import échoué",
-      detail: error instanceof Error ? error.message : "Erreur inconnue",
-      life: 3000,
-    });
-  } finally {
-    busyImport.value = false;
+async function handleImportedRules(imported: Rule[]) {
+  for (const rule of imported) {
+    restoreEffectScope(rule.catalog_id, rule.schema_name || "", rule.table_name || "", rule.column_name || "");
   }
+  await loadAll();
+  if (tableConfigVisible.value) queuePreviewRefresh();
 }
 
 function formatPreviewCell(value: unknown) {
@@ -1760,21 +1724,21 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
 
       <button
         class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50"
-        :disabled="!selectedCatalogId || loading || busyImport"
+        :disabled="!selectedCatalogId || loading || savingEffects || !!importDestination"
         @click="openImportDialog"
         title="Import rules from file (JSON) into selected database"
       >
         <i class="pi pi-upload mr-2 text-xs"></i> Import
       </button>
 
-      <input
-        ref="fileInputRef"
-        type="file"
-        accept="application/json"
-        class="hidden"
-        @change="handleImportFile"
-      />
     </div>
+
+    <RuleImportDialog
+      v-if="importDestination"
+      :destination="importDestination"
+      @close="importDestination = null"
+      @imported="handleImportedRules"
+    />
 
     <div v-if="loading" class="text-gray-500 text-sm">Loading...</div>
     <div v-else-if="loadingSchema" class="text-gray-500 text-sm">
