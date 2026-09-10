@@ -54,12 +54,9 @@ class MaskCrypto {
     static final int DATE_MAX_EPOCH_DAY =  2_932_896; // 9999-12-31
     static final int DATE_DOMAIN_SIZE   = DATE_MAX_EPOCH_DAY - DATE_MIN_EPOCH_DAY + 1;
 
-    // TIMESTAMP(3)
+    // TIMESTAMP(0..6), with an exclusive upper bound so each precision has a full domain.
     static final long TS_MIN_EPOCH_MICROS   = -62135596800000000L;   // 0001-01-01T00:00:00Z
-    static final long TS_MAX_EPOCH_MICROS   =  253402300799999000L; // 9999-12-31T23:59:59.999Z
-    static final long TS_MIN_EPOCH_MILLIS   = Math.floorDiv(TS_MIN_EPOCH_MICROS, 1000L);
-    static final long TS_MAX_EPOCH_MILLIS   = Math.floorDiv(TS_MAX_EPOCH_MICROS, 1000L);
-    static final long TS_DOMAIN_SIZE_MILLIS = (TS_MAX_EPOCH_MILLIS - TS_MIN_EPOCH_MILLIS) + 1L;
+    static final long TS_END_EPOCH_MICROS   = 253402300800000000L;   // 10000-01-01T00:00:00Z
 
     static {
         String secret = System.getenv("MASKQL_ENCRYPT_PASSWORD");
@@ -126,7 +123,7 @@ class MaskCrypto {
     // ==================================
     //  PRP Feistel (HMAC-SHA-256) — RAW
     // ==================================
-    static long prp64EncryptRaw(long x, String domain) {
+    static long prp64Encrypt(long x, String domain) {
         int L = (int)(x >>> 32);
         int R = (int)(x & 0xFFFFFFFFL);
         for (int i = 0; i < 8; i++) {
@@ -140,7 +137,7 @@ class MaskCrypto {
         return ((long)L << 32) | (R & 0xFFFFFFFFL);
     }
 
-    static long prp64DecryptRaw(long x, String password, String domain) {
+    static long prp64Decrypt(long x, String password, String domain) {
         SecretKeySpec key = keyFromPassword(password);
         int L = (int)(x >>> 32);
         int R = (int)(x & 0xFFFFFFFFL);
@@ -256,38 +253,38 @@ class MaskCrypto {
         return x;
     }
 
-    static long prp64Encrypt(long x, String domain) {
-        if (DOMAIN_TIMESTAMP.equals(domain)) {
-            if ((x % 1000L) != 0L) {
-                throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "TIMESTAMP(3) excepted");
-            }
-            if (x < TS_MIN_EPOCH_MICROS || x > TS_MAX_EPOCH_MICROS) {
-                throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "TIMESTAMP out of range");
-            }
-            long millis = Math.floorDiv(x, 1000L);
-            long rel    = millis - TS_MIN_EPOCH_MILLIS;
-            long enc    = permuteInRange64(rel, TS_DOMAIN_SIZE_MILLIS, DOMAIN_TIMESTAMP);
-            long outMs  = enc + TS_MIN_EPOCH_MILLIS;
-            return Math.multiplyExact(outMs, 1000L);
-        }
-        return prp64EncryptRaw(x, domain);
+    static long encryptTimestamp(long epochMicros, long precision) {
+        long microsPerUnit = timestampUnit(epochMicros, precision);
+        long min = TS_MIN_EPOCH_MICROS / microsPerUnit;
+        long size = (TS_END_EPOCH_MICROS - TS_MIN_EPOCH_MICROS) / microsPerUnit;
+        // For p=3 these are the original millisecond bounds and domain label.
+        long encrypted = permuteInRange64(epochMicros / microsPerUnit - min, size, DOMAIN_TIMESTAMP);
+        return Math.multiplyExact(encrypted + min, microsPerUnit);
     }
 
-    static long prp64Decrypt(long x, String password, String domain) {
-        if (DOMAIN_TIMESTAMP.equals(domain)) {
-            if ((x % 1000L) != 0L) {
-                throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "TIMESTAMP(3) excepted");
-            }
-            if (x < TS_MIN_EPOCH_MICROS || x > TS_MAX_EPOCH_MICROS) {
-                throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "TIMESTAMP out of range");
-            }
-            long millis = Math.floorDiv(x, 1000L);
-            long rel    = millis - TS_MIN_EPOCH_MILLIS;
-            long dec    = invertPermuteInRange64(rel, TS_DOMAIN_SIZE_MILLIS, password, DOMAIN_TIMESTAMP);
-            long outMs  = dec + TS_MIN_EPOCH_MILLIS;
-            return Math.multiplyExact(outMs, 1000L);
+    static long decryptTimestamp(long epochMicros, String password, long precision) {
+        long microsPerUnit = timestampUnit(epochMicros, precision);
+        long min = TS_MIN_EPOCH_MICROS / microsPerUnit;
+        long size = (TS_END_EPOCH_MICROS - TS_MIN_EPOCH_MICROS) / microsPerUnit;
+        long decrypted = invertPermuteInRange64(epochMicros / microsPerUnit - min, size, password, DOMAIN_TIMESTAMP);
+        return Math.multiplyExact(decrypted + min, microsPerUnit);
+    }
+
+    private static long timestampUnit(long epochMicros, long precision) {
+        if (precision < 0 || precision > 6) {
+            throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "TIMESTAMP precision must be between 0 and 6");
         }
-        return prp64DecryptRaw(x, password, domain);
+        long unit = 1L;
+        for (long p = precision; p < 6; p++) {
+            unit *= 10L;
+        }
+        if (epochMicros < TS_MIN_EPOCH_MICROS || epochMicros >= TS_END_EPOCH_MICROS) {
+            throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "TIMESTAMP out of range");
+        }
+        if (epochMicros % unit != 0) {
+            throw new TrinoException(StandardErrorCode.GENERIC_USER_ERROR, "Value does not match TIMESTAMP(" + precision + ") precision");
+        }
+        return unit;
     }
 
     // ===============
@@ -433,7 +430,9 @@ class MaskCrypto {
             byte[] f = prf(key, domain, (int) L, i, (byte) 0xE5);
             long fval = ByteBuffer.wrap(f).order(ByteOrder.BIG_ENDIAN).getLong() & Lmask;
             long newR = L;
-            long newL = (R ^ fval) & Lmask;
+            // With an odd bit count the halves alternate widths after each swap.
+            // The previous L can have Rbits bits; masking to Lbits loses its top bit.
+            long newL = (R ^ fval) & Rmask;
             R = newR;
             L = newL;
         }

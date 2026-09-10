@@ -253,23 +253,31 @@ class TestCryptoFunctions(unittest.TestCase):
 
     # TIMESTAMP
     def test_encrypt_decrypt_timestamp(self):
-        original_ts = "2024-01-02 03:04:05.123"
-        row = self._row(
-            """
-            SELECT
-                encrypt(CAST(? AS TIMESTAMP(3))),
-                typeof(encrypt(CAST(? AS TIMESTAMP(3)))),
-                CAST(decrypt(encrypt(CAST(? AS TIMESTAMP(3))), ?) AS VARCHAR),
-                typeof(decrypt(encrypt(CAST(? AS TIMESTAMP(3))), ?))
-            """,
-            (original_ts, original_ts, original_ts, ENCRYPT_PASSWORD, original_ts, ENCRYPT_PASSWORD),
-        )
-        enc, enc_type, dec_str, dec_type = row
-        
-        self.assertNotEqual(str(enc), original_ts, "Encrypted TIMESTAMP must differ")
-        self.assertEqual(enc_type, "timestamp(3)")
-        self.assertEqual(dec_str, original_ts, "Decrypt must restore original TIMESTAMP")
-        self.assertEqual(dec_type, "timestamp(3)")
+        cases = [
+            (0, "2024-01-02 03:04:05"),
+            (1, "2024-01-02 03:04:05.1"),
+            (2, "2024-01-02 03:04:05.12"),
+            (3, "2024-01-02 03:04:05.123"),
+            (4, "2024-01-02 03:04:05.1234"),
+            (5, "2024-01-02 03:04:05.12345"),
+            (6, "2024-01-02 03:04:05.123456"),
+            (2, "1969-12-31 23:59:59.99"),
+            (3, "0001-01-01 04:39:37.216"),  # Regression: lost bit during decryption.
+            (2, None),
+        ]
+        for precision, original in cases:
+            with self.subTest(precision=precision, original=original):
+                encrypted, encrypted_type, decrypted = self._row(
+                    f"""
+                    SELECT encrypt(value), typeof(encrypt(value)),
+                           CAST(decrypt(encrypt(value), ?) AS VARCHAR)
+                    FROM (VALUES (CAST(? AS TIMESTAMP({precision})))) AS t(value)
+                    """,
+                    (ENCRYPT_PASSWORD, original),
+                )
+                self.assertEqual(encrypted_type, f"timestamp({precision})")
+                self.assertEqual(decrypted, original)
+                self.assertEqual(encrypted is None, original is None)
 
 
 if __name__ == "__main__":
