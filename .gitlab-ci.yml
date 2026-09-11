@@ -5,7 +5,7 @@ stages:
 
 # Vars
 variables:
-  COMPOSE_PROJECT_NAME: "maskql-${CI_PIPELINE_ID}"
+  MASKQL_TEST_PROJECT: "maskql-tox-${CI_PIPELINE_ID}"
 
 tests:
   stage: test

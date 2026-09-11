@@ -26,6 +26,10 @@ At the end:
 1. only patients 1, 2, and 3 are returned,
 2. the `last_name` column is still visible, but no longer in clear text.
 
+For an executable replay with saved inputs, rules, query and actual outputs, see
+the [structured example](../examples/structured/README.md) and
+[test procedure](VALIDATION.md).
+
 ## Prerequisites
 
 - Docker and Docker Compose

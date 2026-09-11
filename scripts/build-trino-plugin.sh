@@ -4,7 +4,7 @@ set -euo pipefail
 
 readonly REQUIRED_JAVA_MAJOR=24
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-readonly PLUGIN_DIR="$ROOT_DIR/trino/plugins/maskql-plugin"
+readonly PLUGIN_DIR="${MASKQL_PLUGIN_PROJECT_DIR:-$ROOT_DIR/trino/plugins/maskql-plugin}"
 
 detect_javac_major() {
     if ! command -v javac >/dev/null 2>&1; then

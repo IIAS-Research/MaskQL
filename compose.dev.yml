@@ -22,6 +22,7 @@ services:
       - --entrypoints.websecure.address=:443
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
+      - --providers.docker.constraints=Label(`com.docker.compose.project`, `${COMPOSE_PROJECT_NAME:-maskql}`)
       - --providers.docker.network=${COMPOSE_PROJECT_NAME:-maskql}_public
       - --providers.file.filename=/dynamic/tls.yml
       - --providers.file.watch=true
@@ -34,7 +35,7 @@ services:
       - "${MASKQL_PORT:-443}:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./certs:/certs:ro
+      - ${MASKQL_TLS_DIR:-./certs}:/certs:ro
       - ./tls.yml:/dynamic/tls.yml:ro
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/ping"]
@@ -50,11 +51,11 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=${COMPOSE_PROJECT_NAME:-maskql}_public
-      - traefik.http.routers.front.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/`) && !PathPrefix(`/api`) && !PathPrefix(`/v1`)
-      - traefik.http.routers.front.entrypoints=websecure
-      - traefik.http.services.front.loadbalancer.server.port=80
-      - traefik.http.middlewares.front-compress.compress=true
-      - traefik.http.routers.front.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-front.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/`) && !PathPrefix(`/api`) && !PathPrefix(`/v1`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-front.entrypoints=websecure
+      - traefik.http.services.${COMPOSE_PROJECT_NAME:-maskql}-front.loadbalancer.server.port=80
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-maskql}-front-compress.compress=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-front.tls=true
     networks: [private]
     depends_on: [reverse-proxy]
     restart: unless-stopped
@@ -82,10 +83,10 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=${COMPOSE_PROJECT_NAME:-maskql}_public
-      - traefik.http.routers.frontdev.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/`) && !PathPrefix(`/api`) && !PathPrefix(`/v1`)
-      - traefik.http.routers.frontdev.entrypoints=websecure
-      - traefik.http.routers.frontdev.tls=true
-      - traefik.http.services.frontdev.loadbalancer.server.port=5173
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-frontdev.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/`) && !PathPrefix(`/api`) && !PathPrefix(`/v1`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-frontdev.entrypoints=websecure
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-frontdev.tls=true
+      - traefik.http.services.${COMPOSE_PROJECT_NAME:-maskql}-frontdev.loadbalancer.server.port=5173
     networks: [private, public]
     depends_on: [reverse-proxy]
     healthcheck:
@@ -117,23 +118,23 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=${COMPOSE_PROJECT_NAME:-maskql}_public
-      - traefik.http.routers.api.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/api`)
-      - traefik.http.routers.api.entrypoints=websecure
-      - traefik.http.routers.api.tls=true
-      - traefik.http.routers.api.priority=1000
-      - traefik.http.routers.api.middlewares=api-strip,api-prefix
-      - traefik.http.middlewares.api-strip.stripprefix.prefixes=/api
-      - traefik.http.middlewares.api-prefix.headers.customrequestheaders.X-Forwarded-Prefix=/api
-      - traefik.http.middlewares.api-prefix.headers.customrequestheaders.X-Forwarded-Proto=https
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-api.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/api`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-api.entrypoints=websecure
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-api.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-api.priority=1000
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-api.middlewares=${COMPOSE_PROJECT_NAME:-maskql}-api-strip,${COMPOSE_PROJECT_NAME:-maskql}-api-prefix
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-maskql}-api-strip.stripprefix.prefixes=/api
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-maskql}-api-prefix.headers.customrequestheaders.X-Forwarded-Prefix=/api
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-maskql}-api-prefix.headers.customrequestheaders.X-Forwarded-Proto=https
 
 
       # JDBC/CLI (raw /v1)
-      - traefik.http.routers.trino.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/v1`)
-      - traefik.http.routers.trino.entrypoints=websecure
-      - traefik.http.routers.trino.tls=true
-      - traefik.http.routers.trino.priority=1000
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-trino.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/v1`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-trino.entrypoints=websecure
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-trino.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-trino.priority=1000
 
-      - traefik.http.services.api.loadbalancer.server.port=8081
+      - traefik.http.services.${COMPOSE_PROJECT_NAME:-maskql}-api.loadbalancer.server.port=8081
     restart: unless-stopped
 
   maskql-dev:
@@ -165,19 +166,19 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=${COMPOSE_PROJECT_NAME:-maskql}_public
-      - traefik.http.routers.api.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/api`)
-      - traefik.http.routers.api.entrypoints=websecure
-      - traefik.http.routers.api.tls=true
-      - traefik.http.routers.api.priority=1000
-      - traefik.http.routers.api.middlewares=api-strip,api-prefix
-      - traefik.http.middlewares.api-strip.stripprefix.prefixes=/api
-      - traefik.http.middlewares.api-prefix.headers.customrequestheaders.X-Forwarded-Prefix=/api
-      - traefik.http.middlewares.api-prefix.headers.customrequestheaders.X-Forwarded-Proto=https
-      - traefik.http.routers.trino.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/v1`)
-      - traefik.http.routers.trino.entrypoints=websecure
-      - traefik.http.routers.trino.tls=true
-      - traefik.http.routers.trino.priority=1000
-      - traefik.http.services.api.loadbalancer.server.port=8081
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-api.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/api`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-api.entrypoints=websecure
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-api.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-api.priority=1000
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-api.middlewares=${COMPOSE_PROJECT_NAME:-maskql}-api-strip,${COMPOSE_PROJECT_NAME:-maskql}-api-prefix
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-maskql}-api-strip.stripprefix.prefixes=/api
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-maskql}-api-prefix.headers.customrequestheaders.X-Forwarded-Prefix=/api
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-maskql}-api-prefix.headers.customrequestheaders.X-Forwarded-Proto=https
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-trino.rule=Host(`${MASKQL_HOST}`) && PathPrefix(`/v1`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-trino.entrypoints=websecure
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-trino.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-maskql}-trino.priority=1000
+      - traefik.http.services.${COMPOSE_PROJECT_NAME:-maskql}-api.loadbalancer.server.port=8081
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8081/healthz || exit 1"]
@@ -194,7 +195,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: demo
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./tests/postgresql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -213,8 +214,8 @@ services:
     dns_search: ["${MASKQL_TRINO_DNS_SEARCH:-.}"]
     volumes:
       - trino_data:/data/trino
-      - ./trino/plugins/maskql-plugin/target/maskql-acl-0.1.0-plugin.jar:/usr/lib/trino/plugin/maskql-plugin/maskql-acl-0.1.0-plugin.jar:ro
-      - ./trino/plugins/maskql-plugin/target/maskql-acl-0.1.0.jar:/usr/lib/trino/plugin/maskql-plugin/maskql-acl-0.1.0.jar:ro
+      - ${MASKQL_PLUGIN_DIR:-./trino/plugins/maskql-plugin/target}/maskql-acl-0.1.0-plugin.jar:/usr/lib/trino/plugin/maskql-plugin/maskql-acl-0.1.0-plugin.jar:ro
+      - ${MASKQL_PLUGIN_DIR:-./trino/plugins/maskql-plugin/target}/maskql-acl-0.1.0.jar:/usr/lib/trino/plugin/maskql-plugin/maskql-acl-0.1.0.jar:ro
     environment:
       TRINO_SHARED_SECRET: ${MASKQL_TRINO_SHARED_SECRET}
       MASKQL_ENCRYPT_PASSWORD: ${MASKQL_ENCRYPT_PASSWORD}

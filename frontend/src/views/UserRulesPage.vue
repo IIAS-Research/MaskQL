@@ -51,7 +51,7 @@ onMounted(load);
         <div class="mt-5 italic">
             <span class="bold">Tips : </span><br />
             - You can use any SQL function available in <a href="https://trino.io/docs/current/functions.html" target="_blank">Trino</a><br />
-            - You can use MaskQL functions : encrypt(), decrypt(), pdf_to_text() and text_pseudo()
+            - You can use MaskQL functions : encrypt(), decrypt(), pdf_to_text() and text_pseudo(text, seed)
         </div>
     </div>
 </template>

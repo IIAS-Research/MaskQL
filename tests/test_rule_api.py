@@ -285,7 +285,7 @@ class RuleApiTests(unittest.TestCase):
         payload = self._rule_payload(catalog_id=self.catalog_id, user_id=self.user_id)
         # Same unsupported signature as text_pseudo(dse_demande) on a BOOLEAN column.
         invalid_effect = "text_pseudo(id > 0)"
-        for effect in (invalid_effect, "ARRAY[true]", "max(id)", "row_number() OVER ()"):
+        for effect in (invalid_effect, "text_pseudo(name, true)", "ARRAY[true]", "max(id)", "row_number() OVER ()"):
             with self.subTest(effect=effect):
                 response = self._post_rule({**payload, "effect": effect})
                 self.assertEqual(response.status_code, 400, response.text)
@@ -310,5 +310,7 @@ class RuleApiTests(unittest.TestCase):
             self.assertEqual(rejected_filter.status_code, 400, rejected_filter.text)
 
         # Validation accepts the text signature without executing the NLP service.
-        valid = self._patch_rule(rule_id, {"effect": "text_pseudo(name)"})
-        self.assertEqual(valid.status_code, 200, valid.text)
+        for effect in ("text_pseudo(name)", "text_pseudo(name, CAST(id AS VARCHAR))"):
+            valid = self._patch_rule(rule_id, {"effect": effect})
+            self.assertEqual(valid.status_code, 200, valid.text)
+            self.assertEqual(self._get_rule(rule_id).json()["effect"], effect)

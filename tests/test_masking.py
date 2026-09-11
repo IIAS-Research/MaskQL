@@ -289,7 +289,7 @@ class TestMasking(unittest.TestCase):
             self.assertEqual(cur.fetchone(), [1])
 
     def test_healthcare_patient_identity_is_masked(self):
-        """English patient fields keep names encrypted and contacts hidden."""
+        """English patient fields keep names masked and contacts hidden."""
         cases = [
             (1, "Fictional-Martin", "Élodie"),
             (3, "Fictional-O'Connor", "Élodie"),

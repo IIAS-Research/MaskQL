@@ -1,0 +1,63 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Length 731 >>
+stream
+BT /F1 11 Tf 14 TL 45 795 Td
+(SYNTHETIC CLINICAL NOTE - ALL IDENTITIES ARE FICTIONAL) Tj
+T*
+() Tj
+T*
+(Patient: Morgan Willowfield) Tj
+T*
+(Date of birth: 14/03/1978) Tj
+T*
+(Address: 47 Example Lane, Fictionford 00000) Tj
+T*
+(Telephone: 020 7946 0123) Tj
+T*
+(Email: morgan.willowfield@example.test) Tj
+T*
+(Medical record \(IPP\): 8000000142) Tj
+T*
+() Tj
+T*
+(Consultation on 12/02/2025 with Dr Avery Brookfield.) Tj
+T*
+() Tj
+T*
+(Reason for consultation: mild fatigue in a simulated follow-up scenario.) Tj
+T*
+(The fictional patient reports interrupted sleep over the past week.) Tj
+T*
+(The demonstration examination describes normal mobility.) Tj
+T*
+(No treatment is prescribed. This note contains no real clinical information.) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000344 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1126
+%%EOF

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "schema_name": "administrative",
+      "table_name": "patients",
+      "allow": true,
+      "effect": "patient_id <= 3"
+    },
+    {
+      "schema_name": "administrative",
+      "table_name": "patients",
+      "column_name": "last_name",
+      "allow": true,
+      "effect": "encrypt(last_name)"
+    }
+  ]
+}

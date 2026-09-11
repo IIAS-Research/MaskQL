@@ -163,11 +163,9 @@ Run tests with [tox](https://tox.wiki/) using `uv`:
 uv run tox
 ```
 
-This will:
-
-1. Start the development stack
-2. Health check
-3. Run `unittest` tests
+This starts an isolated test stack, runs the full `unittest` suite, saves logs
+under `.tox/int/log/`, and removes the test containers and volumes.
+See the [test procedure and reproducible examples](docs/VALIDATION.md).
 
 ---
 

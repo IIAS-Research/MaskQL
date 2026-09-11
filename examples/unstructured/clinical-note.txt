@@ -1,0 +1,15 @@
+SYNTHETIC CLINICAL NOTE - ALL IDENTITIES ARE FICTIONAL
+
+Patient: Morgan Willowfield
+Date of birth: 14/03/1978
+Address: 47 Example Lane, Fictionford 00000
+Telephone: 020 7946 0123
+Email: morgan.willowfield@example.test
+Medical record (IPP): 8000000142
+
+Consultation on 12/02/2025 with Dr Avery Brookfield.
+
+Reason for consultation: mild fatigue in a simulated follow-up scenario.
+The fictional patient reports interrupted sleep over the past week.
+The demonstration examination describes normal mobility.
+No treatment is prescribed. This note contains no real clinical information.
