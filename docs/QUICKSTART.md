@@ -102,7 +102,8 @@ Log in with:
 - username: `admin`
 - password: `admin`
 
-You should land on the main interface, with `Databases` and `Users` in the sidebar.
+The home dashboard summarizes users, databases and rules, with database connection statuses.
+Open a user's access rules directly from the dashboard, or expand the guide at the bottom for setup instructions.
 
 ## 4. Create a test user
 
@@ -113,23 +114,23 @@ In the UI:
 3. enter:
    - username: `quickstart`
    - password: `quickstart`
-4. click `Create`.
+4. click `Create user`.
 
 You should now see the new user in the users list.
 
 ## 5. Create a catalog for the seeded PostgreSQL data
 
-Open `Databases`, then click `Create database`.
+Open `Databases`, then click `Connect database`.
 
 Use these values:
 
 - Name: `quickstartdemo`
 - JDBC URL: `jdbc:postgresql://postgres:5432/maskqltest`
-- DBMS: `PostgreSQL`
+- Database type: `PostgreSQL`
 - Username: `postgres`
 - Password: `postgres`
 
-Click `Create`.
+Click `Connect database`.
 
 Back on the databases page:
 

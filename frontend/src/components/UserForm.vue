@@ -1,106 +1,123 @@
 <script setup lang="ts">
-    import { computed, ref } from "vue";
-    import type { User, UserCreate } from "../types/user";
+import { computed, ref } from "vue";
+import type { User, UserCreate } from "../types/user";
+import "../assets/directory.css";
+import "../assets/settings.css";
 
-    type Mode = "create" | "edit";
+const props = withDefaults(defineProps<{
+  modelValue: UserCreate | User;
+  saving?: boolean;
+  mode?: "create" | "edit";
+  error?: string;
+}>(), {
+  saving: false,
+  mode: "create",
+  error: "",
+});
 
-    const props = withDefaults(defineProps<{
-        modelValue: UserCreate | User;
-        saving?: boolean;
-        mode?: Mode;
-    }>(), {
-        saving: false,
-        mode: "create",
-    });
+const emit = defineEmits<{
+  (e: "update:modelValue", value: UserCreate | User): void;
+  (e: "submit", value: UserCreate | User): void;
+  (e: "cancel"): void;
+}>();
 
-    const emit = defineEmits<{
-        (e: "update:modelValue", value: UserCreate | User): void;
-        (e: "submit", value: UserCreate | User): void;
-        (e: "cancel"): void;
-    }>();
+const username = computed({
+  get: () => props.modelValue.username,
+  set: (value: string) => emit("update:modelValue", { ...props.modelValue, username: value }),
+});
+const password = computed({
+  get: () => props.modelValue.password,
+  set: (value: string) => emit("update:modelValue", { ...props.modelValue, password: value }),
+});
+const showPassword = ref(false);
+const errors = ref<{ username?: string; password?: string }>({});
 
-    const local = computed<UserCreate | User>({
-        get: () => props.modelValue,
-        set: (v) => emit("update:modelValue", v),
-    });
-
-    const showPwd = ref(false);
-
-    const errors = ref<{ username?: string; password?: string }>({});
-    function validate() {
-        const e: typeof errors.value = {};
-        if (!(local.value as any).username) e.username = "Username required";
-        if (props.mode === "create" && !(local.value as any).password) {
-            e.password = "Password required";
-        }
-        errors.value = e;
-        return Object.keys(e).length === 0;
-    }
-
-    function onSubmit() {
-        if (!validate()) return;
-        emit("submit", { ...(local.value as any) });
-    }
+function onSubmit() {
+  if (props.saving) return;
+  errors.value = {};
+  if (!username.value.trim()) errors.value.username = "Enter a username.";
+  if (props.mode === "create" && !password.value) errors.value.password = "Enter a password.";
+  if (Object.keys(errors.value).length) return;
+  emit("submit", { ...props.modelValue });
+}
 </script>
 
 <template>
-    <form class="space-y-4" @submit.prevent="onSubmit">
-        <div>
-        <label class="block text-gray-700 mb-1">Username</label>
+  <form class="directory-panel settings-form" :aria-busy="saving" novalidate @submit.prevent="onSubmit">
+    <section class="settings-section" aria-labelledby="user-account-heading">
+      <div class="settings-section-heading">
+        <h2 id="user-account-heading">
+          <i class="pi pi-user" aria-hidden="true"></i>Account details
+        </h2>
+        <p class="settings-hint">Used to sign in to MaskQL.</p>
+      </div>
+      <div class="min-w-0">
+        <label for="user-username" class="settings-label">Username</label>
         <input
-            v-model="(local as any).username"
-            type="text"
-            class="w-full px-3 py-2 border rounded-lg focus:ring"
-            :disabled="saving"
+          id="user-username"
+          v-model="username"
+          name="username"
+          type="text"
+          autocomplete="username"
+          class="settings-input"
+          :disabled="saving"
+          :aria-invalid="!!errors.username"
+          :aria-describedby="errors.username ? 'user-username-error' : undefined"
+          required
+          @input="errors.username = undefined"
         />
-        <p v-if="errors.username" class="text-sm text-red-600 mt-1">{{ errors.username }}</p>
-        </div>
+        <p v-if="errors.username" id="user-username-error" class="settings-field-error" role="alert">{{ errors.username }}</p>
+      </div>
+    </section>
 
-        <div>
-        <label class="block text-gray-700 mb-1">
-            Password
-            <span v-if="mode === 'edit'" class="text-gray-500 text-sm">Not updated if empty</span>
+    <section class="settings-section" aria-labelledby="user-password-heading">
+      <div class="settings-section-heading">
+        <h2 id="user-password-heading">
+          <i class="pi pi-lock" aria-hidden="true"></i>Password
+        </h2>
+      </div>
+      <div class="min-w-0">
+        <label for="user-password" class="settings-label">
+          {{ mode === 'edit' ? 'New password' : 'Password' }}
+          <span v-if="mode === 'edit'" class="ml-2 text-xs font-normal text-slate-400">Optional</span>
         </label>
-        <div class="flex">
-            <input
-            v-model="(local as any).password"
-            :type="showPwd ? 'text' : 'password'"
-            class="w-full px-3 py-2 border rounded-l-lg focus:ring focus:outline-none"
+        <div class="settings-password">
+          <input
+            id="user-password"
+            v-model="password"
+            name="password"
+            :type="showPassword ? 'text' : 'password'"
+            autocomplete="new-password"
+            class="settings-input"
             :disabled="saving"
-            />
-            <button
+            :required="mode === 'create'"
+            :aria-invalid="!!errors.password"
+            :aria-describedby="[mode === 'edit' ? 'user-password-hint' : '', errors.password ? 'user-password-error' : ''].filter(Boolean).join(' ') || undefined"
+            @input="errors.password = undefined"
+          />
+          <button
             type="button"
-            class="px-3 border border-l-0 rounded-r-lg"
-            @click="showPwd = !showPwd"
+            class="settings-password-toggle"
+            :aria-label="showPassword ? 'Hide password' : 'Show password'"
+            :aria-pressed="showPassword"
             :disabled="saving"
-            >
-            {{ showPwd ? 'Hide' : 'Show' }}
-            </button>
+            @click="showPassword = !showPassword"
+          >
+            <i :class="showPassword ? 'pi pi-eye-slash' : 'pi pi-eye'" aria-hidden="true"></i>
+          </button>
         </div>
-        <p v-if="errors.password" class="text-sm text-red-600 mt-1">{{ errors.password }}</p>
-        </div>
+        <p v-if="mode === 'edit'" id="user-password-hint" class="settings-hint">Leave blank to keep the current password.</p>
+        <p v-if="errors.password" id="user-password-error" class="settings-field-error" role="alert">{{ errors.password }}</p>
+      </div>
+    </section>
 
-        <div class="pt-2 flex gap-3">
-        <button
-            type="submit"
-            :disabled="saving"
-            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-        >
-            <span v-if="mode === 'create' && !saving">Create</span>
-            <span v-else-if="mode === 'edit' && !saving">Save</span>
-            <span v-else>Loading...</span>
-        </button>
-
-        <button
-            type="button"
-            class="px-4 py-2 border rounded-lg hover:bg-gray-50"
-            @click="emit('cancel')"
-            :disabled="saving"
-        >
-            Cancel
-        </button>
-        </div>
-    </form>
+    <p v-if="error" class="settings-error" role="alert">{{ error }}</p>
+    <footer class="settings-footer">
+      <button type="button" class="directory-secondary" :disabled="saving" @click="emit('cancel')">Cancel</button>
+      <button type="submit" :disabled="saving" class="directory-primary">
+        <i class="pi" :class="saving ? 'pi-spinner pi-spin' : 'pi-check'" aria-hidden="true"></i>
+        {{ saving ? 'Saving...' : mode === 'create' ? 'Create user' : 'Save changes' }}
+      </button>
+    </footer>
+  </form>
 </template>
-
-<style scoped></style>

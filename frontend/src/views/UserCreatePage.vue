@@ -5,6 +5,7 @@ import { useToast } from "primevue/usetoast";
 import type { UserCreate } from "../types/user";
 import { UserAPI } from "../types/user";
 import UserForm from "../components/UserForm.vue";
+import "../assets/directory.css";
 
 const router = useRouter();
 const toast = useToast();
@@ -31,10 +32,10 @@ async function handleSubmit(payload: UserCreate) {
 </script>
 
 <template>
-    <div class="p-6 max-w-2xl mx-auto">
-        <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">New user</h1>
-        <button class="px-3 py-2 rounded-lg border hover:bg-gray-50" @click="$router.back()">Back</button>
+    <div class="directory-form-page">
+        <div class="directory-header">
+        <h1 class="directory-title">Create user</h1>
+        <button type="button" class="directory-secondary shrink-0" @click="$router.back()"><i class="pi pi-angle-left" aria-hidden="true"></i>Back</button>
         </div>
 
         <UserForm

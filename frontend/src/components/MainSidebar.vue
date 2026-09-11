@@ -1,59 +1,71 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const router = useRouter();
+const route = useRoute();
 
 const menuItems = [
-    { label: "Databases", icon: "pi pi-book", route: "/catalogs" },
-    { label: "Users", icon: "pi pi-user", route: "/users" }
+    { label: "Home", icon: "pi pi-home", route: "/", activeNames: ["home"] },
+    { label: "Users", icon: "pi pi-user", route: "/users", activeNames: ["users", "user", "user-new", "user-rules"] },
+    { label: "Databases", icon: "pi pi-book", route: "/catalogs", activeNames: ["catalogs", "catalog", "catalog-new"] }
 ];
 
-const goTo = (path: string) => {
-    router.push(path);
+function isActive(item: typeof menuItems[number]) {
+    return item.activeNames.includes(String(route.name));
 }
 </script>
 
 <template>
-    <div class="flex flex-col h-screen w-16 bg-gray-900 text-white items-center justify-between py-4">
+    <aside class="flex flex-col h-screen w-16 shrink-0 bg-gray-900 text-white items-center justify-between py-4">
     <div class="group relative">
-        <img src="/images/maskql_logo.svg" alt="Logo" class="w-10 h-10" />
+        <RouterLink to="/" aria-label="MaskQL home" class="block rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+            <img src="/images/maskql_logo.svg" alt="" class="w-10 h-10" />
+        </RouterLink>
         <span
-            class="absolute left-14 top-1/2 -translate-y-1/2 px-2 py-1 text-sm bg-gray-800 text-white rounded-md opacity-0 group-hover:opacity-100 whitespace-nowrap"
+            aria-hidden="true"
+            class="pointer-events-none absolute left-14 top-1/2 z-50 -translate-y-1/2 px-2 py-1 text-sm bg-gray-800 text-white rounded-md opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 whitespace-nowrap"
             >
             MaskQL
         </span>
     </div>
 
-    <div class="flex flex-col gap-6">
+    <nav aria-label="Main navigation" class="flex flex-col gap-6">
         <div v-for="item in menuItems" :key="item.label" class="group relative">
-            <button
-            @click="goTo(item.route)"
-            class="p-3 rounded-xl hover:bg-gray-700 flex items-center justify-center"
+            <RouterLink
+            :to="item.route"
+            :aria-label="item.label"
+            :aria-current="isActive(item) ? 'page' : undefined"
+            class="p-3 rounded-xl flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            :class="isActive(item) ? 'bg-indigo-600 text-white' : 'hover:bg-gray-700'"
             >
-            <i :class="item.icon"></i>
-            </button>
+            <i :class="item.icon" aria-hidden="true"></i>
+            </RouterLink>
             <span
-            class="absolute left-14 top-1/2 -translate-y-1/2 px-2 py-1 text-sm bg-gray-800 text-white rounded-md opacity-0 group-hover:opacity-100 whitespace-nowrap"
+            aria-hidden="true"
+            class="pointer-events-none absolute left-14 top-1/2 z-50 -translate-y-1/2 px-2 py-1 text-sm bg-gray-800 text-white rounded-md opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 whitespace-nowrap"
             >
             {{ item.label }}
             </span>
         </div>
-    </div>
+    </nav>
 
     <div class="group relative">
         <button
-            class="p-3 rounded-xl hover:bg-red-600 flex items-center justify-center"
+            type="button"
+            aria-label="Logout"
+            class="p-3 rounded-xl hover:bg-red-600 flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             @click="router.push('/logout')"
         >
-            <i class="pi pi-sign-out"></i>
+            <i class="pi pi-sign-out" aria-hidden="true"></i>
         </button>
         <span
-            class="absolute left-14 top-1/2 -translate-y-1/2 px-2 py-1 text-sm bg-gray-800 text-white rounded-md opacity-0 group-hover:opacity-100 whitespace-nowrap"
+            aria-hidden="true"
+            class="pointer-events-none absolute left-14 top-1/2 z-50 -translate-y-1/2 px-2 py-1 text-sm bg-gray-800 text-white rounded-md opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 whitespace-nowrap"
         >
             Logout
         </span>
         </div>
-    </div>
+    </aside>
 </template>
 
 <style>

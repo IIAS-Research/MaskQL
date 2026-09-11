@@ -3,8 +3,10 @@ import { RouterView } from 'vue-router'
 import { useRoute } from 'vue-router'
 import CustomParticules from './components/CustomParticules.vue'
 import MainSidebar from './components/MainSidebar.vue'
+import DeleteConfirmationDialog from './components/DeleteConfirmationDialog.vue'
 
 const route = useRoute()
+const formRoutes = ['user', 'catalog', 'user-new', 'catalog-new']
 </script>
 
 <template>
@@ -16,10 +18,14 @@ const route = useRoute()
 
     <div class="flex-1 relative overflow-hidden">
       <Toast />
+      <DeleteConfirmationDialog />
       <RouterView />
       <img
+        v-if="route.name !== 'home'"
         id="watermark_iias"
-        class="fixed inset-auto bottom-4 right-4 opacity-80 pointer-events-none"
+        :class="formRoutes.includes(String(route.name))
+          ? 'static block ml-auto mr-5 mb-5 opacity-80 pointer-events-none'
+          : 'fixed inset-auto bottom-4 right-4 opacity-80 pointer-events-none'"
         src="/images/IIAS_MINIATURE.png"
       />
       <CustomParticules />

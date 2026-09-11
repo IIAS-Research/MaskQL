@@ -5,6 +5,7 @@ import { useToast } from "primevue/usetoast";
 import type { User } from "../types/user";
 import { UserAPI } from "../types/user";
 import RuleManager from "../components/RuleManager.vue";
+import "../assets/directory.css";
 
 const route = useRoute();
 const router = useRouter();
@@ -31,16 +32,16 @@ onMounted(load);
 </script>
 
 <template>
-    <div class="p-6 max-w-6xl mx-auto space-y-6">
-        <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-800">Manage user access</h1>
-            <p class="text-gray-500">User : <span class="font-medium">{{ user?.username }}</span> (ID {{ user?.id }})</p>
+    <div class="directory-page space-y-6">
+        <div class="directory-header">
+        <div class="min-w-0">
+            <h1 class="directory-title">Manage user access</h1>
+            <p class="directory-subtitle break-words">User: <span class="font-medium">{{ user?.username }}</span></p>
         </div>
-        <div class="flex gap-2">
-            <button class="px-3 py-2 border rounded-lg hover:bg-gray-50" @click="$router.back()">Back</button>
-            <button class="px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700" @click="$router.push({ name: 'user', params: { id } })">
-            Edit profile
+        <div class="flex flex-wrap gap-2">
+            <button type="button" class="directory-secondary" @click="$router.back()"><i class="pi pi-angle-left" aria-hidden="true"></i>Back</button>
+            <button type="button" class="directory-secondary" @click="$router.push({ name: 'user', params: { id } })">
+            <i class="pi pi-pencil text-xs" aria-hidden="true"></i>Edit user
             </button>
         </div>
         </div>
@@ -48,11 +49,6 @@ onMounted(load);
         <div v-if="loading" class="text-gray-500">Loading...</div>
 
         <RuleManager v-else :user-id="id" :user-name="user?.username" :key="id" />
-        <div class="mt-5 italic">
-            <span class="bold">Tips : </span><br />
-            - You can use any SQL function available in <a href="https://trino.io/docs/current/functions.html" target="_blank">Trino</a><br />
-            - You can use MaskQL functions : encrypt(), decrypt(), pdf_to_text() and text_pseudo(text, seed)
-        </div>
     </div>
 </template>
 

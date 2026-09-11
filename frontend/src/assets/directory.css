@@ -1,0 +1,79 @@
+.directory-page {
+  @apply mx-auto max-w-6xl px-5 pb-28 pt-8 sm:px-8 sm:pt-10;
+}
+.directory-form-page {
+  @apply mx-auto max-w-2xl px-5 pb-8 pt-8 sm:px-8 sm:pt-10;
+}
+.directory-header {
+  @apply mb-7 flex flex-wrap items-center justify-between gap-4;
+}
+.directory-title {
+  @apply text-3xl font-semibold tracking-tight text-slate-900;
+}
+.directory-subtitle {
+  @apply mt-2 max-w-2xl text-sm leading-relaxed text-slate-600;
+}
+.directory-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700;
+}
+.directory-secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700;
+}
+.directory-access {
+  @apply border-indigo-200 text-indigo-700 hover:border-indigo-300 hover:bg-indigo-50;
+}
+.directory-primary > .pi {
+  @apply text-xs;
+}
+.directory-panel {
+  @apply min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm;
+}
+.directory-toolbar {
+  @apply flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 p-5 sm:px-6;
+}
+.directory-search {
+  @apply relative w-full min-w-0 sm:max-w-sm sm:flex-1;
+}
+.directory-search > i {
+  @apply pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400;
+}
+.directory-search input {
+  @apply w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100;
+}
+.directory-count {
+  @apply text-xs font-medium tabular-nums text-slate-500;
+}
+.directory-icon {
+  @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900;
+}
+.directory-avatar {
+  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-sm font-semibold text-indigo-600;
+}
+.directory-link {
+  @apply text-sm font-medium text-indigo-700 hover:underline;
+}
+.directory-text-button {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-50 hover:text-indigo-800 hover:no-underline;
+}
+.directory-name {
+  @apply break-all text-sm font-semibold text-slate-900 hover:text-indigo-700 hover:underline;
+}
+.directory-empty {
+  @apply flex flex-col items-center px-5 py-12 text-center text-sm text-slate-500 sm:px-8;
+}
+.directory-error {
+  @apply flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900;
+}
+.directory-primary:focus-visible,
+.directory-secondary:focus-visible,
+.directory-icon:focus-visible,
+.directory-name:focus-visible,
+.directory-text-button:focus-visible,
+.directory-link:focus-visible {
+  @apply outline outline-2 outline-offset-2 outline-indigo-600;
+}
+.directory-primary:disabled,
+.directory-secondary:disabled,
+.directory-icon:disabled {
+  @apply cursor-wait opacity-50;
+}
