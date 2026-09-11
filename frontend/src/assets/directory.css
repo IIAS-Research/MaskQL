@@ -8,19 +8,25 @@
   @apply mb-7 flex flex-wrap items-center justify-between gap-4;
 }
 .directory-title {
-  @apply text-3xl font-semibold tracking-tight text-slate-900;
+  @apply relative w-fit max-w-full text-3xl font-semibold tracking-tight text-slate-900;
+}
+.directory-title::after {
+  content: "";
+  @apply pointer-events-none absolute right-0 h-1 w-20 max-w-full rounded-full bg-orange-300;
+  bottom: -0.25rem;
+  transform: rotate(-1deg);
 }
 .directory-subtitle {
   @apply mt-2 max-w-2xl text-sm leading-relaxed text-slate-600;
 }
 .directory-primary {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700;
+  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700;
 }
 .directory-secondary {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700;
+  @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-accent-300 hover:bg-accent-50 hover:text-accent-700;
 }
 .directory-access {
-  @apply border-indigo-200 text-indigo-700 hover:border-indigo-300 hover:bg-indigo-50;
+  @apply border-accent-300 bg-white text-accent-700 hover:border-accent-500 hover:bg-accent-50 hover:text-accent-800;
 }
 .directory-primary > .pi {
   @apply text-xs;
@@ -38,7 +44,7 @@
   @apply pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400;
 }
 .directory-search input {
-  @apply w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100;
+  @apply w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-accent-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-accent-100;
 }
 .directory-count {
   @apply text-xs font-medium tabular-nums text-slate-500;
@@ -47,16 +53,22 @@
   @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900;
 }
 .directory-avatar {
-  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-sm font-semibold text-indigo-600;
+  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-sm font-semibold text-brand-600;
+}
+.directory-avatar-accent {
+  @apply bg-accent-100 text-accent-700;
 }
 .directory-link {
-  @apply text-sm font-medium text-indigo-700 hover:underline;
+  @apply text-sm font-medium text-accent-700 hover:underline;
 }
 .directory-text-button {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-50 hover:text-indigo-800 hover:no-underline;
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-accent-700 transition-colors hover:bg-accent-50 hover:text-accent-800 hover:no-underline;
+}
+.directory-text-button > .pi-plus {
+  @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-orange-200 text-sm text-orange-900;
 }
 .directory-name {
-  @apply break-all text-sm font-semibold text-slate-900 hover:text-indigo-700 hover:underline;
+  @apply break-all text-sm font-semibold text-slate-900 hover:text-accent-700 hover:underline;
 }
 .directory-empty {
   @apply flex flex-col items-center px-5 py-12 text-center text-sm text-slate-500 sm:px-8;
@@ -70,10 +82,29 @@
 .directory-name:focus-visible,
 .directory-text-button:focus-visible,
 .directory-link:focus-visible {
-  @apply outline outline-2 outline-offset-2 outline-indigo-600;
+  @apply outline outline-2 outline-offset-2 outline-accent-600;
 }
 .directory-primary:disabled,
 .directory-secondary:disabled,
 .directory-icon:disabled {
   @apply cursor-wait opacity-50;
+}
+@media (hover: hover) and (pointer: fine) {
+  .directory-primary:not(:disabled):hover {
+    box-shadow: 0 4px 9px -5px rgb(23 63 38 / 0.5);
+  }
+  .directory-primary:not(:disabled):active {
+    box-shadow: none;
+  }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .directory-primary {
+    transition: background-color 150ms, box-shadow 150ms, transform 150ms;
+  }
+  .directory-primary:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+  .directory-primary:not(:disabled):active {
+    transform: translateY(0);
+  }
 }

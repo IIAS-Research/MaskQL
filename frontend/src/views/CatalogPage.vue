@@ -62,14 +62,14 @@ onMounted(load);
     </nav>
     <header class="settings-header">
       <div class="settings-identity">
-        <span class="settings-avatar" aria-hidden="true"><i class="pi pi-database text-2xl"></i></span>
+        <span class="settings-avatar settings-avatar-accent" aria-hidden="true"><i class="pi pi-database text-2xl"></i></span>
         <div class="min-w-0">
           <h1 id="connection-title" class="directory-title break-all">{{ savedName || 'Edit connection' }}</h1>
           <p class="directory-subtitle">{{ savedDbms ? `${savedDbms} connection` : 'Database connection settings' }}</p>
         </div>
       </div>
     </header>
-    <div v-if="loading" class="directory-panel directory-empty" role="status"><i class="pi pi-spinner pi-spin mb-3 text-xl text-indigo-500" aria-hidden="true"></i>Loading connection...</div>
+    <div v-if="loading" class="directory-panel directory-empty" role="status"><i class="pi pi-spinner pi-spin mb-3 text-xl text-brand-500" aria-hidden="true"></i>Loading connection...</div>
     <div v-else-if="loadError" class="directory-panel directory-empty">
       <i class="pi pi-exclamation-circle mb-3 text-2xl text-amber-500" aria-hidden="true"></i>
       <p class="font-medium text-slate-900" role="alert">Unable to load this connection.</p>

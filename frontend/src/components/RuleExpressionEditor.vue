@@ -172,17 +172,17 @@ function resetGuide() { readSql(props.modelValue); if (!hasGuide.value) mode.val
 <template>
   <div class="rule-expression-editor" :class="{ 'mt-2': kind === 'filter' }" role="group" :aria-label="kind === 'mask' ? `Transformation for ${column}` : 'Row filter expression'">
     <div class="flex border-b border-slate-200" role="tablist" aria-label="Expression editor" @keydown="navigateTabs">
-      <button v-for="option in (['guided', 'sql'] as const)" :id="`${id}-tab-${option}`" :key="option" type="button" role="tab" class="-mb-px flex flex-1 items-center justify-center gap-2 border-b-2 px-2 pb-3 pt-1 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600" :class="mode === option ? 'border-indigo-600 font-semibold text-indigo-700' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'" :aria-selected="mode === option" :aria-controls="`${id}-panel`" :tabindex="mode === option ? 0 : -1" @click="setMode(option)">
+      <button v-for="option in (['guided', 'sql'] as const)" :id="`${id}-tab-${option}`" :key="option" type="button" role="tab" class="-mb-px flex flex-1 items-center justify-center gap-2 border-b-2 px-2 pb-3 pt-1 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-600" :class="mode === option ? 'border-accent-600 font-semibold text-accent-700' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'" :aria-selected="mode === option" :aria-controls="`${id}-panel`" :tabindex="mode === option ? 0 : -1" @click="setMode(option)">
         <i :class="option === 'guided' ? 'pi pi-sliders-h' : 'pi pi-code'" class="text-sm" aria-hidden="true"></i>{{ option === 'guided' ? 'Visual editor' : 'SQL editor' }}
       </button>
     </div>
-    <div :id="`${id}-panel`" role="tabpanel" :aria-labelledby="`${id}-tab-${mode}`" tabindex="0" class="space-y-3 pt-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+    <div :id="`${id}-panel`" role="tabpanel" :aria-labelledby="`${id}-tab-${mode}`" tabindex="0" class="space-y-3 pt-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-600">
       <textarea v-if="mode === 'sql'" :id="id" :value="modelValue" @input="updateSql" :rows="kind === 'filter' ? 3 : 2" class="w-full rounded-lg border px-2.5 py-2 font-mono text-sm" :class="{ 'border-red-500 bg-red-50': feedback?.status === 'error' }" :aria-label="kind === 'mask' ? `SQL transformation for ${column}` : 'SQL row filter'" :aria-invalid="feedback?.status === 'error'" :aria-describedby="describedBy" :placeholder="kind === 'filter' ? `country = 'FR'` : 'lower(my_column)'"></textarea>
       <div v-else-if="!hasGuide" class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
         <p class="font-medium text-slate-700">Visual editor unavailable for this SQL expression.</p>
         <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <button type="button" class="font-medium text-indigo-700 hover:underline" @click="startGuide">Replace SQL with a visual rule</button>
-          <span class="inline-flex items-center gap-2">or <button type="button" class="font-medium text-indigo-700 hover:underline" @click="editSql">Continue in SQL editor</button></span>
+          <button type="button" class="font-medium text-accent-700 hover:underline" @click="startGuide">Replace SQL with a visual rule</button>
+          <span class="inline-flex items-center gap-2">or <button type="button" class="font-medium text-accent-700 hover:underline" @click="editSql">Continue in SQL editor</button></span>
         </div>
       </div>
       <div v-else role="group" :aria-label="kind === 'filter' ? 'Filter conditions' : 'Transformation settings'" :aria-describedby="describedBy" :aria-invalid="incomplete || feedback?.status === 'error'" class="space-y-3" :class="{ 'rounded-lg border border-red-400 p-2': feedback?.status === 'error' }">
@@ -191,7 +191,7 @@ function resetGuide() { readSql(props.modelValue); if (!hasGuide.value) mode.val
           <div v-if="filter.conditions.length" class="flex flex-wrap items-center gap-x-3 gap-y-2">
             <span class="text-xs font-medium text-slate-600">Keep rows matching</span>
             <div role="group" aria-label="Combine conditions" class="inline-flex rounded-lg bg-slate-200/70 p-0.5">
-              <button v-for="join in (['AND', 'OR'] as const)" :key="join" type="button" :aria-pressed="filter.join === join" :title="join === 'AND' ? 'Every condition must match' : 'At least one condition must match'" class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50" :class="filter.join === join ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'" :disabled="typesLoading" @click="filter.join = join; updateGuide()">{{ join === 'AND' ? 'All conditions' : 'Any condition' }}</button>
+              <button v-for="join in (['AND', 'OR'] as const)" :key="join" type="button" :aria-pressed="filter.join === join" :title="join === 'AND' ? 'Every condition must match' : 'At least one condition must match'" class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-600 disabled:opacity-50" :class="filter.join === join ? 'bg-accent-600 text-white shadow-sm hover:bg-accent-700' : 'text-slate-600 hover:bg-white hover:text-slate-900'" :disabled="typesLoading" @click="filter.join = join; updateGuide()">{{ join === 'AND' ? 'All conditions' : 'Any condition' }}</button>
             </div>
           </div>
           <p v-if="!filter.conditions.length" class="py-2 text-sm text-slate-500">All rows are kept. Add a condition to restrict access.</p>
@@ -228,7 +228,7 @@ function resetGuide() { readSql(props.modelValue); if (!hasGuide.value) mode.val
               <p v-else-if="!needsValue(condition.operator)" class="mt-2 text-xs text-slate-500">NULL means a missing value; an empty text is a different value.</p>
             </div>
           </div>
-          <button :id="!filter.conditions.length ? id : undefined" type="button" class="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50" :disabled="typesLoading" @click="addCondition"><i class="pi pi-plus text-xs" aria-hidden="true"></i>Add condition</button>
+          <button :id="!filter.conditions.length ? id : undefined" type="button" class="inline-flex items-center gap-2 rounded-lg border border-accent-200 bg-white px-3 py-2 text-sm font-medium text-accent-700 hover:bg-accent-50 disabled:opacity-50" :disabled="typesLoading" @click="addCondition"><i class="pi pi-plus text-xs" aria-hidden="true"></i>Add condition</button>
         </template>
         <template v-else>
           <RuleFunctionPicker v-if="choosing" :column="column" :column-type="columnType" :selected-id="transformation?.functionId" @choose="chooseFunction" @close="closePicker" @sql="editSql" />
@@ -237,7 +237,7 @@ function resetGuide() { readSql(props.modelValue); if (!hasGuide.value) mode.val
               <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                 <h5 class="min-w-[8rem] flex-1 text-base font-semibold text-slate-900">{{ definition.label }}</h5>
                 <div class="flex shrink-0 items-center gap-1" role="group" aria-label="Transformation actions">
-                  <button :id="id" type="button" class="rounded-md px-2 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50" :disabled="typesLoading" @click="choosing = true">Change</button>
+                  <button :id="id" type="button" class="rounded-md px-2 py-1.5 text-xs font-medium text-accent-700 hover:bg-accent-50" :disabled="typesLoading" @click="choosing = true">Change</button>
                   <button type="button" class="rounded-md px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-red-50 hover:text-red-700" aria-label="Remove transformation" @click="removeTransformation">Remove</button>
                 </div>
               </div>
@@ -251,7 +251,7 @@ function resetGuide() { readSql(props.modelValue); if (!hasGuide.value) mode.val
             </details>
           </div>
           <div v-else class="space-y-2">
-            <button :id="id" type="button" class="flex w-full items-center justify-between gap-3 rounded-lg border border-indigo-600 bg-indigo-600 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition-colors hover:border-indigo-700 hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50" :disabled="typesLoading" @click="choosing = true">Select a transformation<i class="pi pi-chevron-down text-xs text-indigo-100" aria-hidden="true"></i></button>
+            <button :id="id" type="button" class="flex w-full items-center justify-between gap-3 rounded-lg border border-accent-600 bg-accent-600 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition-colors hover:border-accent-700 hover:bg-accent-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-600 disabled:opacity-50" :disabled="typesLoading" @click="choosing = true">Select a transformation<i class="pi pi-chevron-down text-xs text-white/80" aria-hidden="true"></i></button>
             <p class="text-xs text-slate-500">{{ replacingSql ? 'Select the replacement for your SQL expression.' : 'No transformation applied.' }}</p>
           </div>
           <p v-if="!columnType && !typesLoading" class="text-xs text-slate-500">The column type is unavailable. Only hiding the value is offered; SQL remains available.</p>

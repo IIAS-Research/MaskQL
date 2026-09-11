@@ -1,3 +1,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root { accent-color: theme('colors.accent.600'); }
+  :focus-visible { outline-color: theme('colors.accent.600'); }
+}

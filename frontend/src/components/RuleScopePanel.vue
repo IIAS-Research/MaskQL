@@ -17,7 +17,6 @@ const props = withDefaults(
     statusOf: (key: string) => Status;
     badgeLabelOf?: (key: string) => string;
     badgeToneOf?: (key: string) => Status;
-    cardClassOf?: (key: string) => string;
     onAllow: (key: string) => void | Promise<unknown>;
     onDeny: (key: string) => void | Promise<unknown>;
     onInherit: (key: string) => void | Promise<unknown>;
@@ -74,12 +73,6 @@ function badgeLabel(key: string) {
       : "deny")
   );
 }
-function cardClass(key: string) {
-  return (
-    props.cardClassOf?.(key) ??
-    "border border-slate-200 bg-white hover:bg-slate-50"
-  );
-}
 </script>
 
 <template>
@@ -92,16 +85,15 @@ function cardClass(key: string) {
       <li
         v-for="it in items"
         :key="it.key"
-        class="rounded-xl p-2 cursor-pointer transition-colors"
-        :class="[
-          cardClass(it.key),
-          selectedKey === it.key ? 'ring-2 ring-indigo-500' : '',
-        ]"
+        class="rounded-xl border border-slate-200 p-2 cursor-pointer transition-colors"
+        :class="selectedKey === it.key ? 'bg-slate-100' : 'bg-white hover:bg-slate-50'"
+        :aria-current="selectedKey === it.key ? 'true' : undefined"
         @click="emit('select', it.key)"
       >
         <div class="flex items-start justify-between gap-3">
           <div class="flex items-center gap-2 min-w-0">
-            <div class="text-sm font-medium truncate">{{ it.label }}</div>
+            <i v-if="selectedKey === it.key" class="pi pi-chevron-right shrink-0 text-[10px] text-accent-700" aria-hidden="true"></i>
+            <div class="text-sm truncate" :class="selectedKey === it.key ? 'font-semibold text-accent-900' : 'font-medium'">{{ it.label }}</div>
             <i
               v-if="it.hint"
               class="pi pi-exclamation-triangle text-[11px] text-amber-500 shrink-0"

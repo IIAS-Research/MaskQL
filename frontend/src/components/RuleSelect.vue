@@ -58,7 +58,7 @@ function onKeydown(event: KeyboardEvent) {
 <style scoped>
 .rule-select.p-dropdown { @apply w-full min-w-0 rounded-lg border border-slate-200 bg-white; }
 .rule-select.p-dropdown:not(.p-disabled):hover { @apply border-slate-400; }
-.rule-select.p-dropdown.p-focus { @apply border-indigo-500 ring-2 ring-indigo-100; }
+.rule-select.p-dropdown.p-focus { @apply border-accent-500 ring-2 ring-accent-100; }
 .rule-select :deep(.p-dropdown-label) { @apply min-w-0 px-2.5 py-2 text-sm leading-5 text-slate-800; }
 .rule-select :deep(.p-dropdown-trigger) { @apply w-8 text-slate-400; }
 .rule-select :deep(.p-dropdown-trigger-icon) { @apply h-3 w-3; }
@@ -68,6 +68,6 @@ function onKeydown(event: KeyboardEvent) {
 :global(.rule-select-panel.p-dropdown-panel .p-dropdown-items) { @apply py-1; }
 :global(.rule-select-panel.p-dropdown-panel .p-dropdown-items .p-dropdown-item) { @apply whitespace-normal px-3 py-2 text-sm; overflow-wrap: anywhere; }
 :global(.rule-select-panel.p-dropdown-panel .p-dropdown-items .p-dropdown-item.p-highlight),
-:global(.rule-select-panel.p-dropdown-panel .p-dropdown-items .p-dropdown-item.p-highlight.p-focus) { @apply bg-indigo-50 text-indigo-700; }
+:global(.rule-select-panel.p-dropdown-panel .p-dropdown-items .p-dropdown-item.p-highlight.p-focus) { @apply bg-accent-200 font-medium text-accent-900; }
 :global(.rule-select-panel.p-dropdown-panel .p-dropdown-items .p-dropdown-empty-message) { @apply px-3 py-2 text-sm text-slate-500; }
 </style>

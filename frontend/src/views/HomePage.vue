@@ -51,8 +51,8 @@ const ruleKinds = computed(() => {
   }
   return [
     { label: "Access only", count: (rules.value?.length ?? 0) - filters - transformations, color: "bg-slate-400" },
-    { label: "Row filters", count: filters, color: "bg-sky-500" },
-    { label: "Column transformations", count: transformations, color: "bg-indigo-500" },
+    { label: "Row filters", count: filters, color: "bg-brand-500" },
+    { label: "Column transformations", count: transformations, color: "bg-orange-600" },
   ];
 });
 
@@ -123,19 +123,19 @@ onMounted(refresh);
     </p>
 
     <dl class="mt-6 grid grid-cols-3 divide-x divide-slate-200 rounded-2xl border border-slate-200 bg-white" :aria-busy="loading">
-      <div class="min-w-0 px-2 py-3 sm:p-5">
-        <dt class="text-[11px] font-medium text-slate-500 sm:text-sm">Users</dt>
+      <div class="relative min-w-0 px-2 py-3 sm:p-5">
+        <dt class="text-[11px] font-medium text-slate-500 sm:text-sm md:pr-14">Users<span class="overview-stat-icon overview-stat-users" aria-hidden="true"><i class="pi pi-users"></i></span></dt>
         <dd class="mt-2 break-words font-semibold tabular-nums text-slate-900" :class="users === null ? 'text-xs sm:text-sm' : 'text-2xl sm:text-3xl'">{{ loading ? 'Loading...' : users?.length ?? 'Unavailable' }}</dd>
         <dd v-if="users !== null && rules !== null" class="mt-2 hidden text-xs text-slate-500 sm:block">{{ configuredUsers }} with saved rules</dd>
       </div>
-      <div class="min-w-0 px-2 py-3 sm:p-5">
-        <dt class="text-[11px] font-medium text-slate-500 sm:text-sm">Databases</dt>
+      <div class="relative min-w-0 px-2 py-3 sm:p-5">
+        <dt class="text-[11px] font-medium text-slate-500 sm:text-sm md:pr-14">Databases<span class="overview-stat-icon overview-stat-databases" aria-hidden="true"><i class="pi pi-database"></i></span></dt>
         <dd class="mt-2 break-words font-semibold tabular-nums text-slate-900" :class="catalogs === null ? 'text-xs sm:text-sm' : 'text-2xl sm:text-3xl'">{{ loading ? 'Loading...' : catalogs?.length ?? 'Unavailable' }}</dd>
         <dd v-if="catalogs !== null" class="mt-2 hidden text-xs text-slate-500 sm:block">Configured connections</dd>
       </div>
-      <div class="min-w-0 px-2 py-3 sm:p-5">
-        <dt class="text-[11px] font-medium text-slate-500 sm:text-sm">Rules</dt>
-        <dd class="mt-2 break-words font-semibold tabular-nums text-slate-900" :class="rules === null ? 'text-xs sm:text-sm' : 'text-2xl sm:text-3xl'">{{ loading ? 'Loading...' : rules?.length ?? 'Unavailable' }}</dd>
+      <div class="relative min-w-0 px-2 py-3 sm:p-5">
+        <dt class="text-[11px] font-medium text-accent-700 sm:text-sm md:pr-14">Rules<span class="overview-stat-icon overview-stat-rules" aria-hidden="true"><i class="pi pi-sliders-h"></i></span></dt>
+        <dd class="mt-2 break-words font-semibold tabular-nums text-accent-700" :class="rules === null ? 'text-xs sm:text-sm' : 'text-2xl sm:text-3xl'">{{ loading ? 'Loading...' : rules?.length ?? 'Unavailable' }}</dd>
         <dd v-if="rules !== null" class="mt-2 hidden text-xs text-slate-500 sm:block">Saved across all users</dd>
       </div>
     </dl>
@@ -223,7 +223,7 @@ onMounted(refresh);
     </div>
 
     <details class="mt-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
-      <summary class="cursor-pointer text-sm font-semibold text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-600">How to configure access<span class="ml-2 inline-block text-xs font-normal text-slate-500">A quick guide</span></summary>
+      <summary class="cursor-pointer text-sm font-semibold text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-600">How to configure access<span class="ml-2 inline-block text-xs font-normal text-slate-500">A quick guide</span></summary>
       <ol class="mt-4 grid gap-4 text-sm md:grid-cols-3">
         <li><h3 class="font-semibold text-slate-900">1. Choose a user</h3><p class="mt-1 leading-relaxed text-slate-600">Select Manage access next to a user to edit their rules.</p></li>
         <li><h3 class="font-semibold text-slate-900">2. Choose the data</h3><p class="mt-1 leading-relaxed text-slate-600">Select a database and schema, then open a table using its gear icon.</p></li>
@@ -233,3 +233,22 @@ onMounted(refresh);
     <footer class="mt-8 flex justify-end"><img src="/images/IIAS_MINIATURE.png" alt="IIAS" class="h-10 max-w-full object-contain opacity-80" /></footer>
   </main>
 </template>
+
+<style scoped>
+.overview-stat-icon {
+  @apply pointer-events-none absolute right-5 top-5 hidden h-11 w-11 place-items-center text-lg md:grid;
+}
+.overview-stat-users {
+  @apply bg-brand-100 text-brand-700;
+  border-radius: 16px 16px 16px 5px;
+  transform: rotate(-8deg);
+}
+.overview-stat-users > i { transform: rotate(8deg); }
+.overview-stat-databases {
+  @apply rounded-full bg-accent-800 text-white;
+}
+.overview-stat-rules {
+  @apply bg-orange-300 text-accent-800;
+  clip-path: polygon(50% 0, 62% 12%, 80% 10%, 85% 28%, 100% 38%, 92% 55%, 98% 73%, 80% 82%, 72% 100%, 53% 93%, 35% 100%, 24% 84%, 5% 79%, 9% 59%, 0 43%, 15% 30%, 19% 11%, 39% 14%);
+}
+</style>

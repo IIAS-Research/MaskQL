@@ -16,14 +16,14 @@ function isActive(item: typeof menuItems[number]) {
 </script>
 
 <template>
-    <aside class="flex flex-col h-screen w-16 shrink-0 bg-gray-900 text-white items-center justify-between py-4">
+    <aside class="flex flex-col h-screen w-16 shrink-0 bg-accent-900 text-white items-center justify-between py-4">
     <div class="group relative">
         <RouterLink to="/" aria-label="MaskQL home" class="block rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
             <img src="/images/maskql_logo.svg" alt="" class="w-10 h-10" />
         </RouterLink>
         <span
             aria-hidden="true"
-            class="pointer-events-none absolute left-14 top-1/2 z-50 -translate-y-1/2 px-2 py-1 text-sm bg-gray-800 text-white rounded-md opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 whitespace-nowrap"
+            class="pointer-events-none absolute left-14 top-1/2 z-50 -translate-y-1/2 px-2 py-1 text-sm bg-accent-800 text-white rounded-md opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 whitespace-nowrap"
             >
             MaskQL
         </span>
@@ -36,13 +36,13 @@ function isActive(item: typeof menuItems[number]) {
             :aria-label="item.label"
             :aria-current="isActive(item) ? 'page' : undefined"
             class="p-3 rounded-xl flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-            :class="isActive(item) ? 'bg-indigo-600 text-white' : 'hover:bg-gray-700'"
+            :class="isActive(item) ? 'bg-brand-600 text-white hover:bg-brand-700' : 'hover:bg-accent-800'"
             >
             <i :class="item.icon" aria-hidden="true"></i>
             </RouterLink>
             <span
             aria-hidden="true"
-            class="pointer-events-none absolute left-14 top-1/2 z-50 -translate-y-1/2 px-2 py-1 text-sm bg-gray-800 text-white rounded-md opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 whitespace-nowrap"
+            class="pointer-events-none absolute left-14 top-1/2 z-50 -translate-y-1/2 px-2 py-1 text-sm bg-accent-800 text-white rounded-md opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 whitespace-nowrap"
             >
             {{ item.label }}
             </span>
@@ -60,7 +60,7 @@ function isActive(item: typeof menuItems[number]) {
         </button>
         <span
             aria-hidden="true"
-            class="pointer-events-none absolute left-14 top-1/2 z-50 -translate-y-1/2 px-2 py-1 text-sm bg-gray-800 text-white rounded-md opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 whitespace-nowrap"
+            class="pointer-events-none absolute left-14 top-1/2 z-50 -translate-y-1/2 px-2 py-1 text-sm bg-accent-800 text-white rounded-md opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 whitespace-nowrap"
         >
             Logout
         </span>

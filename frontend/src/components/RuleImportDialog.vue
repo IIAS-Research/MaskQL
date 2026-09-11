@@ -304,8 +304,8 @@ async function applyImport() {
     @update:visible="!importing && emit('close')"
   >
     <div class="space-y-4">
-      <div class="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
-        <p class="text-xs font-medium uppercase tracking-wide text-indigo-700">
+      <div class="rounded-xl border border-accent-200 bg-accent-50 p-4">
+        <p class="text-xs font-medium uppercase tracking-wide text-accent-700">
           Destination de l’import
         </p>
         <div class="mt-2 flex flex-wrap gap-x-10 gap-y-2">
@@ -537,7 +537,7 @@ async function applyImport() {
       <button
         v-if="!finished"
         type="button"
-        class="ml-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+        class="ml-2 rounded-lg bg-brand-600 px-3 py-2 text-sm text-white hover:bg-brand-700 disabled:opacity-50"
         :disabled="!canImport"
         @click="applyImport"
       >

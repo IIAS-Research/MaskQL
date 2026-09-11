@@ -162,7 +162,7 @@ onMounted(fetchCatalogs);
         </div>
       </div>
 
-      <div v-if="loading" class="directory-empty" role="status"><i class="pi pi-spinner pi-spin mb-3 text-xl text-indigo-500" aria-hidden="true"></i>Loading databases...</div>
+      <div v-if="loading" class="directory-empty" role="status"><i class="pi pi-spinner pi-spin mb-3 text-xl text-brand-500" aria-hidden="true"></i>Loading databases...</div>
       <div v-else-if="loadError" class="directory-empty">
         <i class="pi pi-exclamation-circle mb-4 text-2xl text-amber-500" aria-hidden="true"></i>
         <h2 class="text-base font-semibold text-slate-900" role="alert">Unable to load databases</h2>
@@ -170,7 +170,7 @@ onMounted(fetchCatalogs);
         <button type="button" class="directory-secondary mt-5" @click="fetchCatalogs">Try again</button>
       </div>
       <div v-else-if="!catalogs.length" class="directory-empty">
-        <span class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500"><i class="pi pi-database text-2xl" aria-hidden="true"></i></span>
+        <span class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-100 text-accent-700"><i class="pi pi-database text-2xl" aria-hidden="true"></i></span>
         <h2 class="text-base font-semibold text-slate-900">Connect your first database</h2>
         <p class="mt-2 max-w-sm leading-relaxed">Add a connection to make its schemas and tables available for access rules.</p>
         <RouterLink :to="{ name: 'catalog-new' }" class="directory-primary mt-5"><i class="pi pi-plus" aria-hidden="true"></i>Connect database</RouterLink>
@@ -186,7 +186,7 @@ onMounted(fetchCatalogs);
         <ul v-else class="divide-y divide-slate-100">
           <li v-for="catalog in filtered" :key="catalog.id" class="grid items-start gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto]">
             <div class="flex min-w-0 items-start gap-3">
-              <span class="directory-avatar"><i class="pi pi-database text-lg" aria-hidden="true"></i></span>
+              <span class="directory-avatar directory-avatar-accent"><i class="pi pi-database text-lg" aria-hidden="true"></i></span>
               <div class="min-w-0">
                 <RouterLink :to="{ name: 'catalog', params: { id: catalog.id } }" class="directory-name">{{ catalog.name }}</RouterLink>
                 <p class="mt-1 text-xs text-slate-500">{{ getTrinoDbmsLabel(catalog.sgbd) }}</p>

@@ -127,7 +127,7 @@ onMounted(() => {
       </div>
 
       <div v-if="loading" class="directory-empty" role="status">
-        <i class="pi pi-spinner pi-spin mb-3 text-xl text-indigo-500" aria-hidden="true"></i>
+        <i class="pi pi-spinner pi-spin mb-3 text-xl text-brand-500" aria-hidden="true"></i>
         <p class="text-sm text-slate-500">Loading users...</p>
       </div>
       <div v-else-if="users === null" class="directory-empty" role="alert">
@@ -137,7 +137,7 @@ onMounted(() => {
         <button type="button" class="directory-secondary mt-5" @click="fetchUsers">Retry</button>
       </div>
       <div v-else-if="!users.length" class="directory-empty">
-        <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600"><i class="pi pi-users text-xl" aria-hidden="true"></i></div>
+        <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600"><i class="pi pi-users text-xl" aria-hidden="true"></i></div>
         <h2 class="font-semibold text-slate-900">Your first user starts here</h2>
         <p class="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-500">Create an account, then choose which data they can access.</p>
         <RouterLink :to="{ name: 'user-new' }" class="directory-primary mt-5"><i class="pi pi-plus" aria-hidden="true"></i>Create user</RouterLink>

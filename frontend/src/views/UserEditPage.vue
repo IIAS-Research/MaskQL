@@ -77,7 +77,7 @@ onMounted(load);
       <ManageAccessLink v-if="model" :user-id="id" :username="username" />
     </header>
 
-    <div v-if="loading" class="directory-panel directory-empty" role="status"><i class="pi pi-spinner pi-spin mb-3 text-xl text-indigo-500" aria-hidden="true"></i>Loading user...</div>
+    <div v-if="loading" class="directory-panel directory-empty" role="status"><i class="pi pi-spinner pi-spin mb-3 text-xl text-brand-500" aria-hidden="true"></i>Loading user...</div>
     <div v-else-if="loadError" class="directory-panel directory-empty">
       <i class="pi pi-exclamation-circle mb-3 text-2xl text-amber-500" aria-hidden="true"></i>
       <p class="font-medium text-slate-900" role="alert">{{ loadError }}</p>

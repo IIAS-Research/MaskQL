@@ -75,7 +75,6 @@ const schemaEntriesByCatalog = ref(new Map<number, CatalogSchemaEntry[]>());
 
 const selectedCatalogId = ref<number | null>(null);
 const selectedSchema = ref<string | null>(null);
-const selectedTable = ref<string | null>(null);
 const draftSchemaName = ref("");
 const draftTableName = ref("");
 const draftColumnName = ref("");
@@ -170,12 +169,6 @@ function badgeClass(status: Status) {
   if (status === "allow") return "text-green-700 bg-green-50 border-green-200";
   if (status === "deny") return "text-red-700 bg-red-50 border-red-200";
   return "text-gray-600 bg-gray-50 border-gray-200";
-}
-
-function subtleCardClass(status: "allow" | "deny") {
-  return status === "allow"
-    ? "border border-green-100 border-l-4 border-l-green-400 bg-green-50/10 hover:bg-green-50/25"
-    : "border border-red-100 border-l-4 border-l-red-400 bg-red-50/10 hover:bg-red-50/25";
 }
 
 function columnPillClass(status: "allow" | "deny") {
@@ -351,10 +344,6 @@ function badgeLabelOf(cId: number, schema = "", table = "", column = "") {
   }`;
 }
 
-function cardClassOf(cId: number, schema = "", table = "", column = "") {
-  return subtleCardClass(effectiveStatusOf(cId, schema, table, column));
-}
-
 function rebuildRuleMap() {
   ruleMap.value.clear();
   for (const rule of rules.value) {
@@ -423,19 +412,6 @@ function rebuildSchemaTree() {
     schemasByCatalog.value.get(selectedCatalogId.value) ?? new Set<string>();
   if (selectedSchema.value && !knownSchemas.has(selectedSchema.value)) {
     selectedSchema.value = null;
-  }
-
-  if (!selectedSchema.value) {
-    selectedTable.value = null;
-    return;
-  }
-
-  const knownTables =
-    tablesByScope.value.get(
-      `${selectedCatalogId.value}|${selectedSchema.value}`,
-    ) ?? new Set<string>();
-  if (selectedTable.value && !knownTables.has(selectedTable.value)) {
-    selectedTable.value = null;
   }
 }
 
@@ -987,14 +963,6 @@ async function removeMissingPath(
     if (selectedSchema.value === schema && !table && !column) {
       selectedSchema.value = null;
     }
-    if (
-      selectedSchema.value === schema &&
-      selectedTable.value === table &&
-      table &&
-      !column
-    ) {
-      selectedTable.value = null;
-    }
 
     if (tableConfig.value) {
       const removedTable =
@@ -1053,7 +1021,6 @@ function openTableConfig(key: string) {
 
   selectedCatalogId.value = catalogId;
   selectedSchema.value = schema;
-  selectedTable.value = table;
 
   tableConfig.value = { catalogId, schema, table };
   expandedColumnKey.value = null;
@@ -1095,7 +1062,6 @@ function resetState() {
   colsByScope.value.clear();
   selectedCatalogId.value = null;
   selectedSchema.value = null;
-  selectedTable.value = null;
   draftSchemaName.value = "";
   draftTableName.value = "";
   draftColumnName.value = "";
@@ -1192,14 +1158,9 @@ watch(
 
 watch(selectedCatalogId, async (catalogId) => {
   selectedSchema.value = null;
-  selectedTable.value = null;
   if (catalogId != null) {
     await loadCatalogSchema(catalogId);
   }
-});
-
-watch(selectedSchema, () => {
-  selectedTable.value = null;
 });
 
 const catalogItems = computed(() =>
@@ -1234,11 +1195,6 @@ function badgeLabelOfCatalogKey(key: string) {
 function badgeToneOfCatalogKey(key: string) {
   const [, id] = key.split(":");
   return effectiveStatusOf(Number(id));
-}
-
-function cardClassOfCatalogKey(key: string) {
-  const [, id] = key.split(":");
-  return cardClassOf(Number(id));
 }
 
 const allowCatalogKey = (key: string) => setAllow(Number(key.split(":")[1]));
@@ -1293,11 +1249,6 @@ function badgeToneOfSchemaKey(key: string) {
   return effectiveStatusOf(Number(cId), schema);
 }
 
-function cardClassOfSchemaKey(key: string) {
-  const [, cId, schema] = key.split(":");
-  return cardClassOf(Number(cId), schema);
-}
-
 const allowSchemaKey = (key: string) => {
   const [, cId, schema] = key.split(":");
   return setAllow(Number(cId), schema);
@@ -1332,23 +1283,6 @@ const tableItems = computed<ScopeItem[]>(() => {
     }));
 });
 
-const selectedTableKey = computed(() =>
-  selectedCatalogId.value && selectedSchema.value && selectedTable.value
-    ? `tbl:${selectedCatalogId.value}:${selectedSchema.value}:${selectedTable.value}`
-    : null,
-);
-
-function selectTable(key: string) {
-  if (key === "__add__") {
-    void addManualTable();
-    return;
-  }
-  const [, cId, schema, table] = key.split(":");
-  selectedCatalogId.value = Number(cId);
-  selectedSchema.value = schema;
-  selectedTable.value = table;
-}
-
 function statusOfTableKey(key: string) {
   const [, cId, schema, table] = key.split(":");
   return statusOf(Number(cId), schema, table);
@@ -1362,11 +1296,6 @@ function badgeLabelOfTableKey(key: string) {
 function effectiveStatusOfTableKey(key: string) {
   const [, cId, schema, table] = key.split(":");
   return effectiveStatusOf(Number(cId), schema, table);
-}
-
-function cardClassOfTableKey(key: string) {
-  const [, cId, schema, table] = key.split(":");
-  return cardClassOf(Number(cId), schema, table);
 }
 
 const allowTableKey = (key: string) => {
@@ -1518,7 +1447,6 @@ async function addManualTable() {
   if (!created) return;
 
   draftTableName.value = "";
-  selectedTable.value = table;
   toast.add({
     severity: "success",
     summary: "Added",
@@ -1784,7 +1712,6 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
         :status-of="statusOfCatalogKey"
         :badge-label-of="badgeLabelOfCatalogKey"
         :badge-tone-of="badgeToneOfCatalogKey"
-        :card-class-of="cardClassOfCatalogKey"
         :on-allow="allowCatalogKey"
         :on-deny="denyCatalogKey"
         :on-inherit="inheritCatalogKey"
@@ -1798,7 +1725,6 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
         :status-of="statusOfSchemaKey"
         :badge-label-of="badgeLabelOfSchemaKey"
         :badge-tone-of="badgeToneOfSchemaKey"
-        :card-class-of="cardClassOfSchemaKey"
         :on-allow="allowSchemaKey"
         :on-deny="denySchemaKey"
         :on-inherit="inheritSchemaKey"
@@ -1829,14 +1755,20 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
           <li
             v-for="it in tableItems"
             :key="it.key"
-            class="rounded-xl p-3 cursor-pointer transition-colors"
-            :class="cardClassOfTableKey(it.key)"
-            @click="selectTable(it.key)"
+            class="rounded-xl border border-slate-200 bg-white p-3 cursor-pointer transition-colors hover:bg-slate-50"
+            @click="openTableConfig(it.key)"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <div class="flex items-center gap-2 min-w-0">
-                  <div class="text-sm font-medium truncate">{{ it.label }}</div>
+                  <button
+                    type="button"
+                    class="min-w-0 truncate rounded text-left text-sm font-semibold text-slate-900 hover:text-accent-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-600"
+                    :title="it.label"
+                    :aria-label="`Configure table ${it.label}`"
+                    aria-haspopup="dialog"
+                    @click.stop="openTableConfig(it.key)"
+                  >{{ it.label }}</button>
                   <i
                     v-if="it.hint"
                     class="pi pi-exclamation-triangle text-[11px] text-amber-500 shrink-0"
@@ -1873,8 +1805,11 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
                   </div>
 
                   <button
+                    type="button"
                     class="inline-flex items-center justify-center h-8 w-8 border rounded-lg text-gray-700 hover:bg-gray-100"
                     title="Configure table"
+                    :aria-label="`Configure table ${it.label}`"
+                    aria-haspopup="dialog"
                     @click.stop="openTableConfig(it.key)"
                   >
                     <i class="pi pi-cog text-sm"></i>
@@ -2171,14 +2106,14 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
                 v-for="it in activeColumnItems"
                 :key="it.key"
                 class="rounded-xl border bg-white p-4 transition-colors"
-                :class="expandedColumnKey === it.key ? 'border-indigo-300' : 'border-slate-200'"
+                :class="expandedColumnKey === it.key ? 'border-slate-300' : 'border-slate-200'"
                 @focusin="focusPreviewColumnKey(it.key)"
               >
                 <div class="flex items-center justify-between gap-2" :class="{ 'sticky top-0 z-10 -mx-4 -mt-4 rounded-t-xl bg-white p-4': expandedColumnKey === it.key }">
                   <div class="flex min-w-0 flex-1 items-center gap-1 sm:gap-2">
                     <button
                       type="button"
-                      class="flex min-w-0 items-center gap-2 text-left text-sm font-semibold text-slate-900 hover:text-indigo-700"
+                      class="flex min-w-0 items-center gap-2 text-left text-sm font-semibold text-slate-900 hover:text-accent-700"
                       :title="it.label"
                       :aria-expanded="expandedColumnKey === it.key"
                       :aria-controls="`column-editor-${encodeURIComponent(it.key)}`"
@@ -2192,7 +2127,7 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
                       :title="columnTypesLoading ? 'Loading column type...' : `Column type: ${columnTypes.get(it.label) ?? 'unavailable'}`"
                       :aria-label="columnTypesLoading ? 'Loading column type...' : `Column type: ${columnTypes.get(it.label) ?? 'unavailable'}`"
                     >{{ columnTypesLoading ? '...' : columnTypes.get(it.label) ?? 'Unknown' }}</span>
-                    <i v-if="getEffectColumnKey(it.key).trim() && expandedColumnKey !== it.key" class="pi pi-sliders-h shrink-0 text-xs text-indigo-500" title="Transformation configured" aria-label="Transformation configured"></i>
+                    <i v-if="getEffectColumnKey(it.key).trim() && expandedColumnKey !== it.key" class="pi pi-sliders-h shrink-0 text-xs text-accent-600" title="Transformation configured" aria-label="Transformation configured"></i>
                     <i
                       v-if="it.hint"
                       class="pi pi-exclamation-triangle text-[11px] text-amber-500 shrink-0"
@@ -2306,13 +2241,13 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
               <div class="flex flex-wrap items-center justify-end gap-2">
                 <span
                   v-if="previewColumnName"
-                  class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs text-indigo-700"
+                  class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-accent-200 bg-accent-50 px-2 py-1 text-xs text-accent-800"
                 >
                   <span class="max-w-[14rem] truncate">
                     Focus: {{ previewColumnName }}
                   </span>
                   <button
-                    class="inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-indigo-100"
+                    class="inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-accent-100"
                     type="button"
                     aria-label="Clear preview focus"
                     @click="clearPreviewColumn"

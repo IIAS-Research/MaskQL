@@ -37,5 +37,5 @@ watch(() => route.fullPath, () => {
 .delete-confirmation.p-dialog .p-confirm-dialog-reject { @apply border border-slate-200 bg-white text-slate-700 hover:bg-slate-100; }
 .delete-confirmation.p-dialog .p-confirm-dialog-accept { @apply border border-red-600 bg-red-600 text-white hover:border-red-700 hover:bg-red-700; }
 .delete-confirmation.p-dialog .p-button:focus-visible,
-.delete-confirmation.p-dialog .p-dialog-header-icon:focus-visible { @apply outline outline-2 outline-offset-2 outline-indigo-600; }
+.delete-confirmation.p-dialog .p-dialog-header-icon:focus-visible { @apply outline outline-2 outline-offset-2 outline-accent-600; }
 </style>

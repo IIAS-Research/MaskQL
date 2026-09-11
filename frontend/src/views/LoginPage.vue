@@ -43,7 +43,7 @@ async function handleLogin() {
           v-model="username"
           type="text"
           placeholder="theDarkKnight"
-          class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-indigo-300 focus:outline-none"
+          class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-accent-300 focus:outline-none"
         />
       </div>
 
@@ -53,7 +53,7 @@ async function handleLogin() {
           v-model="password"
           type="password"
           placeholder="••••••••"
-          class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-indigo-300 focus:outline-none"
+          class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-accent-300 focus:outline-none"
           @keyup.enter="handleLogin"
         />
       </div>
@@ -62,7 +62,7 @@ async function handleLogin() {
       <button
         @click="handleLogin"
         :disabled="loading"
-        class="w-full py-2 px-4 bg-[#6EC384] text-white font-semibold rounded-lg shadow hover:bg-[#61D07D] disabled:opacity-50"
+        class="w-full py-2 px-4 bg-brand-600 text-white font-semibold rounded-lg shadow hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-600 disabled:opacity-50"
       >
         <span v-if="!loading">Login</span>
         <span v-else>Loading...</span>
