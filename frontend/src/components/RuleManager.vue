@@ -14,6 +14,7 @@ import type { Rule } from "../types/rule";
 import { RuleAPI } from "../types/rule";
 import RuleScopePanel from "./RuleScopePanel.vue";
 import RuleImportDialog from "./RuleImportDialog.vue";
+import RuleExpressionEditor from "./RuleExpressionEditor.vue";
 
 const props = defineProps<{ userId: number; userName?: string }>();
 const toast = useToast();
@@ -81,6 +82,11 @@ const draftColumnName = ref("");
 
 const tableConfigVisible = ref(false);
 const tableConfig = ref<TableConfigScope | null>(null);
+const expandedColumnKey = ref<string | null>(null);
+const columnTypes = ref(new Map<string, string>());
+const columnTypesLoading = ref(false);
+const columnTypesError = ref("");
+let columnTypesRequest = 0;
 const preview = ref<CatalogTablePreview | null>(null);
 const previewLoading = ref(false);
 const previewRequestError = ref("");
@@ -740,7 +746,10 @@ function clearEffectDrafts() {
   effectTimers.value.clear();
 }
 
-onBeforeUnmount(clearEffectDrafts);
+onBeforeUnmount(() => {
+  clearEffectDrafts();
+  closeTableConfig();
+});
 
 function hasScannedPath(
   catalogId: number,
@@ -1020,6 +1029,11 @@ async function removeMissingPath(
 function closeTableConfig() {
   tableConfigVisible.value = false;
   tableConfig.value = null;
+  expandedColumnKey.value = null;
+  columnTypesRequest += 1;
+  columnTypes.value = new Map();
+  columnTypesLoading.value = false;
+  columnTypesError.value = "";
   preview.value = null;
   previewLoading.value = false;
   previewRequestError.value = "";
@@ -1042,11 +1056,32 @@ function openTableConfig(key: string) {
   selectedTable.value = table;
 
   tableConfig.value = { catalogId, schema, table };
+  expandedColumnKey.value = null;
   tableConfigVisible.value = true;
   preview.value = null;
   previewRequestError.value = "";
   previewColumnName.value = null;
+  void loadColumnTypes();
   void refreshTablePreview();
+}
+
+async function loadColumnTypes() {
+  const scope = tableConfig.value;
+  if (!scope) return;
+  const request = ++columnTypesRequest;
+  columnTypes.value = new Map();
+  columnTypesLoading.value = true;
+  columnTypesError.value = "";
+  try {
+    const columns = await CatalogAPI.listTableColumns(scope.catalogId, scope.schema, scope.table);
+    if (request === columnTypesRequest) {
+      columnTypes.value = new Map(columns.map(column => [column.name, column.type]));
+    }
+  } catch {
+    if (request === columnTypesRequest) columnTypesError.value = "Column types could not be loaded. Check the connection or use SQL mode.";
+  } finally {
+    if (request === columnTypesRequest) columnTypesLoading.value = false;
+  }
 }
 
 function resetState() {
@@ -1124,6 +1159,7 @@ async function syncSelectedCatalogSchema() {
       tableConfig.value &&
       tableConfig.value.catalogId === selectedCatalogId.value
     ) {
+      void loadColumnTypes();
       queuePreviewRefresh();
     }
     toast.add({
@@ -1434,6 +1470,14 @@ const activeColumnItems = computed<ScopeItem[]>(() => {
   return getColumnsForTable(scope.catalogId, scope.schema, scope.table);
 });
 
+const expressionColumns = computed(() => {
+  const scope = tableConfig.value;
+  if (!scope) return [];
+  return Array.from(colsByScope.value.get(`${scope.catalogId}|${scope.schema}|${scope.table}`) ?? [])
+    .sort((a, b) => a.localeCompare(b))
+    .map(name => ({ name, type: columnTypes.value.get(name) ?? null }));
+});
+
 const activeTableLabel = computed(() =>
   tableConfig.value
     ? `${tableConfig.value.schema}.${tableConfig.value.table}`
@@ -1523,23 +1567,6 @@ function effectiveStatusOfColumnKey(key: string) {
   return effectiveStatusOf(Number(cId), schema, table, column);
 }
 
-function cardClassOfColumnKey(key: string) {
-  const [, cId, schema, table, column] = key.split(":");
-  return cardClassOf(Number(cId), schema, table, column);
-}
-
-function isPreviewColumnKey(key: string) {
-  const [, cId, schema, table, column] = key.split(":");
-  const scope = tableConfig.value;
-  return (
-    !!scope &&
-    scope.catalogId === Number(cId) &&
-    scope.schema === schema &&
-    scope.table === table &&
-    previewColumnName.value === column
-  );
-}
-
 const allowColumnKey = (key: string) => {
   const [, cId, schema, table, column] = key.split(":");
   focusPreviewColumn(Number(cId), schema, table, column, false);
@@ -1563,6 +1590,10 @@ const getEffectColumnKey = (key: string) => {
   const [, cId, schema, table, column] = key.split(":");
   return getEffectScope(Number(cId), schema, table, column);
 };
+function toggleColumnEditor(key: string) {
+  expandedColumnKey.value = expandedColumnKey.value === key ? null : key;
+  focusPreviewColumnKey(key);
+}
 const getEffectFeedbackColumnKey = (key: string) => {
   const [, cId, schema, table, column] = key.split(":");
   return effectFeedback.value.get(keyFor(props.userId, Number(cId), schema, table, column));
@@ -1975,22 +2006,24 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
       @hide="closeTableConfig"
     >
       <div v-if="tableConfig" class="space-y-4">
-        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <div class="text-xs uppercase tracking-[0.2em] text-slate-500">
-                Table
-              </div>
-              <h3 class="text-lg font-semibold text-slate-900">
+        <div class="space-y-4">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h3 class="break-words text-lg font-semibold text-slate-900">
                 {{ activeTableLabel }}
               </h3>
-              <p class="mt-1 text-sm text-slate-600">
-                Changes are saved automatically and the preview refreshes after
-                each update.
+              <p class="mt-1 text-xs text-slate-500">
+                Valid changes are saved automatically.
               </p>
             </div>
 
-            <div class="flex flex-col items-end gap-2 shrink-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <span
+                class="whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px]"
+                :class="badgeClass(effectiveStatusOf(tableConfig.catalogId, tableConfig.schema, tableConfig.table))"
+                :title="badgeLabelOf(tableConfig.catalogId, tableConfig.schema, tableConfig.table)"
+                :aria-label="badgeLabelOf(tableConfig.catalogId, tableConfig.schema, tableConfig.table)"
+              >{{ effectiveStatusOf(tableConfig.catalogId, tableConfig.schema, tableConfig.table) }}</span>
               <div class="inline-flex border rounded-lg">
                 <button
                   :class="
@@ -2065,7 +2098,7 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
                     tableConfig.table,
                   )
                 "
-                class="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs text-amber-700"
+                class="inline-flex items-center gap-2 text-xs text-amber-700"
               >
                 <i class="pi pi-exclamation-triangle text-[11px]"></i>
                 Missing from scanned schema
@@ -2073,99 +2106,60 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
             </div>
           </div>
 
-          <div class="mt-4 flex items-center gap-2 flex-wrap">
-            <span
-              class="text-[10px] px-1.5 py-0.5 border rounded whitespace-normal break-words"
-              :class="
-                badgeClass(
-                  effectiveStatusOf(
+          <section class="rounded-xl border border-slate-200" aria-labelledby="row-filter-title">
+            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3">
+              <h4 id="row-filter-title" class="text-base font-semibold text-slate-900">Row filter</h4>
+              <p id="row-filter-help" class="text-xs text-slate-500">Choose which rows this user can see.</p>
+            </div>
+            <div class="rounded-b-xl border-t border-slate-200 bg-gray-50 px-4 pb-4">
+              <RuleExpressionEditor
+                :key="keyFor(props.userId, tableConfig.catalogId, tableConfig.schema, tableConfig.table)"
+                id="row-filter"
+                kind="filter"
+                :columns="expressionColumns"
+                :types-loading="columnTypesLoading"
+                :model-value="
+                  getEffectScope(
                     tableConfig.catalogId,
                     tableConfig.schema,
                     tableConfig.table,
-                  ),
-                )
-              "
-            >
-              {{
-                badgeLabelOf(
-                  tableConfig.catalogId,
-                  tableConfig.schema,
-                  tableConfig.table,
-                )
-              }}
-            </span>
-          </div>
-
-          <div class="mt-4">
-            <label for="row-filter" class="block text-sm font-medium text-slate-700">
-              Row filter
-            </label>
-            <textarea
-              id="row-filter"
-              :value="
-                getEffectScope(
-                  tableConfig.catalogId,
-                  tableConfig.schema,
-                  tableConfig.table,
-                )
-              "
-              @input="
-                setEffectScope(
-                  tableConfig.catalogId,
-                  tableConfig.schema,
-                  tableConfig.table,
-                  '',
-                  ($event.target as HTMLTextAreaElement).value,
-                )
-              "
-              rows="3"
-              class="mt-2 w-full rounded-xl border px-3 py-2 text-sm"
-              :class="{ 'border-red-500 bg-red-50': tableEffectFeedback?.status === 'error' }"
-              :aria-invalid="tableEffectFeedback?.status === 'error'"
-              :aria-describedby="tableEffectFeedback ? 'row-filter-feedback row-filter-help' : 'row-filter-help'"
-              placeholder="country = 'FR'"
-            ></textarea>
-            <p
-              v-if="tableEffectFeedback"
-              id="row-filter-feedback"
-              role="status"
-              aria-live="polite"
-              class="mt-1 text-xs"
-              :class="tableEffectFeedback.status === 'error' ? 'text-red-700' : tableEffectFeedback.status === 'saved' ? 'text-green-700' : 'text-slate-500'"
-            >
-              <strong v-if="tableEffectFeedback.status === 'error'">Non sauvegardé. </strong>
-              {{ tableEffectFeedback.message }}
-              <button
-                v-if="tableEffectFeedback.status === 'error'"
-                type="button"
-                class="ml-2 inline-flex items-center gap-1 rounded px-1 text-xs text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                title="Revenir à la dernière version enregistrée"
-                @click.stop="restoreEffectScope(tableConfig.catalogId, tableConfig.schema, tableConfig.table)"
-              >
-                <i class="pi pi-undo text-[10px]" aria-hidden="true"></i>
-                Rétablir
-              </button>
-            </p>
-            <p id="row-filter-help" class="mt-1 text-xs text-slate-500">
-              SQL WHERE clause applied by MaskQL on this table.
-            </p>
-          </div>
+                  )
+                "
+                @update:model-value="
+                  setEffectScope(
+                    tableConfig.catalogId,
+                    tableConfig.schema,
+                    tableConfig.table,
+                    '',
+                    $event,
+                  )
+                "
+                :feedback="tableEffectFeedback"
+                described-by="row-filter-help"
+                @restore="restoreEffectScope(tableConfig.catalogId, tableConfig.schema, tableConfig.table)"
+              />
+              <p v-if="columnTypesError" role="status" class="mt-2 text-xs text-amber-700">
+                {{ columnTypesError }}
+                <button type="button" class="ml-1 underline" @click="loadColumnTypes">Retry</button>
+              </p>
+            </div>
+          </section>
         </div>
 
         <div
-          class="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.35fr)]"
+          class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.35fr)]"
         >
-          <section class="rounded-2xl border bg-white p-4">
+          <section class="min-w-0">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h4 class="text-sm font-semibold text-gray-900">Columns</h4>
+                <h4 class="text-base font-semibold text-gray-900">Columns</h4>
                 <p class="text-xs text-gray-500">
-                  {{ activeColumnItems.length }} column(s) on this table
+                  Select a column to edit its transformation.
                 </p>
               </div>
             </div>
 
-            <div class="mt-4 space-y-2 max-h-[32rem] overflow-auto pr-1">
+            <div class="mt-4 space-y-2">
               <div
                 v-if="!activeColumnItems.length"
                 class="rounded-xl border border-dashed p-4 text-sm text-gray-500"
@@ -2176,39 +2170,47 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
               <div
                 v-for="it in activeColumnItems"
                 :key="it.key"
-                class="rounded-xl p-2 transition-colors"
-                :class="[
-                  cardClassOfColumnKey(it.key),
-                  isPreviewColumnKey(it.key) ? 'ring-2 ring-indigo-200' : '',
-                ]"
-                @click="focusPreviewColumnKey(it.key)"
+                class="rounded-xl border bg-white p-4 transition-colors"
+                :class="expandedColumnKey === it.key ? 'border-indigo-300' : 'border-slate-200'"
                 @focusin="focusPreviewColumnKey(it.key)"
               >
-                <div class="flex items-start justify-between gap-2">
-                  <div class="min-w-0 flex-1">
-                    <div class="flex items-center gap-2 min-w-0">
-                      <div class="text-sm font-medium truncate">
-                        {{ it.label }}
-                      </div>
-                      <i
-                        v-if="it.hint"
-                        class="pi pi-exclamation-triangle text-[11px] text-amber-500 shrink-0"
-                        :title="it.hint"
-                        :aria-label="it.hint"
-                      ></i>
-                    </div>
-
-                    <div class="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                      <span
-                        class="text-[10px] px-1.5 py-0.5 border rounded whitespace-normal break-words"
-                        :class="badgeClass(effectiveStatusOfColumnKey(it.key))"
-                      >
-                        {{ badgeLabelOfColumnKey(it.key) }}
-                      </span>
-                    </div>
+                <div class="flex items-center justify-between gap-2" :class="{ 'sticky top-0 z-10 -mx-4 -mt-4 rounded-t-xl bg-white p-4': expandedColumnKey === it.key }">
+                  <div class="flex min-w-0 flex-1 items-center gap-1 sm:gap-2">
+                    <button
+                      type="button"
+                      class="flex min-w-0 items-center gap-2 text-left text-sm font-semibold text-slate-900 hover:text-indigo-700"
+                      :title="it.label"
+                      :aria-expanded="expandedColumnKey === it.key"
+                      :aria-controls="`column-editor-${encodeURIComponent(it.key)}`"
+                      @click="toggleColumnEditor(it.key)"
+                    >
+                      <i :class="expandedColumnKey === it.key ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" class="shrink-0 text-[10px] text-slate-400" aria-hidden="true"></i>
+                      <span class="truncate">{{ it.label }}</span>
+                    </button>
+                    <span
+                      class="min-w-0 max-w-[3.5rem] truncate font-mono text-[10px] text-slate-500 sm:max-w-[7rem]"
+                      :title="columnTypesLoading ? 'Loading column type...' : `Column type: ${columnTypes.get(it.label) ?? 'unavailable'}`"
+                      :aria-label="columnTypesLoading ? 'Loading column type...' : `Column type: ${columnTypes.get(it.label) ?? 'unavailable'}`"
+                    >{{ columnTypesLoading ? '...' : columnTypes.get(it.label) ?? 'Unknown' }}</span>
+                    <i v-if="getEffectColumnKey(it.key).trim() && expandedColumnKey !== it.key" class="pi pi-sliders-h shrink-0 text-xs text-indigo-500" title="Transformation configured" aria-label="Transformation configured"></i>
+                    <i
+                      v-if="it.hint"
+                      class="pi pi-exclamation-triangle text-[11px] text-amber-500 shrink-0"
+                      :title="it.hint"
+                      :aria-label="it.hint"
+                    ></i>
+                    <span
+                      class="shrink-0 whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px]"
+                      :class="badgeClass(effectiveStatusOfColumnKey(it.key))"
+                      :title="badgeLabelOfColumnKey(it.key)"
+                      :aria-label="badgeLabelOfColumnKey(it.key)"
+                    >
+                      {{ effectiveStatusOfColumnKey(it.key) }}
+                    </span>
+                    <span v-if="getEffectFeedbackColumnKey(it.key)?.status === 'error' && expandedColumnKey !== it.key" class="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-red-700" title="Not saved" aria-label="Not saved"><i class="pi pi-exclamation-circle" aria-hidden="true"></i><span class="hidden sm:inline">Not saved</span></span>
                   </div>
 
-                  <div class="flex flex-col items-end gap-1.5 shrink-0">
+                  <div class="flex shrink-0 items-center gap-1.5">
                     <div class="inline-flex border rounded-lg">
                       <button
                         :class="segBtn(statusOfColumnKey(it.key) === 'allow')"
@@ -2244,49 +2246,19 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
                   </div>
                 </div>
 
-                <div class="mt-2">
-                  <label
-                    :for="`effect-${encodeURIComponent(it.key)}`"
-                    class="block text-[10px] font-medium uppercase tracking-wide text-gray-500"
-                  >
-                    Mask / transform
-                  </label>
-                  <input
+                <div v-show="expandedColumnKey === it.key" :id="`column-editor-${encodeURIComponent(it.key)}`" class="-mx-4 -mb-4 rounded-b-xl border-t border-slate-200 bg-gray-50 px-4 pb-4 pt-1">
+                  <RuleExpressionEditor
+                    :key="`${props.userId}:${it.key}`"
                     :id="`effect-${encodeURIComponent(it.key)}`"
-                    :value="getEffectColumnKey(it.key)"
-                    @input="
-                      setEffectColumnKey(
-                        it.key,
-                        ($event.target as HTMLInputElement).value,
-                      )
-                    "
-                    class="mt-1.5 h-8 w-full px-2 py-1 text-sm border rounded-lg"
-                    :class="{ 'border-red-500 bg-red-50': getEffectFeedbackColumnKey(it.key)?.status === 'error' }"
-                    :aria-invalid="getEffectFeedbackColumnKey(it.key)?.status === 'error'"
-                    :aria-describedby="getEffectFeedbackColumnKey(it.key) ? `effect-feedback-${encodeURIComponent(it.key)}` : undefined"
-                    placeholder="lower(my_column)"
+                    kind="mask"
+                    :column="it.label"
+                    :columns="expressionColumns"
+                    :types-loading="columnTypesLoading"
+                    :model-value="getEffectColumnKey(it.key)"
+                    :feedback="getEffectFeedbackColumnKey(it.key)"
+                    @update:model-value="setEffectColumnKey(it.key, $event)"
+                    @restore="restoreEffectColumnKey(it.key)"
                   />
-                  <p
-                    v-if="getEffectFeedbackColumnKey(it.key)"
-                    :id="`effect-feedback-${encodeURIComponent(it.key)}`"
-                    role="status"
-                    aria-live="polite"
-                    class="mt-1 text-xs"
-                    :class="getEffectFeedbackColumnKey(it.key)?.status === 'error' ? 'text-red-700' : getEffectFeedbackColumnKey(it.key)?.status === 'saved' ? 'text-green-700' : 'text-slate-500'"
-                  >
-                    <strong v-if="getEffectFeedbackColumnKey(it.key)?.status === 'error'">Non sauvegardé. </strong>
-                    {{ getEffectFeedbackColumnKey(it.key)?.message }}
-                    <button
-                      v-if="getEffectFeedbackColumnKey(it.key)?.status === 'error'"
-                      type="button"
-                      class="ml-2 inline-flex items-center gap-1 rounded px-1 text-xs text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                      title="Revenir à la dernière version enregistrée"
-                      @click.stop="restoreEffectColumnKey(it.key)"
-                    >
-                      <i class="pi pi-undo text-[10px]" aria-hidden="true"></i>
-                      Rétablir
-                    </button>
-                  </p>
                 </div>
               </div>
             </div>
@@ -2322,7 +2294,7 @@ function datasetRows(dataset?: CatalogPreviewDataset) {
             </div>
           </section>
 
-          <section class="space-y-4">
+          <section class="space-y-4 xl:sticky xl:top-0 xl:self-start">
             <div class="flex items-center justify-between gap-3">
               <div>
                 <h4 class="text-sm font-semibold text-gray-900">Preview</h4>

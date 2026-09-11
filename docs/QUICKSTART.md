@@ -152,23 +152,16 @@ On that page:
 In the table dialog:
 
 1. set the table to `allow`,
-2. in `Row filter`, enter:
-
-```text
-patient_id <= 3
-```
+2. in `Row filter`, select `Visual editor` and click `Add condition`,
+3. choose `patient_id` and `at most`, then enter `3`; the column determines the value type.
 
 Then in the `Columns` section:
 
-1. find the `last_name` column,
+1. click the `last_name` column to open its editor,
 2. set it to `allow`,
-3. in `Mask / transform`, enter:
+3. select `Visual editor`, click `Select a transformation`, then choose the `Encrypt` card in the function library dialog.
 
-```text
-encrypt(last_name)
-```
-
-Changes are saved automatically. You do not need to submit a form.
+Valid expressions are saved automatically. Switch to `SQL editor` to enter raw expressions directly, such as `patient_id <= 3` or `encrypt(last_name)`.
 
 ## 7. Check the built-in before/after preview
 

@@ -47,6 +47,11 @@ class CatalogSchemaPathRead(SQLModel):
     column_name: Optional[str] = None
 
 
+class CatalogTableColumnRead(SQLModel):
+    name: str
+    type: str
+
+
 class CatalogSchemaEntryCreate(SQLModel):
     schema_name: str
     table_name: Optional[str] = None

@@ -12,6 +12,7 @@ from maskql.schemas.catalog import (
     CatalogSchemaEntryRead,
     CatalogSchemaPathRead,
     CatalogSchemaSyncRead,
+    CatalogTableColumnRead,
 )
 from maskql.services.catalog_service import CatalogService
 from maskql.core import require_admin_token
@@ -75,6 +76,20 @@ async def delete_catalog_schema_entry(catalog_id: int, entry_id: int):
     if not ok:
         raise HTTPException(status_code=404, detail="Schema entry not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{catalog_id}/schema/columns", response_model=list[CatalogTableColumnRead])
+async def list_catalog_table_columns(catalog_id: int, schema_name: str, table_name: str):
+    try:
+        return await CatalogService.list_table_columns(catalog_id, schema_name, table_name)
+    except ValueError as e:
+        status_code = 404 if str(e) == "Catalog not found" else 400
+        raise HTTPException(status_code=status_code, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to read column types. Check that the table exists and the catalog is connected.",
+        ) from e
 
 
 @router.post("/{catalog_id}/schema/sync", response_model=CatalogSchemaSyncRead)

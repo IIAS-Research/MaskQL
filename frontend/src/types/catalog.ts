@@ -41,6 +41,11 @@ export interface CatalogSchemaPath {
   column_name: string | null;
 }
 
+export interface CatalogTableColumn {
+  name: string;
+  type: string;
+}
+
 export interface CatalogSchemaSyncResult {
   catalog_id: number;
   schemas: number;
@@ -111,6 +116,18 @@ export class Catalogs extends BaseResource<
   async inspectSchema(catalogId: number): Promise<CatalogSchemaPath[]> {
     const { data } = await http.get<CatalogSchemaPath[]>(
       `${this.endpoint}/${catalogId}/schema/live`,
+    );
+    return data;
+  }
+
+  async listTableColumns(
+    catalogId: number,
+    schemaName: string,
+    tableName: string,
+  ): Promise<CatalogTableColumn[]> {
+    const { data } = await http.get<CatalogTableColumn[]>(
+      `${this.endpoint}/${catalogId}/schema/columns`,
+      { params: { schema_name: schemaName, table_name: tableName } },
     );
     return data;
   }

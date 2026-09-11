@@ -9,13 +9,20 @@ uv run tox
 ```
 
 Tox builds the plugin, loads the healthcare fixture into a fresh `maskql-tox`
-stack, runs the full suite, and removes its test containers and volumes.
+stack, runs the Python integration suite, and removes its test containers and volumes.
 Java 24+ and Maven are used when available; otherwise the build runs in Docker.
 Ports default to 8443 and 15432; override them with `MASKQL_TEST_PORT` and
 `MASKQL_TEST_POSTGRES_PORT` if needed.
 
 Results appear in the terminal. Logs stay in `.tox/int/log/`, ignored by Git;
 CI retains them as downloadable artifacts for seven days.
+
+Run the frontend tests separately with Node.js and npm:
+
+```bash
+npm --prefix frontend ci
+npm --prefix frontend run test:unit -- --run
+```
 
 ## Run the examples
 

@@ -18,6 +18,7 @@ from maskql.schemas.catalog import (
     CatalogSchemaEntryRead,
     CatalogSchemaPathRead,
     CatalogSchemaSyncRead,
+    CatalogTableColumnRead,
     CatalogTablePreviewRead,
 )
 from maskql.services.user_service import UserService
@@ -302,6 +303,24 @@ class CatalogService:
             )
             for schema_name, table_name, column_name in sorted(paths, key=_schema_path_sort_key)
         ]
+
+    @staticmethod
+    async def list_table_columns(
+        catalog_id: int,
+        schema_name: str,
+        table_name: str,
+        *,
+        timeout: float = 30.0,
+    ) -> list[CatalogTableColumnRead]:
+        catalog = await CatalogService.get(catalog_id)
+        if not catalog:
+            raise ValueError("Catalog not found")
+        if not schema_name.strip() or not table_name.strip():
+            raise ValueError("Schema and table names are required")
+
+        path = ".".join(_sql_identifier(name) for name in (catalog.name, schema_name, table_name))
+        result = await trino_sql(f"SHOW COLUMNS FROM {path}", timeout=timeout)
+        return [CatalogTableColumnRead(name=row[0], type=row[1]) for row in result["rows"]]
 
     @staticmethod
     async def list_schema_entries(catalog_id: int) -> list[CatalogSchemaEntryRead]:
