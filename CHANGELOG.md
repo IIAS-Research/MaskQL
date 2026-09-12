@@ -2,6 +2,28 @@
 
 <!-- version list -->
 
+## v1.6.0 (2026-09-12)
+
+### Bug Fixes
+
+- Handle 0...6 timestamp
+  ([`60049a6`](https://github.com/IIAS-Research/MaskQL/commit/60049a62d59b3040e49391b83d915399db2485e3))
+
+### Features
+
+- Better tests and validations
+  ([`64ff2d0`](https://github.com/IIAS-Research/MaskQL/commit/64ff2d03a19403ad534b131e864895ce82a33e25))
+
+- Check input validity before save
+  ([`cb6ca3a`](https://github.com/IIAS-Research/MaskQL/commit/cb6ca3ae0415c94e7ba5472184ebaca5cfb50a24))
+
+- UI update
+  ([`ec44adb`](https://github.com/IIAS-Research/MaskQL/commit/ec44adb978dca64a58e584fab9b091bc45063c3e))
+
+- Visual editor
+  ([`445b656`](https://github.com/IIAS-Research/MaskQL/commit/445b65628d013da8ae11a2c411eb52f04e6ae17c))
+
+
 ## v1.5.0 (2026-06-17)
 
 
