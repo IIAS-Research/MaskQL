@@ -1,3 +1,5 @@
+\set ON_ERROR_STOP on
+
 CREATE DATABASE maskql;
 CREATE DATABASE maskqltest;
 
@@ -36,3 +38,5 @@ INSERT INTO documents (client_id, file)
 VALUES 
   (1, pg_read_binary_file('/docker-entrypoint-initdb.d/example.pdf')),
   (1, pg_read_binary_file('/docker-entrypoint-initdb.d/example2.pdf'));
+
+\ir fixtures/healthcare.sql

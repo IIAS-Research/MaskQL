@@ -7,6 +7,7 @@ import io.trino.spi.function.ScalarFunction;
 import io.trino.spi.function.SqlType;
 import io.trino.spi.type.StandardTypes;
 import io.trino.spi.function.LiteralParameters;
+import io.trino.spi.function.LiteralParameter;
 
 import java.util.Base64;
 
@@ -202,15 +203,15 @@ public final class MaskStructured {
     @LiteralParameters("p")
     @Description("Encrypt TIMESTAMP(p) with env password (p ≤ 6, 64-bit epoch micros)")
     @SqlType("timestamp(p)")
-    public static long encryptTimestamp(@SqlType("timestamp(p)") long epochMicros) {
-        return MaskCrypto.prp64Encrypt(epochMicros, MaskCrypto.DOMAIN_TIMESTAMP);
+    public static long encryptTimestamp(@LiteralParameter("p") long precision, @SqlType("timestamp(p)") long epochMicros) {
+        return MaskCrypto.encryptTimestamp(epochMicros, precision);
     }
 
     @ScalarFunction("decrypt")
     @LiteralParameters("p")
     @Description("Decrypt TIMESTAMP(p) with env password (p ≤ 6)")
     @SqlType("timestamp(p)")
-    public static long decryptTimestamp(@SqlType("timestamp(p)") long epochMicros, @SqlType(StandardTypes.VARCHAR) Slice password) {
-        return MaskCrypto.prp64Decrypt(epochMicros, password.toStringUtf8(), MaskCrypto.DOMAIN_TIMESTAMP);
+    public static long decryptTimestamp(@LiteralParameter("p") long precision, @SqlType("timestamp(p)") long epochMicros, @SqlType(StandardTypes.VARCHAR) Slice password) {
+        return MaskCrypto.decryptTimestamp(epochMicros, password.toStringUtf8(), precision);
     }
 }

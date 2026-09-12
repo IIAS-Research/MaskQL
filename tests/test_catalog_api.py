@@ -122,6 +122,13 @@ class CatalogApiTests(unittest.TestCase):
     def test_admin_auth_needed(self):
         r = self._post_catalog(self._payload(), with_auth=False)
         self.assertEqual(r.status_code, 401, f"Must be Unauthorized : {r.status_code} {r.text}")
+        columns = requests.get(
+            f"{CATALOG_ENDPOINT}/1/schema/columns",
+            params={"schema_name": "administrative", "table_name": "patients"},
+            verify=API_VERIFY_SSL,
+            timeout=API_TIMEOUT,
+        )
+        self.assertEqual(columns.status_code, 401, columns.text)
 
     def test_create_and_get_by_id_and_list(self):
         payload = self._payload()
@@ -191,6 +198,12 @@ class CatalogApiTests(unittest.TestCase):
         # Waiting for 404
         g = self._get(f"/catalogs/{cid}")
         self.assertEqual(g.status_code, 404, f"After delete, 404 must be received. {g.status_code}: {g.text}")
+        columns = self.http.get(
+            f"{CATALOG_ENDPOINT}/{cid}/schema/columns",
+            params={"schema_name": "administrative", "table_name": "patients"},
+            timeout=API_TIMEOUT,
+        )
+        self.assertEqual(columns.status_code, 404, columns.text)
 
     def test_list_connection_statuses(self):
         item = self._post_catalog_with_assert(self._payload())
@@ -226,6 +239,24 @@ class CatalogApiTests(unittest.TestCase):
                 for it in entries
             },
         )
+        columns = self.http.get(
+            f"{CATALOG_ENDPOINT}/{item['id']}/schema/columns",
+            params={"schema_name": "administrative", "table_name": "patients"},
+            timeout=API_TIMEOUT,
+        )
+        self.assertEqual(columns.status_code, 200, columns.text)
+        types = {column["name"]: column["type"] for column in columns.json()}
+        self.assertEqual(types["patient_id"], "bigint")
+        self.assertEqual(types["birth_date"], "date")
+        self.assertEqual(types["contact_allowed"], "boolean")
+        self.assertEqual(types["patient_number"], "varchar(20)")
+        missing = self.http.get(
+            f"{CATALOG_ENDPOINT}/{item['id']}/schema/columns",
+            params={"schema_name": "administrative", "table_name": "missing_table"},
+            timeout=API_TIMEOUT,
+        )
+        self.assertEqual(missing.status_code, 502, missing.text)
+        self.assertIn("Unable to read column types", missing.json()["detail"])
 
     def test_sync_catalog_schema_keeps_valid_rules_and_preserves_manual_ones(self):
         catalog = self._post_catalog_with_assert(

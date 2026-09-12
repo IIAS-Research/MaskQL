@@ -76,7 +76,7 @@ class RuleApiTests(unittest.TestCase):
         # Create catalog (auth via session)
         catalog_payload = {
             "name": _rand_str("catalog"),
-            "url": "jdbc:postgresql://postgres:5432/appdb",
+            "url": "jdbc:postgresql://postgres:5432/maskqltest",
             "sgbd": "postgresql",
             "username": "postgres",
             "password": "postgres",
@@ -158,11 +158,11 @@ class RuleApiTests(unittest.TestCase):
     ) -> Dict[str, Any]:
         """Build a valid rule payload."""
         return {
-            "table_name": table_name or _rand_str("table"),
-            "column_name": column_name or _rand_str("column"),
-            "schema_name": schema_name or _rand_str("schema"),
+            "table_name": table_name or "client",
+            "column_name": column_name or "name",
+            "schema_name": schema_name or "public",
             "allow": True if allow is None else allow,
-            "effect": effect or "UPPER(column) AS column",
+            "effect": effect if effect is not None else "upper(name)",
             "catalog_id": catalog_id,
             "user_id": user_id,
         }
@@ -248,7 +248,7 @@ class RuleApiTests(unittest.TestCase):
         self.assertEqual(body.get("user_id"), payload["user_id"])
 
         # PATCH /rules/{id}
-        new_mask = "MASK(col1) AS col1"
+        new_mask = "NULL"
         p = self._patch_rule(rule_id, {"effect": new_mask, "allow": False})
         self.assertEqual(p.status_code, 200, f"PATCH /rules/{rule_id} must be 200, got {p.status_code}: {p.text}")
         pdata = p.json()
@@ -280,3 +280,37 @@ class RuleApiTests(unittest.TestCase):
         # Second DELETE -> 404
         d404 = self._delete_rule(rule_id)
         self.assertEqual(d404.status_code, 404, f"Second DELETE must be 404, got {d404.status_code}: {d404.text}")
+
+    def test_incompatible_effect_is_not_saved(self):
+        payload = self._rule_payload(catalog_id=self.catalog_id, user_id=self.user_id)
+        # Same unsupported signature as text_pseudo(dse_demande) on a BOOLEAN column.
+        invalid_effect = "text_pseudo(id > 0)"
+        for effect in (invalid_effect, "text_pseudo(name, true)", "ARRAY[true]", "max(id)", "row_number() OVER ()"):
+            with self.subTest(effect=effect):
+                response = self._post_rule({**payload, "effect": effect})
+                self.assertEqual(response.status_code, 400, response.text)
+                self.assertIn("Cannot validate effect", response.json()["detail"])
+
+        rules = self.http.get(RULES_ENDPOINT, params={"user_id": self.user_id}, timeout=API_TIMEOUT)
+        self.assertEqual(rules.status_code, 200, rules.text)
+        self.assertEqual(rules.json(), [])
+
+        created = self._post_rule(payload)
+        self.assertEqual(created.status_code, 201, created.text)
+        rule_id = created.json()["id"]
+        self._created_rule_ids.append(rule_id)
+
+        rejected = self._patch_rule(rule_id, {"effect": invalid_effect})
+        self.assertEqual(rejected.status_code, 400, rejected.text)
+        self.assertIn("boolean", rejected.json()["detail"])
+        self.assertEqual(self._get_rule(rule_id).json()["effect"], payload["effect"])
+
+        for allow in (True, False):
+            rejected_filter = self._post_rule({**payload, "column_name": None, "allow": allow, "effect": "name"})
+            self.assertEqual(rejected_filter.status_code, 400, rejected_filter.text)
+
+        # Validation accepts the text signature without executing the NLP service.
+        for effect in ("text_pseudo(name)", "text_pseudo(name, CAST(id AS VARCHAR))"):
+            valid = self._patch_rule(rule_id, {"effect": effect})
+            self.assertEqual(valid.status_code, 200, valid.text)
+            self.assertEqual(self._get_rule(rule_id).json()["effect"], effect)

@@ -25,6 +25,10 @@ build/
 htmlcov/
 .pytest_cache/
 
+# Generated validation and example results
+/docs/validation/
+/examples/*/results/
+
 # IDE
 .vscode/
 .idea/

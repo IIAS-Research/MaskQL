@@ -31,13 +31,22 @@ public final class MaskUnstructured {
     private static final EdsPseudoBridge BRIDGE = EdsPseudoBridge.getInstance();
 
 
-    @ScalarFunction("text_pseudo")
-    @Description("Replace identifying entities in texts by fake placeholders")
+    @ScalarFunction(value = "text_pseudo", deterministic = false)
+    @Description("Pseudonymize text using the legacy seed; prefer text_pseudo(text, seed)")
     @SqlType(StandardTypes.VARCHAR)
     public static Slice textPseudo(@SqlType(StandardTypes.VARCHAR) Slice input) {
-        if (input == null) return null;
-        String json = BRIDGE.processOne(input.toStringUtf8());
-        return Slices.utf8Slice(json);
+        return textPseudo(input, Slices.utf8Slice("coucou"));
+    }
+
+    @ScalarFunction(value = "text_pseudo", deterministic = false)
+    @Description("Pseudonymize text using an explicit seed or patient context")
+    @SqlType(StandardTypes.VARCHAR)
+    public static Slice textPseudo(
+            @SqlType(StandardTypes.VARCHAR) Slice input,
+            @SqlType(StandardTypes.VARCHAR) Slice seed) {
+        if (input == null || seed == null) return null;
+        String text = BRIDGE.processOne(input.toStringUtf8(), seed.toStringUtf8());
+        return Slices.utf8Slice(text);
     }
 
     @ScalarFunction("pdf_to_text")

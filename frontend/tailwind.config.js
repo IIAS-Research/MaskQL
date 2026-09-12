@@ -1,3 +1,5 @@
+const { brand, accent } = require('./palette.json')
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
@@ -5,8 +7,13 @@ module.exports = {
     "./src/**/*.{vue,js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        brand,
+        accent,
+      },
+      ringColor: { DEFAULT: accent[200] },
+    },
   },
   plugins: [],
 }
-

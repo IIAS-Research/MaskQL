@@ -16,6 +16,7 @@ import 'primeicons/primeicons.css';
 import 'primevue/resources/primevue.min.css';
 import "primevue/resources/themes/lara-light-blue/theme.css";
 import ToastService from "primevue/toastservice";
+import ConfirmationService from "primevue/confirmationservice";
 import Sidebar from 'primevue/sidebar';
 import InputText from "primevue/inputtext";
 import Toast from 'primevue/toast';
@@ -34,6 +35,7 @@ app.use(createPinia())
 app.use(VueAxios, axios)
 app.use(PrimeVue, { styled: true })
 app.use(ToastService)
+app.use(ConfirmationService)
 app.use(Particles);
 app.use(VueTyper)
 

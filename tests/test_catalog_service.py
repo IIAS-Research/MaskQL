@@ -152,6 +152,44 @@ class CatalogConnectionStatusTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mocked_trino_sql.await_args.kwargs["timeout"], 5)
 
 
+class CatalogTableColumnTests(unittest.IsolatedAsyncioTestCase):
+    async def test_columns_use_quoted_metadata_query_and_preserve_trino_types(self):
+        catalog = _catalog(sgbd="postgresql")
+        trino = AsyncMock(return_value={"rows": [
+            ['patient"id', "bigint", "", ""],
+            ["amount", "decimal(18, 4)", "", ""],
+            ["recorded_at", "timestamp(3) with time zone", "", ""],
+        ]})
+        with (
+            patch.object(CatalogService, "get", AsyncMock(return_value=catalog)),
+            patch("maskql.services.catalog_service.trino_sql", trino),
+        ):
+            columns = await CatalogService.list_table_columns(7, 'clinical"data', 'patient.records', timeout=5)
+
+        trino.assert_awaited_once_with(
+            'SHOW COLUMNS FROM "sample"."clinical""data"."patient.records"', timeout=5,
+        )
+        self.assertEqual([column.model_dump() for column in columns], [
+            {"name": 'patient"id', "type": "bigint"},
+            {"name": "amount", "type": "decimal(18, 4)"},
+            {"name": "recorded_at", "type": "timestamp(3) with time zone"},
+        ])
+
+    async def test_columns_reject_missing_paths_and_do_not_hide_trino_errors(self):
+        catalog = _catalog(sgbd="postgresql")
+        with patch("maskql.services.catalog_service.trino_sql", AsyncMock()) as trino:
+            with patch.object(CatalogService, "get", AsyncMock(return_value=None)):
+                with self.assertRaisesRegex(ValueError, "Catalog not found"):
+                    await CatalogService.list_table_columns(7, "clinical", "notes")
+            with patch.object(CatalogService, "get", AsyncMock(return_value=catalog)):
+                with self.assertRaisesRegex(ValueError, "Schema and table names are required"):
+                    await CatalogService.list_table_columns(7, "clinical", " ")
+                trino.assert_not_awaited()
+                trino.side_effect = RuntimeError("Table does not exist")
+                with self.assertRaisesRegex(RuntimeError, "Table does not exist"):
+                    await CatalogService.list_table_columns(7, "clinical", "missing")
+
+
 class CatalogReplacementTests(unittest.IsolatedAsyncioTestCase):
     async def test_replace_catalog_restores_previous_catalog_when_same_name_create_fails(self):
         previous = _catalog(sgbd="postgresql")

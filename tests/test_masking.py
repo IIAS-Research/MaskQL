@@ -288,53 +288,84 @@ class TestMasking(unittest.TestCase):
             cur.execute("SELECT 1")
             self.assertEqual(cur.fetchone(), [1])
 
-    def test_masking_applied_on_name(self):
-        """
-        Check if column name is masked
-        """
+    def test_healthcare_patient_identity_is_masked(self):
+        """English patient fields keep names masked and contacts hidden."""
         cases = [
-            ("alice@example.com", "Alice Dupont"),
-            ("amandine@example.com", "Amandine Durant")
+            (1, "Fictional-Martin", "Élodie"),
+            (3, "Fictional-O'Connor", "Élodie"),
         ]
-        for email, plain_name in cases:
-            with self.subTest(email=email):
-                with self.conn.cursor() as cur:
-                    row = cur.execute(
-                        "SELECT name FROM client WHERE email = ?",
-                        (email,),
-                    ).fetchone()
-                    
-                    # Basic tests
-                    self.assertIsNotNone(row, f"No row for {email}")
-                    masked = row[0]
-                    self.assertIsInstance(masked, str, "name must be a string")
+        for patient_id, plain_last_name, plain_first_name in cases:
+            with self.subTest(patient_id=patient_id):
+                last_name, first_name, email, phone = self._row(
+                    "SELECT last_name, first_name, email, phone "
+                    "FROM administrative.patients WHERE patient_id = ?",
+                    (patient_id,),
+                )
+                for masked, plain in [(last_name, plain_last_name), (first_name, plain_first_name)]:
+                    self.assertIsInstance(masked, str)
+                    self.assertTrue(masked)
+                    self.assertNotEqual(masked, plain)
+                self.assertIsNone(email)
+                self.assertIsNone(phone)
 
-                    self.assertNotEqual(
-                        masked, plain_name,
-                        f"Name is not masked ({plain_name})",
-                    )
-                    
-    def test_filter_applied_on_name(self):
-        """
-        Check if row filter is applied of column email
-        """
+    def test_healthcare_tables_are_readable(self):
+        """Read values as well as counts to exercise every seeded SQL type."""
+        tables = {
+            "administrative.departments": 6,
+            "administrative.patients": 200,
+            "administrative.practitioners": 20,
+            "clinical.encounters": 600,
+            "clinical.observations": 1800,
+            "clinical.prescriptions": 600,
+            "clinical.clinical_notes": 200,
+            "research.studies": 3,
+            "research.consents": 200,
+            "research.enrollments": 100,
+        }
+        for table, expected_count in tables.items():
+            with self.subTest(table=table), self.conn.cursor() as cur:
+                rows = cur.execute(f"SELECT * FROM {table}").fetchall()
+                self.assertEqual(len(rows), expected_count)
+
+    def test_healthcare_relationships(self):
+        """Clinical records stay linked and enrollments have prior consent."""
+        self.assertEqual(self._row("""
+            SELECT count(*), count(DISTINCT p.patient_id), count(DISTINCT e.encounter_id)
+            FROM administrative.patients p
+            JOIN clinical.encounters e ON e.patient_id = p.patient_id
+            JOIN clinical.observations o ON o.encounter_id = e.encounter_id
+            JOIN administrative.practitioners pr ON pr.practitioner_id = e.practitioner_id
+            WHERE pr.department_id = e.department_id
+              AND o.observed_at BETWEEN e.admitted_at AND e.discharged_at
+        """), [1800, 200, 600])
+        self.assertEqual(self._row("""
+            SELECT count(*) FROM research.enrollments e
+            JOIN research.consents c ON c.consent_id = e.consent_id
+            JOIN research.studies s ON s.study_id = e.study_id
+            WHERE c.patient_id = e.patient_id AND c.accepted
+              AND c.signed_at <= e.enrolled_at
+              AND CAST(e.enrolled_at AS date) >= s.start_date
+              AND (s.end_date IS NULL OR CAST(e.enrolled_at AS date) <= s.end_date)
+        """), [100])
+
+    def test_seeded_row_filter(self):
+        """Check the original client filter without depending on contact masks."""
         cases = [
-            ("bob@example.com", False),
-            ("alice@example.com", True),
-            ("amandine@example.com", True)
+            (2, False),  # bob@example.com
+            (1, True),   # alice@example.com
+            (3, True),   # amandine@example.com
         ]
-        for email, must_be_present in cases:
-            with self.subTest(email=email):
+        for client_id, must_be_present in cases:
+            with self.subTest(client_id=client_id):
                 with self.conn.cursor() as cur:
                     row = cur.execute(
-                        "SELECT name FROM client WHERE email = ?",
-                        (email,),
+                        "SELECT id FROM public.client WHERE id = ?",
+                        (client_id,),
                     ).fetchone()
-                    
                     if must_be_present:
-                        self.assertIsNotNone(row, f"No row for {email}, it should be present")
+                        self.assertIsNotNone(row)
                     else:
-                        self.assertIsNone(row, f"Row for {email}, it shouldn't be present")
+                        self.assertIsNone(row)
 
     def test_encrypt_mask_keeps_queryable_bounded_varchar(self):
         """A masked varchar(n) column must stay queryable without a manual CAST in the rule."""

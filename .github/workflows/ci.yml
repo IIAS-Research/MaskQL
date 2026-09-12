@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      COMPOSE_PROJECT_NAME: maskql-${{ github.run_id }}-${{ github.run_attempt }}
+      MASKQL_TEST_PROJECT: maskql-tox-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

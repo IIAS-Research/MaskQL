@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LoginPage from '../views/LoginPage.vue';
+import HomePage from '../views/HomePage.vue';
 import { getAdminHealth, adminLogout } from "../auth";
 import CatalogsPage from '../views/CatalogsPage.vue';
 import CatalogPage from '../views/CatalogPage.vue';
@@ -11,11 +12,13 @@ import UserRulesPage from '../views/UserRulesPage.vue';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
+  scrollBehavior: (_to, _from, savedPosition) => savedPosition || { top: 0, left: 0 },
   routes: [
     {
       path: '/',
       name: 'home',
-      redirect: '/catalogs'
+      meta: { requiresAdmin: true, title: 'Home' },
+      component: HomePage,
     },
     {
       path: '/catalogs',

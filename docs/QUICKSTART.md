@@ -14,23 +14,21 @@ In this quickstart, you will:
 6. check the built-in before/after preview,
 7. run one SQL query as the user you just created.
 
-The example uses the seeded table `public.client`:
-
-| id | name | email |
-| --- | --- | --- |
-| 1 | Alice Dupont | alice@example.com |
-| 2 | Bob Martin | bob@example.com |
-| 3 | Amandine Durant | amandine@example.com |
+The example uses the 200 synthetic patients in `administrative.patients`, with columns `patient_id`, `last_name` (`TEXT`), `first_name` (`TEXT`), `email`, `phone`, and `birth_date`.
 
 The two rules used in this walkthrough are:
 
-1. a table rule with the filter `email like 'a%'`,
-2. a column rule on `name` with `encrypt(name)`.
+1. a table rule with the filter `patient_id <= 3`,
+2. a column rule on `last_name` with `encrypt(last_name)`.
 
 At the end:
 
-1. the row for `bob@example.com` is filtered out,
-2. the `name` column is still visible, but no longer in clear text.
+1. only patients 1, 2, and 3 are returned,
+2. the `last_name` column is still visible, but no longer in clear text.
+
+For an executable replay with saved inputs, rules, query and actual outputs, see
+the [structured example](../examples/structured/README.md) and
+[test procedure](VALIDATION.md).
 
 ## Prerequisites
 
@@ -86,6 +84,8 @@ Wait until the API is ready:
 until curl -sk https://localhost/api/healthz >/dev/null; do sleep 2; done
 ```
 
+If you already have a PostgreSQL volume, run `make demo-data`, then click `Sync schema` for your catalog.
+
 Notes:
 
 - `HF_TOKEN` is not required here as long as you are not rebuilding the Trino image locally.
@@ -102,7 +102,8 @@ Log in with:
 - username: `admin`
 - password: `admin`
 
-You should land on the main interface, with `Databases` and `Users` in the sidebar.
+The home dashboard summarizes users, databases and rules, with database connection statuses.
+Open a user's access rules directly from the dashboard, or expand the guide at the bottom for setup instructions.
 
 ## 4. Create a test user
 
@@ -113,30 +114,30 @@ In the UI:
 3. enter:
    - username: `quickstart`
    - password: `quickstart`
-4. click `Create`.
+4. click `Create user`.
 
 You should now see the new user in the users list.
 
 ## 5. Create a catalog for the seeded PostgreSQL data
 
-Open `Databases`, then click `Create database`.
+Open `Databases`, then click `Connect database`.
 
 Use these values:
 
 - Name: `quickstartdemo`
 - JDBC URL: `jdbc:postgresql://postgres:5432/maskqltest`
-- DBMS: `PostgreSQL`
+- Database type: `PostgreSQL`
 - Username: `postgres`
 - Password: `postgres`
 
-Click `Create`.
+Click `Connect database`.
 
 Back on the databases page:
 
 1. check that the new catalog appears,
 2. click `Sync schema` once for that catalog.
 
-After a moment, the catalog should be usable and the scanned schema should include `public.client`.
+After a moment, the catalog should be usable and the scanned schema should include `administrative.patients`.
 
 ## 6. Add the two rules from the UI
 
@@ -145,30 +146,23 @@ Open `Users`, find `quickstart`, then click `Manage access`.
 On that page:
 
 1. in `Databases`, select `quickstartdemo`,
-2. in `Schemas`, select `public`,
-3. in `Tables`, find `client`,
-4. click the gear icon on `client` to open `Configure table`.
+2. in `Schemas`, select `administrative`,
+3. in `Tables`, find `patients`,
+4. click the gear icon on `patients` to open `Configure table`.
 
 In the table dialog:
 
 1. set the table to `allow`,
-2. in `Row filter`, enter:
-
-```text
-email like 'A%'
-```
+2. in `Row filter`, select `Visual editor` and click `Add condition`,
+3. choose `patient_id` and `at most`, then enter `3`; the column determines the value type.
 
 Then in the `Columns` section:
 
-1. find the `name` column,
+1. click the `last_name` column to open its editor,
 2. set it to `allow`,
-3. in `Mask / transform`, enter:
+3. select `Visual editor`, click `Select a transformation`, then choose the `Encrypt` card in the function library dialog.
 
-```text
-encrypt(name)
-```
-
-Changes are saved automatically. You do not need to submit a form.
+Valid expressions are saved automatically. Switch to `SQL editor` to enter raw expressions directly, such as `patient_id <= 3` or `encrypt(last_name)`.
 
 ## 7. Check the built-in before/after preview
 
@@ -181,9 +175,9 @@ It shows:
 
 What you should see:
 
-- in `Before MaskQL`, the three clear-text rows are visible,
-- in `After MaskQL`, `Bob Martin` is gone because `bob@example.com` does not match `email like 'A%'`,
-- in `After MaskQL`, the `name` values for Alice and Amandine are encrypted.
+- in `Before MaskQL`, a sample of five clear-text rows is visible,
+- in `After MaskQL`, only patients 1, 2, and 3 remain out of the 200 patients,
+- in `After MaskQL`, the `last_name` values are encrypted.
 
 This is the quickest way to understand what MaskQL is doing, because you can change the rules and see the preview refresh immediately.
 
@@ -203,7 +197,7 @@ conn = trino.dbapi.connect(
     port=443,
     user="quickstart",
     catalog="quickstartdemo",
-    schema="public",
+    schema="administrative",
     http_scheme="https",
     auth=BasicAuthentication("quickstart", "quickstart"),
     verify=False,
@@ -211,7 +205,7 @@ conn = trino.dbapi.connect(
 
 try:
     cur = conn.cursor()
-    cur.execute("SELECT id, name, email FROM client ORDER BY id")
+    cur.execute("SELECT patient_id, last_name FROM patients ORDER BY patient_id")
     for row in cur.fetchall():
         print(row)
 finally:
@@ -219,19 +213,18 @@ finally:
 PY
 ```
 
-You should get two rows, not three:
+You should get three rows:
 
 ```text
-(1, '<encrypted value>', 'alice@example.com')
-(3, '<encrypted value>', 'amandine@example.com')
+[1, '<encrypted value>']
+[2, '<encrypted value>']
+[3, '<encrypted value>']
 ```
 
 The exact encrypted strings depend on `MASKQL_ENCRYPT_PASSWORD`, so they will differ from one setup to another. The important part is:
 
-1. Bob is filtered out,
-2. Alice and Amandine are still returned,
-3. `name` is encrypted,
-4. `email` stays readable.
+1. only patients 1, 2, and 3 are returned,
+2. `last_name` is encrypted.
 
 ## 9. Stop the stack
 
@@ -245,5 +238,5 @@ make down
 
 - If the browser warns about the certificate, this is expected for the local self-signed setup.
 - If the UI does not load, check that `make local` finished and that `https://localhost/api/healthz` responds.
-- If `public.client` does not appear in the access page, go back to `Databases` and click `Sync schema` again.
+- If `administrative.patients` does not appear in the access page, go back to `Databases` and click `Sync schema` again.
 - If Trino does not start, rebuild the plugin with `bash ./scripts/build-trino-plugin.sh`.

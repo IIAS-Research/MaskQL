@@ -1,3 +1,5 @@
+import { accent } from '../../palette.json';
+
 export const particlesJSConfig = {
     "particles": {
         "number": {
@@ -8,7 +10,7 @@ export const particlesJSConfig = {
             }
         },
         "color": {
-            "value": "#9AD8DE"
+            "value": accent[200]
         },
         "shape": {
             "type": "circle",
@@ -21,7 +23,7 @@ export const particlesJSConfig = {
             },
         },
         "opacity": {
-            "value": 0.5,
+            "value": 0.35,
             "random": false,
             "anim": {
                 "enable": false,
@@ -43,8 +45,8 @@ export const particlesJSConfig = {
         "line_linked": {
             "enable": true,
             "distance": 150,
-            "color": "#aadae2",
-            "opacity": 0.4,
+            "color": accent[200],
+            "opacity": 0.2,
             "width": 1
         },
         "move": {

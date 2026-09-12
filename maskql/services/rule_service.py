@@ -1,13 +1,15 @@
 # maskql/services/rule_service.py
 from __future__ import annotations
 from typing import Sequence, Optional
+import httpx
 from sqlmodel import select
 from maskql.db import AsyncSessionLocal
 from maskql.models.rule import Rule
 from maskql.models.catalog import Catalog
-from maskql.services.catalog_service import CatalogService
+from maskql.services.catalog_service import CatalogService, _sql_identifier
 from maskql.models.user import User
 from maskql.schemas.rule import RuleCreate, RulePatch
+from maskql.utils.trino import trino_sql
 
 import logging
 logger = logging.getLogger(__name__)
@@ -83,17 +85,49 @@ class RuleService:
             return await session.get(Rule, rule_id)
 
     @staticmethod
+    async def _validate_effect(rule: Rule, catalog: Catalog) -> None:
+        effect = (rule.effect or "").strip()
+        if not effect or not (rule.table_name or rule.column_name):
+            return
+        if rule.column_name and not rule.allow:
+            return
+        if not rule.schema_name or not rule.table_name:
+            raise ValueError("An effect requires a schema and a table")
+
+        table = ".".join(_sql_identifier(part) for part in (
+            catalog.name, rule.schema_name, rule.table_name,
+        ))
+        path = f"{table}.{_sql_identifier(rule.column_name)}" if rule.column_name else table
+        try:
+            if rule.column_name:
+                columns = await trino_sql(f"DESCRIBE {table}", user="maskql-admin", timeout=10)
+                column_type = next((row[1] for row in columns["rows"] if row[0] == rule.column_name), None)
+                if column_type is None:
+                    raise ValueError(f"Cannot validate effect for {path}: column not found")
+                # Match the ACL cast; WHERE also rejects aggregates and window functions.
+                query = f"SELECT 1 FROM {table} WHERE CAST(({effect}) AS {column_type}) IS NULL"
+            else:
+                query = f"SELECT 1 FROM {table} WHERE ({effect})"
+            # Analyze types and function signatures without executing the expression.
+            await trino_sql(f"EXPLAIN (TYPE VALIDATE) {query}", user="maskql-admin", timeout=10)
+        except (RuntimeError, httpx.HTTPError) as exc:
+            raise ValueError(f"Cannot validate effect for {path}: {str(exc) or 'Trino unavailable'}") from exc
+
+    @staticmethod
     async def create(data: RuleCreate) -> Rule:
         async with AsyncSessionLocal() as session:
             # FK existence checks
             if not data.catalog_id:
                 if data.catalog:
-                    data.catalog_id = (await CatalogService.get_by_name(data.catalog)).id
-                    del data.catalog
+                    catalog = await CatalogService.get_by_name(data.catalog)
+                    if catalog is None:
+                        raise ValueError("Catalog not found")
+                    data.catalog_id = catalog.id
                 else:
                     raise ValueError("One of catalog_id and catalog is required")
                 
-            if data.catalog_id is None or (await session.get(Catalog, data.catalog_id) is None):
+            catalog = await session.get(Catalog, data.catalog_id)
+            if catalog is None:
                 raise ValueError("Catalog not found")
             
             if await session.get(User, data.user_id) is None:
@@ -112,6 +146,7 @@ class RuleService:
                 raise ValueError("A rule with this path already exists in this catalog")
             
             obj = Rule(**data.model_dump(exclude={"catalog"}))
+            await RuleService._validate_effect(obj, catalog)
             session.add(obj)
             await session.commit()
             await session.refresh(obj)
@@ -131,9 +166,10 @@ class RuleService:
             new_user_id = payload.get("user_id", obj.user_id)
             new_table = payload.get("table_name", obj.table_name)
             new_column = payload.get("column_name", obj.column_name)
-            new_schema = payload.get("schema", obj.schema_name)
+            new_schema = payload.get("schema_name", obj.schema_name)
 
-            if "catalog_id" in payload and await session.get(Catalog, new_catalog_id) is None:
+            catalog = await session.get(Catalog, new_catalog_id)
+            if catalog is None:
                 raise ValueError("Catalog not found")
             if "user_id" in payload and await session.get(User, new_user_id) is None:
                 raise ValueError("User not found")
@@ -142,6 +178,7 @@ class RuleService:
             dup = await session.exec(
                 select(Rule).where(
                     Rule.id != obj.id,
+                    Rule.user_id == new_user_id,
                     Rule.catalog_id == new_catalog_id,
                     Rule.table_name == new_table,
                     Rule.column_name == new_column,
@@ -154,6 +191,7 @@ class RuleService:
             for k, v in payload.items():
                 setattr(obj, k, v)
 
+            await RuleService._validate_effect(obj, catalog)
             await session.commit()
             await session.refresh(obj)
             return obj

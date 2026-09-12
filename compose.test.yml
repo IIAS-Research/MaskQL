@@ -1,0 +1,4 @@
+services:
+  trino:
+    volumes:
+      - ${MASKQL_TEST_WORK_DIR:-./.tox/int/tmp}/config.properties:/etc/trino/config.properties:ro

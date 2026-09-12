@@ -2,7 +2,6 @@ package com.maskql.nlp;
 
 import jep.SharedInterpreter;
 
-import java.util.Objects;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public final class EdsPseudoBridge {
@@ -15,7 +14,7 @@ public final class EdsPseudoBridge {
         String pipe = escapePy(PIPELINE_DIR);
 
         // Init python
-        // Load method "_process_text(text)" 
+        // Load method "_process_text(text, seed)"
         py.exec(
             "PIPE = '" + pipe + "'\n" +
             "with open(\"/app/load_edspseudo.py\") as f:" +
@@ -53,12 +52,12 @@ public final class EdsPseudoBridge {
 
     public static EdsPseudoBridge getInstance() { return INSTANCE; }
 
-    public String processOne(String text) {
+    public String processOne(String text, String seed) {
         SharedInterpreter py = tl.get();
         py.set("input", text);
-        py.set("seed", "coucou");
-        py.exec("res_json = _process_text(input, seed)");
-        return (String) py.getValue("res_json");
+        py.set("seed", seed);
+        py.exec("result = _process_text(input, seed)");
+        return (String) py.getValue("result");
     }
 
     private static String escapePy(String s) {

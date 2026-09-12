@@ -76,6 +76,10 @@ make local
 This starts the full development stack with Docker Compose.
 On a fresh clone, the extra build step is needed because `compose.dev.yml` mounts the plugin jars from the local workspace.
 
+The `demo` catalog includes a [synthetic healthcare dataset](docs/DEMO_DATA.md):
+200 patients and 3,729 rows across 10 tables. For an existing development database,
+run `make demo-data` to add it and refresh the schema.
+
 ### Rebuild services locally
 
 Use these targets only when you need to rebuild images from source:
@@ -159,12 +163,9 @@ Run tests with [tox](https://tox.wiki/) using `uv`:
 uv run tox
 ```
 
-This will:
-
-1. Start the stack (`make local`)
-2. Health check
-3. Run `unittest` tests
-4. Stop and clean the stack (`make down`)
+This starts an isolated test stack, runs the full `unittest` suite, saves logs
+under `.tox/int/log/`, and removes the test containers and volumes.
+See the [test procedure and reproducible examples](docs/VALIDATION.md).
 
 ---
 
@@ -209,6 +210,10 @@ Examples:
 
 The backend enforces a unique constraint on `(user_id, catalog_id, schema_name, table_name, column_name)`.
 
+Before saving or importing an effect, MaskQL checks its SQL types with Trino.
+Column masks must be compatible with the column type, and table filters must be
+boolean expressions.
+
 ---
 
 ## Admin UI
@@ -227,7 +232,9 @@ Export produces a file like this:
 {
   "version": 1,
   "user_id": 123,
+  "user_name": "analyst",
   "catalog_id": 7,
+  "catalog_name": "research",
   "exported_at": "2025-09-02T10:00:00Z",
   "rules": [
     { "schema_name": "public", "table_name": "", "column_name": "", "allow": true, "effect": "" },
@@ -237,7 +244,8 @@ Export produces a file like this:
 }
 ```
 
-On import, the UI ignores any `id`, `user_id`, and `catalog_id` inside the file. The rules are applied as upserts for the current user and the currently selected catalog.
+Import targets the current user and selected catalog, with a preview before confirmation.
+Source differences are flagged, missing paths are excluded by default, and invalid expressions are skipped and reported.
 
 ---
 
