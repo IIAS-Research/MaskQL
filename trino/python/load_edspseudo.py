@@ -1,6 +1,5 @@
 import os, sys, importlib, pkgutil, json, traceback
 from pathlib import Path
-from pseudocare import PseudoCare
 
 try:
     # PIPE variable must be loaded
@@ -8,13 +7,15 @@ try:
 
     print('[py] sys.executable =', sys.executable)
     print('[py] sys.path[0]   =', sys.path[0])
-    print('[py] PIPELINE_DIR   =', PIPE)
-    print('[py] exists?        =', os.path.isdir(PIPE))
-    print('[py] listdir        =', os.listdir(PIPE) if os.path.isdir(PIPE) else 'N/A')
-
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
-    REPO = Path(os.environ.get("EDS_REPO", "/opt/models/eds-pseudo-public/"))
+    # Keep the legacy override while using the same path as the Java bridge.
+    REPO = Path(os.environ.get("EDS_REPO") or PIPE)
     PKG  = os.environ.get("EDS_PKG", "eds_pseudo")
+    print('[py] PIPELINE_DIR   =', REPO)
+    if not (REPO / "artifacts").is_dir():
+        raise FileNotFoundError(f"EDS pipeline artifacts not found in {REPO}")
+
+    from pseudocare import PseudoCare
 
     # Import EDSNLP manually
     sys.path.insert(0, str(REPO))

@@ -114,6 +114,6 @@ ENV PYTHONHOME=/opt/python \
     PYTHONPATH=/opt/pyenv/lib/python3.11/site-packages \
     JEP_LIBRARY_PATH=/opt/pyenv/lib/python3.11/site-packages/jep \
     LD_LIBRARY_PATH=/opt/python/lib:$LD_LIBRARY_PATH \
-    EDS_PIPELINE_DIR=/usr/lib/trino/models/eds-pseudo-public
+    EDS_PIPELINE_DIR=/opt/models/eds-pseudo-public
 
 USER trino

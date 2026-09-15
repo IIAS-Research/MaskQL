@@ -3,8 +3,13 @@
 Run this after the Quickstart with the [synthetic healthcare fixture](../../tests/fixtures/healthcare.sql) loaded in `maskqltest`:
 
 ```sh
-uv run python examples/structured/run.py
+export API_VERIFY_SSL=certs/server.crt.pem
+export TRINO_VERIFY_SSL="$API_VERIFY_SSL"
+export MASKQL_ENCRYPT_PASSWORD='change-me-16+chars'
+uv run --frozen python examples/structured/run.py
 ```
+
+These values match the local certificate and disposable encryption key created in the Quickstart. Run the commands from the repository root; adjust the paths and key if your configuration differs.
 
 Set `MASKQL_HOST`, `MASKQL_PORT` and `MASKQL_SCHEME` for your installation (defaults: `localhost`, `443`, `https`). Authentication uses `MASKQL_ADMIN_USER` and `MASKQL_ADMIN_PASSWORD` (local demo defaults: `admin` / `admin`). For a local CA, set `API_VERIFY_SSL` to its certificate path; `false` disables verification for a disposable local setup.
 

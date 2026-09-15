@@ -28,9 +28,6 @@ import java.util.Base64;
 
 public final class MaskUnstructured {
     
-    private static final EdsPseudoBridge BRIDGE = EdsPseudoBridge.getInstance();
-
-
     @ScalarFunction(value = "text_pseudo", deterministic = false)
     @Description("Pseudonymize text using the legacy seed; prefer text_pseudo(text, seed)")
     @SqlType(StandardTypes.VARCHAR)
@@ -45,7 +42,8 @@ public final class MaskUnstructured {
             @SqlType(StandardTypes.VARCHAR) Slice input,
             @SqlType(StandardTypes.VARCHAR) Slice seed) {
         if (input == null || seed == null) return null;
-        String text = BRIDGE.processOne(input.toStringUtf8(), seed.toStringUtf8());
+        String text = EdsPseudoBridge.getInstance().processOne(
+                input.toStringUtf8(), seed.toStringUtf8());
         return Slices.utf8Slice(text);
     }
 
