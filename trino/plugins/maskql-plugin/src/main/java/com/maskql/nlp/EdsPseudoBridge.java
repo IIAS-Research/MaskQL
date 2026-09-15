@@ -2,65 +2,108 @@ package com.maskql.nlp;
 
 import jep.SharedInterpreter;
 
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public final class EdsPseudoBridge {
-    private static final String PIPELINE_DIR = System.getenv().getOrDefault("EDS_PIPELINE_DIR", "/usr/lib/trino/models/eds-pseudo-public");
-    private static final ConcurrentLinkedQueue<SharedInterpreter> REGISTRY = new ConcurrentLinkedQueue<>();
+    private static final String PIPELINE_DIR = System.getenv().getOrDefault(
+            "EDS_PIPELINE_DIR", "/opt/models/eds-pseudo-public");
     private static final EdsPseudoBridge INSTANCE = new EdsPseudoBridge();
 
-    private final ThreadLocal<SharedInterpreter> tl = ThreadLocal.withInitial(() -> {
-        SharedInterpreter py = new SharedInterpreter();
-        String pipe = escapePy(PIPELINE_DIR);
-
-        // Init python
-        // Load method "_process_text(text, seed)"
-        py.exec(
-            "PIPE = '" + pipe + "'\n" +
-            "with open(\"/app/load_edspseudo.py\") as f:" +
-            "    code = f.read()\n" +
-            "exec(code)\n"
-        );
-
-        // Catch error, impossible to debug without that
-        Object err = py.getValue("_ERR");
-        if (err != null && !"None".equals(String.valueOf(err))) {
-            System.err.println("[EdsPseudoBridge] Python init failed:\n" + err);
-            
-            throw new RuntimeException("EDS pipeline init failed");
-        }
-
-        REGISTRY.add(py);
-        return py;
-    });
+    private final ExecutorService worker;
+    private Future<?> initialization;
+    private volatile Thread workerThread;
+    // Only the dedicated worker may create, use or close this JEP interpreter.
+    private SharedInterpreter interpreter;
 
     private EdsPseudoBridge() {
-        try {
-            SharedInterpreter py = tl.get();
-            py.exec("_ = _process_text('warmup', 'seed')");
-        } catch (Throwable t) {
-            System.err.println("[EdsPseudoBridge] Warm-up failed: " + t);
-        }
-
+        worker = Executors.newSingleThreadExecutor(task -> {
+            Thread thread = new Thread(() -> {
+                try {
+                    task.run();
+                } finally {
+                    if (interpreter != null) {
+                        interpreter.close();
+                    }
+                }
+            }, "eds-pseudo-worker");
+            thread.setDaemon(true);
+            workerThread = thread;
+            return thread;
+        });
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            for (SharedInterpreter py : REGISTRY) {
-                try { py.close(); } catch (Throwable ignored) {}
+            worker.shutdown();
+            try {
+                Thread thread = workerThread;
+                if (thread != null) {
+                    // Join the thread, including its interpreter-close block.
+                    thread.join(10_000);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
-            REGISTRY.clear();
         }, "eds-pseudo-shutdown"));
     }
 
-    public static EdsPseudoBridge getInstance() { return INSTANCE; }
-
-    public String processOne(String text, String seed) {
-        SharedInterpreter py = tl.get();
-        py.set("input", text);
-        py.set("seed", seed);
-        py.exec("result = _process_text(input, seed)");
-        return (String) py.getValue("result");
+    public static EdsPseudoBridge getInstance() {
+        return INSTANCE;
     }
 
-    private static String escapePy(String s) {
-        return s.replace("\\", "\\\\").replace("'", "\\'");
+    /** Called by the plugin before Trino reports that startup is complete. */
+    public void initialize() {
+        Future<?> ready;
+        synchronized (this) {
+            if (initialization == null) {
+                // Submit only after class initialization has completed: waiting
+                // for this worker in a static initializer would deadlock JEP.
+                initialization = worker.submit(this::loadPipeline);
+            }
+            ready = initialization;
+        }
+        await(ready, false);
+    }
+
+    private void loadPipeline() {
+        System.err.println("[EdsPseudoBridge] Loading EDS pipeline");
+        interpreter = new SharedInterpreter();
+        interpreter.set("PIPE", PIPELINE_DIR);
+        interpreter.runScript("/app/load_edspseudo.py");
+        Object error = interpreter.getValue("_ERR");
+        if (error != null) {
+            throw new IllegalStateException("EDS pipeline init failed:\n" + error);
+        }
+        interpreter.invoke("_process_text", "warmup", "seed");
+        System.err.println("[EdsPseudoBridge] EDS pipeline ready");
+    }
+
+    public String processOne(String text, String seed) {
+        initialize();
+        // One model per node; serialize calls to preserve JEP thread ownership
+        // and prevent concurrent calls from sharing mutable seed/model state.
+        return await(worker.submit(() ->
+                (String) interpreter.invoke("_process_text", text, seed)), true);
+    }
+
+    private static <T> T await(Future<T> result, boolean cancelOnInterrupt) {
+        try {
+            return result.get();
+        } catch (InterruptedException e) {
+            if (cancelOnInterrupt) {
+                result.cancel(false);
+            }
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for the EDS pipeline", e);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw new IllegalStateException("EDS pipeline execution failed", cause);
+        }
     }
 }

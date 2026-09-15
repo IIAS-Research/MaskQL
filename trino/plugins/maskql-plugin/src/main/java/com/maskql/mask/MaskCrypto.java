@@ -167,7 +167,10 @@ class MaskCrypto {
     }
 
     static int prp32DecryptRaw(int x, String password, String domain) {
-        SecretKeySpec key = keyFromPassword(password);
+        return prp32DecryptRaw(x, keyFromPassword(password), domain);
+    }
+
+    private static int prp32DecryptRaw(int x, SecretKeySpec key, String domain) {
         short L = (short)((x >>> 16) & 0xFFFF);
         short R = (short)(x & 0xFFFF);
         for (int i = 7; i >= 0; i--) {
@@ -195,10 +198,13 @@ class MaskCrypto {
     }
 
     static int invertPermuteInRange32(int y, int n, String password, String domain) {
-        int x = prp32DecryptRaw(y, password, domain);
+        // Cycle walking can require thousands of rounds for DATE. Derive the
+        // same key once per value, as in invertPermuteInRange64.
+        SecretKeySpec key = keyFromPassword(password);
+        int x = prp32DecryptRaw(y, key, domain);
         while (Integer.compareUnsigned(x, n) >= 0) {
             y = x;
-            x = prp32DecryptRaw(y, password, domain);
+            x = prp32DecryptRaw(y, key, domain);
         }
         return x;
     }

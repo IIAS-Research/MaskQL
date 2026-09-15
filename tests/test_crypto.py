@@ -251,6 +251,24 @@ class TestCryptoFunctions(unittest.TestCase):
         self.assertEqual(dec_str, original, "Decrypt must restore original DATE")
         self.assertEqual(dec_type, "date")
 
+    def test_encrypt_decrypt_date_boundaries(self):
+        for original in ["0001-01-01", "9999-12-31", "1969-12-31", "2000-02-29", None]:
+            with self.subTest(original=original):
+                encrypted, encrypted_type, decrypted = self._row(
+                    """
+                    SELECT CAST(encrypt(value) AS VARCHAR), typeof(encrypt(value)),
+                           CAST(decrypt(encrypt(value), ?) AS VARCHAR)
+                    FROM (VALUES (CAST(? AS DATE))) AS t(value)
+                    """,
+                    (ENCRYPT_PASSWORD, original),
+                )
+                self.assertEqual(encrypted_type, "date")
+                self.assertEqual(decrypted, original)
+                self.assertEqual(encrypted is None, original is None)
+                if encrypted is not None:
+                    self.assertGreaterEqual(encrypted, "0001-01-01")
+                    self.assertLessEqual(encrypted, "9999-12-31")
+
     # TIMESTAMP
     def test_encrypt_decrypt_timestamp(self):
         cases = [

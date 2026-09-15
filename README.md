@@ -33,12 +33,12 @@ This is especially useful when you can read a database but cannot change it, and
 If you only want to run MaskQL, use the published Docker images.
 You do not need to clone the repository, set `HF_TOKEN`, or build anything locally.
 
-The smallest deployment bundle is in `install/`:
+Use the deployment files from the repository root:
 
 1. Create a working directory on your server.
-2. Copy `install/compose.yml`, `install/.env`, and `install/tls.yml` into it.
+2. Copy `compose.yml`, `.env.example` (renamed to `.env`), and `tls.yml` into it.
 3. Edit `.env` with your host, admin credentials, and secrets.
-4. Edit `tls.yml` with the paths to your TLS certificate and key.
+4. Create `certs/` and place your TLS certificate and key there as `server.crt.pem` and `server.key.pem`, matching the paths in `tls.yml`.
 5. Start the stack:
 
 ```bash
@@ -47,7 +47,7 @@ docker compose up -d
 
 MaskQL should be available within a few minutes at the HTTPS address defined by `MASKQL_HOST` and `MASKQL_PORT`.
 
-If you already cloned the repository, you can follow the same approach with the root `compose.yml`, `.env.example` (renamed to `.env`), and `tls.yml`.
+If you already cloned the repository, run these steps directly from its root.
 
 ---
 
@@ -122,7 +122,8 @@ Here is the list of environment variables you can configure in the `.env` file:
 ## Create a self-signed certificate for testing
 
 ```bash
-openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 3650 -nodes -subj "/C=FR/ST=Grand-Est/L=Reims/O=CHU de Reims/OU=Institut de l'Intelligence Artificielle en Santé/CN=maskql" -addext "subjectAltName=DNS:localhost"
+mkdir -p certs
+openssl req -x509 -newkey rsa:4096 -keyout certs/server.key.pem -out certs/server.crt.pem -sha256 -days 3650 -nodes -subj "/C=FR/ST=Grand-Est/L=Reims/O=CHU de Reims/OU=Institut de l'Intelligence Artificielle en Santé/CN=maskql" -addext "subjectAltName=DNS:localhost"
 ```
 DNS must match the MaskQL host.
 

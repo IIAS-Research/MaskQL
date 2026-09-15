@@ -35,7 +35,8 @@ the [structured example](../examples/structured/README.md) and
 - Docker and Docker Compose
 - OpenSSL
 - `uv`
-- Java 24+ or Docker for `scripts/build-trino-plugin.sh`
+- `make` and `curl`
+- Java 24+ and Maven for a native plugin build; otherwise `scripts/build-trino-plugin.sh` uses Docker
 
 Run everything below from the repository root.
 
@@ -78,10 +79,21 @@ bash ./scripts/build-trino-plugin.sh
 make local
 ```
 
-Wait until the API is ready:
+Wait until the API and admin interface are ready:
 
 ```bash
-until curl -sk https://localhost/api/healthz >/dev/null; do sleep 2; done
+attempt=0
+until curl --fail --silent --cacert certs/server.crt.pem \
+  --connect-timeout 2 --max-time 5 https://localhost/api/healthz >/dev/null &&
+  curl --fail --silent --cacert certs/server.crt.pem \
+    --connect-timeout 2 --max-time 5 https://localhost/ >/dev/null; do
+  attempt=$((attempt + 1))
+  if [ "$attempt" -ge 90 ]; then
+    echo "MaskQL did not become ready; inspect the stack with make ps and make logs." >&2
+    exit 1
+  fi
+  sleep 2
+done
 ```
 
 If you already have a PostgreSQL volume, run `make demo-data`, then click `Sync schema` for your catalog.
@@ -90,6 +102,7 @@ Notes:
 
 - `HF_TOKEN` is not required here as long as you are not rebuilding the Trino image locally.
 - `make local` also starts the frontend, so the admin UI is available at `https://localhost`.
+- The readiness check requires successful HTTP responses from both the API and frontend, and stops after 90 failed attempts.
 
 ## 3. Sign in to the admin UI
 
@@ -240,3 +253,11 @@ make down
 - If the UI does not load, check that `make local` finished and that `https://localhost/api/healthz` responds.
 - If `administrative.patients` does not appear in the access page, go back to `Databases` and click `Sync schema` again.
 - If Trino does not start, rebuild the plugin with `bash ./scripts/build-trino-plugin.sh`.
+- On the first start, the frontend installs its npm dependencies. If its logs report `ECONNRESET`, restore access to `https://registry.npmjs.org`, then rerun the installation and start the frontend:
+
+  ```bash
+  docker compose --file compose.dev.yml --profile dev --env-file .env run --rm --no-deps frontend-dev npm ci
+  docker compose --file compose.dev.yml --profile dev --env-file .env up -d --no-deps frontend-dev
+  ```
+
+  Repeat the readiness check above. These commands affect only the development frontend.
