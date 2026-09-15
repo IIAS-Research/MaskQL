@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.6.1 (2026-09-15)
+
+### Bug Fixes
+
+- Stabilize date decryption and text model initialization
+  ([`b58bdb7`](https://github.com/IIAS-Research/MaskQL/commit/b58bdb7818592334eed93f38553ece8fd372cdc4))
+
+
 ## v1.6.0 (2026-09-12)
 
 ### Bug Fixes
