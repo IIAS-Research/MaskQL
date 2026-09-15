@@ -239,6 +239,34 @@ The exact encrypted strings depend on `MASKQL_ENCRYPT_PASSWORD`, so they will di
 1. only patients 1, 2, and 3 are returned,
 2. `last_name` is encrypted.
 
+### Save and verify the example
+
+The [structured replay](../examples/structured/README.md) uses the same
+200-patient fixture, filter and encryption rule. From the repository root:
+
+```bash
+export MASKQL_HOST=localhost MASKQL_PORT=443
+export MASKQL_ADMIN_USER=admin MASKQL_ADMIN_PASSWORD=admin
+export API_VERIFY_SSL=certs/server.crt.pem
+export TRINO_VERIFY_SSL="$API_VERIFY_SSL"
+export MASKQL_ENCRYPT_PASSWORD='change-me-16+chars'
+uv run --frozen python examples/structured/run.py
+```
+
+It creates its own temporary user and catalog, saves the source and returned
+rows, checks the before/after preview and decryption, and removes those
+temporary resources. The expected retained names before encryption are
+`Fictional-Martin`, `Fictional-Lefèvre` and `Fictional-O'Connor` (patients 1–3).
+The query has no `WHERE`: the table rule supplies the filter.
+
+For a separate illustration of text processing and PDF extraction, run the
+[fictional clinical note example](../examples/unstructured/README.md):
+
+```bash
+MASKQL_USER=demo MASKQL_PASSWORD=demo \
+uv run --frozen python examples/unstructured/run_examples.py --seed fictional-patient-142
+```
+
 ## 9. Stop the stack
 
 When you are done:

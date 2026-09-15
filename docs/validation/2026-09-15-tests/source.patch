@@ -1,0 +1,568 @@
+diff --git a/Makefile b/Makefile
+index ef357f6..82d249b 100644
+--- a/Makefile
++++ b/Makefile
+@@ -114,3 +114,7 @@ push-trino: check-registry check-hf-token
+ 		-t "$(TRINO_IMAGE):$(IMAGE_TAG)" \
+ 		-t "$(TRINO_IMAGE):$(LATEST_TAG)" \
+ 		--push ./trino
++
++.PHONY: publication-docx
++publication-docx:
++	python3 docs/publication/build_docx.py
+diff --git a/README.md b/README.md
+index 362a8e4..bd75ada 100644
+--- a/README.md
++++ b/README.md
+@@ -33,12 +33,12 @@ This is especially useful when you can read a database but cannot change it, and
+ If you only want to run MaskQL, use the published Docker images.
+ You do not need to clone the repository, set `HF_TOKEN`, or build anything locally.
+ 
+-The smallest deployment bundle is in `install/`:
++Use the deployment files from the repository root:
+ 
+ 1. Create a working directory on your server.
+-2. Copy `install/compose.yml`, `install/.env`, and `install/tls.yml` into it.
++2. Copy `compose.yml`, `.env.example` (renamed to `.env`), and `tls.yml` into it.
+ 3. Edit `.env` with your host, admin credentials, and secrets.
+-4. Edit `tls.yml` with the paths to your TLS certificate and key.
++4. Create `certs/` and place your TLS certificate and key there as `server.crt.pem` and `server.key.pem`, matching the paths in `tls.yml`.
+ 5. Start the stack:
+ 
+ ```bash
+@@ -47,7 +47,7 @@ docker compose up -d
+ 
+ MaskQL should be available within a few minutes at the HTTPS address defined by `MASKQL_HOST` and `MASKQL_PORT`.
+ 
+-If you already cloned the repository, you can follow the same approach with the root `compose.yml`, `.env.example` (renamed to `.env`), and `tls.yml`.
++If you already cloned the repository, run these steps directly from its root.
+ 
+ ---
+ 
+@@ -122,7 +122,8 @@ Here is the list of environment variables you can configure in the `.env` file:
+ ## Create a self-signed certificate for testing
+ 
+ ```bash
+-openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 3650 -nodes -subj "/C=FR/ST=Grand-Est/L=Reims/O=CHU de Reims/OU=Institut de l'Intelligence Artificielle en Santé/CN=maskql" -addext "subjectAltName=DNS:localhost"
++mkdir -p certs
++openssl req -x509 -newkey rsa:4096 -keyout certs/server.key.pem -out certs/server.crt.pem -sha256 -days 3650 -nodes -subj "/C=FR/ST=Grand-Est/L=Reims/O=CHU de Reims/OU=Institut de l'Intelligence Artificielle en Santé/CN=maskql" -addext "subjectAltName=DNS:localhost"
+ ```
+ DNS must match the MaskQL host.
+ 
+diff --git a/docs/QUICKSTART.md b/docs/QUICKSTART.md
+index 2ea967a..0def836 100644
+--- a/docs/QUICKSTART.md
++++ b/docs/QUICKSTART.md
+@@ -35,7 +35,8 @@ the [structured example](../examples/structured/README.md) and
+ - Docker and Docker Compose
+ - OpenSSL
+ - `uv`
+-- Java 24+ or Docker for `scripts/build-trino-plugin.sh`
++- `make` and `curl`
++- Java 24+ and Maven for a native plugin build; otherwise `scripts/build-trino-plugin.sh` uses Docker
+ 
+ Run everything below from the repository root.
+ 
+@@ -78,10 +79,21 @@ bash ./scripts/build-trino-plugin.sh
+ make local
+ ```
+ 
+-Wait until the API is ready:
++Wait until the API and admin interface are ready:
+ 
+ ```bash
+-until curl -sk https://localhost/api/healthz >/dev/null; do sleep 2; done
++attempt=0
++until curl --fail --silent --cacert certs/server.crt.pem \
++  --connect-timeout 2 --max-time 5 https://localhost/api/healthz >/dev/null &&
++  curl --fail --silent --cacert certs/server.crt.pem \
++    --connect-timeout 2 --max-time 5 https://localhost/ >/dev/null; do
++  attempt=$((attempt + 1))
++  if [ "$attempt" -ge 90 ]; then
++    echo "MaskQL did not become ready; inspect the stack with make ps and make logs." >&2
++    exit 1
++  fi
++  sleep 2
++done
+ ```
+ 
+ If you already have a PostgreSQL volume, run `make demo-data`, then click `Sync schema` for your catalog.
+@@ -90,6 +102,7 @@ Notes:
+ 
+ - `HF_TOKEN` is not required here as long as you are not rebuilding the Trino image locally.
+ - `make local` also starts the frontend, so the admin UI is available at `https://localhost`.
++- The readiness check requires successful HTTP responses from both the API and frontend, and stops after 90 failed attempts.
+ 
+ ## 3. Sign in to the admin UI
+ 
+@@ -240,3 +253,11 @@ make down
+ - If the UI does not load, check that `make local` finished and that `https://localhost/api/healthz` responds.
+ - If `administrative.patients` does not appear in the access page, go back to `Databases` and click `Sync schema` again.
+ - If Trino does not start, rebuild the plugin with `bash ./scripts/build-trino-plugin.sh`.
++- On the first start, the frontend installs its npm dependencies. If its logs report `ECONNRESET`, restore access to `https://registry.npmjs.org`, then rerun the installation and start the frontend:
++
++  ```bash
++  docker compose --file compose.dev.yml --profile dev --env-file .env run --rm --no-deps frontend-dev npm ci
++  docker compose --file compose.dev.yml --profile dev --env-file .env up -d --no-deps frontend-dev
++  ```
++
++  Repeat the readiness check above. These commands affect only the development frontend.
+diff --git a/examples/structured/README.md b/examples/structured/README.md
+index cb1a071..02fc56f 100644
+--- a/examples/structured/README.md
++++ b/examples/structured/README.md
+@@ -3,9 +3,14 @@
+ Run this after the Quickstart with the [synthetic healthcare fixture](../../tests/fixtures/healthcare.sql) loaded in `maskqltest`:
+ 
+ ```sh
+-uv run python examples/structured/run.py
++export API_VERIFY_SSL=certs/server.crt.pem
++export TRINO_VERIFY_SSL="$API_VERIFY_SSL"
++export MASKQL_ENCRYPT_PASSWORD='change-me-16+chars'
++uv run --frozen python examples/structured/run.py
+ ```
+ 
++These values match the local certificate and disposable encryption key created in the Quickstart. Run the commands from the repository root; adjust the paths and key if your configuration differs.
++
+ Set `MASKQL_HOST`, `MASKQL_PORT` and `MASKQL_SCHEME` for your installation (defaults: `localhost`, `443`, `https`). Authentication uses `MASKQL_ADMIN_USER` and `MASKQL_ADMIN_PASSWORD` (local demo defaults: `admin` / `admin`). For a local CA, set `API_VERIFY_SSL` to its certificate path; `false` disables verification for a disposable local setup.
+ 
+ The PostgreSQL connection defaults to `jdbc:postgresql://postgres:5432/maskqltest`, with the local demo credentials. Override `MASKQL_SOURCE_URL`, `MASKQL_SOURCE_USER` and `MASKQL_SOURCE_PASSWORD` when needed. Set `MASKQL_ENCRYPT_PASSWORD` to the running server's **test** encryption key to also verify decryption; it is never written to the artifacts.
+diff --git a/examples/unstructured/README.md b/examples/unstructured/README.md
+index 24b31ea..ee188d0 100644
+--- a/examples/unstructured/README.md
++++ b/examples/unstructured/README.md
+@@ -16,6 +16,25 @@ Adjust the host, port and CA path to your installation. The runner makes three
+ extracted text. It binds the input and seed as SQL parameters. `pdf_to_text`
+ returns UTF-8 bytes, converted with `from_utf8` before calling `text_pseudo`.
+ 
++## Model lifecycle
++
++Trino loads the EDS pipeline and completes an initial inference while loading
++the MaskQL plugin, before its health check reports startup complete. A model
++initialization error fails startup and is included in the Trino logs.
++
++Each Trino node keeps one model and one Python interpreter on a dedicated
++thread. Calls to `text_pseudo` are processed sequentially on that node, including
++calls from concurrent queries; this limits model memory use and isolates each
++call's seed. NLP throughput is therefore limited to one inference at a time per
++node. The interpreter is also closed on its owning thread during shutdown.
++
++`EDS_PIPELINE_DIR` selects the model repository, which must contain an
++`artifacts` directory; it defaults to `/opt/models/eds-pseudo-public` in the
++Trino image. The legacy `EDS_REPO` override remains supported and takes
++precedence when set.
++
++## Outputs
++
+ Outputs and `report.json` (seed, SQL and any query errors) go to
+ `results/<timestamp>/`, ignored by Git. Use `--output /tmp/maskql-note-results`
+ to choose a new directory. A failed query produces a nonzero exit status.
+diff --git a/tests/test_crypto.py b/tests/test_crypto.py
+index 9749abc..13d5201 100644
+--- a/tests/test_crypto.py
++++ b/tests/test_crypto.py
+@@ -251,6 +251,24 @@ class TestCryptoFunctions(unittest.TestCase):
+         self.assertEqual(dec_str, original, "Decrypt must restore original DATE")
+         self.assertEqual(dec_type, "date")
+ 
++    def test_encrypt_decrypt_date_boundaries(self):
++        for original in ["0001-01-01", "9999-12-31", "1969-12-31", "2000-02-29", None]:
++            with self.subTest(original=original):
++                encrypted, encrypted_type, decrypted = self._row(
++                    """
++                    SELECT CAST(encrypt(value) AS VARCHAR), typeof(encrypt(value)),
++                           CAST(decrypt(encrypt(value), ?) AS VARCHAR)
++                    FROM (VALUES (CAST(? AS DATE))) AS t(value)
++                    """,
++                    (ENCRYPT_PASSWORD, original),
++                )
++                self.assertEqual(encrypted_type, "date")
++                self.assertEqual(decrypted, original)
++                self.assertEqual(encrypted is None, original is None)
++                if encrypted is not None:
++                    self.assertGreaterEqual(encrypted, "0001-01-01")
++                    self.assertLessEqual(encrypted, "9999-12-31")
++
+     # TIMESTAMP
+     def test_encrypt_decrypt_timestamp(self):
+         cases = [
+diff --git a/tests/test_unstructured.py b/tests/test_unstructured.py
+index 2f0fb74..9352bbf 100644
+--- a/tests/test_unstructured.py
++++ b/tests/test_unstructured.py
+@@ -1,4 +1,7 @@
++import base64
++from concurrent.futures import ThreadPoolExecutor
+ import os
++from pathlib import Path
+ import unittest
+ 
+ import trino
+@@ -6,9 +9,10 @@ from trino.auth import BasicAuthentication
+ 
+ 
+ class TestUnstructuredFunctions(unittest.TestCase):
+-    def test_text_pseudo_uses_sql_seed(self):
++    @staticmethod
++    def _connect():
+         verify = os.getenv("TRINO_VERIFY_SSL", os.getenv("API_VERIFY_SSL", "true"))
+-        connection = trino.dbapi.connect(
++        return trino.dbapi.connect(
+             host=os.getenv("MASKQL_HOST", "localhost"),
+             port=int(os.getenv("MASKQL_PORT", "443")),
+             user="demo",
+@@ -16,6 +20,53 @@ class TestUnstructuredFunctions(unittest.TestCase):
+             auth=BasicAuthentication("demo", "demo"),
+             verify=verify.lower() not in {"0", "false", "no"},
+         )
++
++    def test_pdf_to_text(self):
++        note = Path(__file__).resolve().parents[1] / "examples/unstructured/clinical-note"
++        pdf = base64.b64encode(note.with_suffix(".pdf").read_bytes()).decode("ascii")
++        connection = self._connect()
++        try:
++            with connection.cursor() as cursor:
++                cursor.execute("SELECT from_utf8(pdf_to_text(from_base64(?)))", [pdf])
++                extracted = cursor.fetchone()[0]
++                self.assertEqual(extracted.split(), note.with_suffix(".txt").read_text().split())
++        finally:
++            connection.close()
++
++    def test_text_pseudo_concurrent_queries_preserve_seed(self):
++        def repeated_queries(seed):
++            connection = self._connect()
++            try:
++                with connection.cursor() as cursor:
++                    results = []
++                    for _ in range(2):
++                        cursor.execute(
++                            "SELECT text_pseudo(?, ?)",
++                            ["Medical record (IPP): 8000000142", seed],
++                        )
++                        results.append(cursor.fetchone()[0])
++                    return results
++            finally:
++                connection.close()
++
++        # Independent connections exercise reuse across Trino tasks and expose
++        # any cross-talk between the model's mutable seed state.
++        with ThreadPoolExecutor(max_workers=4) as callers:
++            results = list(callers.map(
++                repeated_queries,
++                ["coucou", "patient-é-'142'", "coucou", "patient-é-'142'"],
++            ))
++        self.assertEqual(results[0], results[2])
++        self.assertEqual(results[1], results[3])
++        self.assertNotEqual(results[0][0], results[1][0])
++        for first, repeated in results:
++            self.assertEqual(first, repeated)
++            self.assertIsInstance(first, str)
++            self.assertTrue(first)
++            self.assertNotIn("8000000142", first)
++
++    def test_text_pseudo_uses_sql_seed(self):
++        connection = self._connect()
+         try:
+             with connection.cursor() as cursor:
+                 # One row keeps these calls in the same execution context, so
+diff --git a/tox.ini b/tox.ini
+index 6ebe0b7..7ccd801 100644
+--- a/tox.ini
++++ b/tox.ini
+@@ -13,6 +13,7 @@ passenv =
+     JAVA_HOME
+     HF_TOKEN
+     KEEP_TEST_STACK
++    MASKQL_IMAGE_TAG
+ setenv =
+     COMPOSE_PROJECT_NAME={env:MASKQL_TEST_PROJECT:maskql-tox}
+     MASKQL_TEST_WORK_DIR={env_tmp_dir}
+diff --git a/trino/Dockerfile b/trino/Dockerfile
+index 5c64a22..c18e52e 100644
+--- a/trino/Dockerfile
++++ b/trino/Dockerfile
+@@ -114,6 +114,6 @@ ENV PYTHONHOME=/opt/python \
+     PYTHONPATH=/opt/pyenv/lib/python3.11/site-packages \
+     JEP_LIBRARY_PATH=/opt/pyenv/lib/python3.11/site-packages/jep \
+     LD_LIBRARY_PATH=/opt/python/lib:$LD_LIBRARY_PATH \
+-    EDS_PIPELINE_DIR=/usr/lib/trino/models/eds-pseudo-public
++    EDS_PIPELINE_DIR=/opt/models/eds-pseudo-public
+ 
+ USER trino
+diff --git a/trino/plugins/maskql-plugin/src/main/java/com/maskql/mask/MaskCrypto.java b/trino/plugins/maskql-plugin/src/main/java/com/maskql/mask/MaskCrypto.java
+index a8fc99e..10afecd 100644
+--- a/trino/plugins/maskql-plugin/src/main/java/com/maskql/mask/MaskCrypto.java
++++ b/trino/plugins/maskql-plugin/src/main/java/com/maskql/mask/MaskCrypto.java
+@@ -167,7 +167,10 @@ class MaskCrypto {
+     }
+ 
+     static int prp32DecryptRaw(int x, String password, String domain) {
+-        SecretKeySpec key = keyFromPassword(password);
++        return prp32DecryptRaw(x, keyFromPassword(password), domain);
++    }
++
++    private static int prp32DecryptRaw(int x, SecretKeySpec key, String domain) {
+         short L = (short)((x >>> 16) & 0xFFFF);
+         short R = (short)(x & 0xFFFF);
+         for (int i = 7; i >= 0; i--) {
+@@ -195,10 +198,13 @@ class MaskCrypto {
+     }
+ 
+     static int invertPermuteInRange32(int y, int n, String password, String domain) {
+-        int x = prp32DecryptRaw(y, password, domain);
++        // Cycle walking can require thousands of rounds for DATE. Derive the
++        // same key once per value, as in invertPermuteInRange64.
++        SecretKeySpec key = keyFromPassword(password);
++        int x = prp32DecryptRaw(y, key, domain);
+         while (Integer.compareUnsigned(x, n) >= 0) {
+             y = x;
+-            x = prp32DecryptRaw(y, password, domain);
++            x = prp32DecryptRaw(y, key, domain);
+         }
+         return x;
+     }
+diff --git a/trino/plugins/maskql-plugin/src/main/java/com/maskql/mask/MaskPlugin.java b/trino/plugins/maskql-plugin/src/main/java/com/maskql/mask/MaskPlugin.java
+index 4526511..f4e6133 100644
+--- a/trino/plugins/maskql-plugin/src/main/java/com/maskql/mask/MaskPlugin.java
++++ b/trino/plugins/maskql-plugin/src/main/java/com/maskql/mask/MaskPlugin.java
+@@ -1,11 +1,13 @@
+ package com.maskql.mask;
+ 
++import com.maskql.nlp.EdsPseudoBridge;
+ import io.trino.spi.Plugin;
+ import java.util.Set;
+ 
+ public class MaskPlugin implements Plugin {
+   @Override
+   public Set<Class<?>> getFunctions() {
++    EdsPseudoBridge.getInstance().initialize();
+     return Set.of(MaskUnstructured.class, MaskStructured.class);
+   }
+ }
+diff --git a/trino/plugins/maskql-plugin/src/main/java/com/maskql/mask/MaskUnstructured.java b/trino/plugins/maskql-plugin/src/main/java/com/maskql/mask/MaskUnstructured.java
+index abe170c..9d9df07 100644
+--- a/trino/plugins/maskql-plugin/src/main/java/com/maskql/mask/MaskUnstructured.java
++++ b/trino/plugins/maskql-plugin/src/main/java/com/maskql/mask/MaskUnstructured.java
+@@ -28,9 +28,6 @@ import java.util.Base64;
+ 
+ public final class MaskUnstructured {
+     
+-    private static final EdsPseudoBridge BRIDGE = EdsPseudoBridge.getInstance();
+-
+-
+     @ScalarFunction(value = "text_pseudo", deterministic = false)
+     @Description("Pseudonymize text using the legacy seed; prefer text_pseudo(text, seed)")
+     @SqlType(StandardTypes.VARCHAR)
+@@ -45,7 +42,8 @@ public final class MaskUnstructured {
+             @SqlType(StandardTypes.VARCHAR) Slice input,
+             @SqlType(StandardTypes.VARCHAR) Slice seed) {
+         if (input == null || seed == null) return null;
+-        String text = BRIDGE.processOne(input.toStringUtf8(), seed.toStringUtf8());
++        String text = EdsPseudoBridge.getInstance().processOne(
++                input.toStringUtf8(), seed.toStringUtf8());
+         return Slices.utf8Slice(text);
+     }
+ 
+diff --git a/trino/plugins/maskql-plugin/src/main/java/com/maskql/nlp/EdsPseudoBridge.java b/trino/plugins/maskql-plugin/src/main/java/com/maskql/nlp/EdsPseudoBridge.java
+index 12b8505..7e70d88 100644
+--- a/trino/plugins/maskql-plugin/src/main/java/com/maskql/nlp/EdsPseudoBridge.java
++++ b/trino/plugins/maskql-plugin/src/main/java/com/maskql/nlp/EdsPseudoBridge.java
+@@ -2,65 +2,108 @@ package com.maskql.nlp;
+ 
+ import jep.SharedInterpreter;
+ 
+-import java.util.concurrent.ConcurrentLinkedQueue;
++import java.util.concurrent.ExecutionException;
++import java.util.concurrent.ExecutorService;
++import java.util.concurrent.Executors;
++import java.util.concurrent.Future;
+ 
+ public final class EdsPseudoBridge {
+-    private static final String PIPELINE_DIR = System.getenv().getOrDefault("EDS_PIPELINE_DIR", "/usr/lib/trino/models/eds-pseudo-public");
+-    private static final ConcurrentLinkedQueue<SharedInterpreter> REGISTRY = new ConcurrentLinkedQueue<>();
++    private static final String PIPELINE_DIR = System.getenv().getOrDefault(
++            "EDS_PIPELINE_DIR", "/opt/models/eds-pseudo-public");
+     private static final EdsPseudoBridge INSTANCE = new EdsPseudoBridge();
+ 
+-    private final ThreadLocal<SharedInterpreter> tl = ThreadLocal.withInitial(() -> {
+-        SharedInterpreter py = new SharedInterpreter();
+-        String pipe = escapePy(PIPELINE_DIR);
+-
+-        // Init python
+-        // Load method "_process_text(text, seed)"
+-        py.exec(
+-            "PIPE = '" + pipe + "'\n" +
+-            "with open(\"/app/load_edspseudo.py\") as f:" +
+-            "    code = f.read()\n" +
+-            "exec(code)\n"
+-        );
+-
+-        // Catch error, impossible to debug without that
+-        Object err = py.getValue("_ERR");
+-        if (err != null && !"None".equals(String.valueOf(err))) {
+-            System.err.println("[EdsPseudoBridge] Python init failed:\n" + err);
+-            
+-            throw new RuntimeException("EDS pipeline init failed");
+-        }
+-
+-        REGISTRY.add(py);
+-        return py;
+-    });
++    private final ExecutorService worker;
++    private Future<?> initialization;
++    private volatile Thread workerThread;
++    // Only the dedicated worker may create, use or close this JEP interpreter.
++    private SharedInterpreter interpreter;
+ 
+     private EdsPseudoBridge() {
+-        try {
+-            SharedInterpreter py = tl.get();
+-            py.exec("_ = _process_text('warmup', 'seed')");
+-        } catch (Throwable t) {
+-            System.err.println("[EdsPseudoBridge] Warm-up failed: " + t);
+-        }
+-
++        worker = Executors.newSingleThreadExecutor(task -> {
++            Thread thread = new Thread(() -> {
++                try {
++                    task.run();
++                } finally {
++                    if (interpreter != null) {
++                        interpreter.close();
++                    }
++                }
++            }, "eds-pseudo-worker");
++            thread.setDaemon(true);
++            workerThread = thread;
++            return thread;
++        });
+         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+-            for (SharedInterpreter py : REGISTRY) {
+-                try { py.close(); } catch (Throwable ignored) {}
++            worker.shutdown();
++            try {
++                Thread thread = workerThread;
++                if (thread != null) {
++                    // Join the thread, including its interpreter-close block.
++                    thread.join(10_000);
++                }
++            } catch (InterruptedException e) {
++                Thread.currentThread().interrupt();
+             }
+-            REGISTRY.clear();
+         }, "eds-pseudo-shutdown"));
+     }
+ 
+-    public static EdsPseudoBridge getInstance() { return INSTANCE; }
++    public static EdsPseudoBridge getInstance() {
++        return INSTANCE;
++    }
++
++    /** Called by the plugin before Trino reports that startup is complete. */
++    public void initialize() {
++        Future<?> ready;
++        synchronized (this) {
++            if (initialization == null) {
++                // Submit only after class initialization has completed: waiting
++                // for this worker in a static initializer would deadlock JEP.
++                initialization = worker.submit(this::loadPipeline);
++            }
++            ready = initialization;
++        }
++        await(ready, false);
++    }
++
++    private void loadPipeline() {
++        System.err.println("[EdsPseudoBridge] Loading EDS pipeline");
++        interpreter = new SharedInterpreter();
++        interpreter.set("PIPE", PIPELINE_DIR);
++        interpreter.runScript("/app/load_edspseudo.py");
++        Object error = interpreter.getValue("_ERR");
++        if (error != null) {
++            throw new IllegalStateException("EDS pipeline init failed:\n" + error);
++        }
++        interpreter.invoke("_process_text", "warmup", "seed");
++        System.err.println("[EdsPseudoBridge] EDS pipeline ready");
++    }
+ 
+     public String processOne(String text, String seed) {
+-        SharedInterpreter py = tl.get();
+-        py.set("input", text);
+-        py.set("seed", seed);
+-        py.exec("result = _process_text(input, seed)");
+-        return (String) py.getValue("result");
++        initialize();
++        // One model per node; serialize calls to preserve JEP thread ownership
++        // and prevent concurrent calls from sharing mutable seed/model state.
++        return await(worker.submit(() ->
++                (String) interpreter.invoke("_process_text", text, seed)), true);
+     }
+ 
+-    private static String escapePy(String s) {
+-        return s.replace("\\", "\\\\").replace("'", "\\'");
++    private static <T> T await(Future<T> result, boolean cancelOnInterrupt) {
++        try {
++            return result.get();
++        } catch (InterruptedException e) {
++            if (cancelOnInterrupt) {
++                result.cancel(false);
++            }
++            Thread.currentThread().interrupt();
++            throw new IllegalStateException("Interrupted while waiting for the EDS pipeline", e);
++        } catch (ExecutionException e) {
++            Throwable cause = e.getCause();
++            if (cause instanceof RuntimeException runtimeException) {
++                throw runtimeException;
++            }
++            if (cause instanceof Error error) {
++                throw error;
++            }
++            throw new IllegalStateException("EDS pipeline execution failed", cause);
++        }
+     }
+ }
+diff --git a/trino/python/load_edspseudo.py b/trino/python/load_edspseudo.py
+index 62a5eb7..022dbe6 100644
+--- a/trino/python/load_edspseudo.py
++++ b/trino/python/load_edspseudo.py
+@@ -1,6 +1,5 @@
+ import os, sys, importlib, pkgutil, json, traceback
+ from pathlib import Path
+-from pseudocare import PseudoCare
+ 
+ try:
+     # PIPE variable must be loaded
+@@ -8,13 +7,15 @@ try:
+ 
+     print('[py] sys.executable =', sys.executable)
+     print('[py] sys.path[0]   =', sys.path[0])
+-    print('[py] PIPELINE_DIR   =', PIPE)
+-    print('[py] exists?        =', os.path.isdir(PIPE))
+-    print('[py] listdir        =', os.listdir(PIPE) if os.path.isdir(PIPE) else 'N/A')
+-
+     os.environ.setdefault("HF_HUB_OFFLINE", "1")
+-    REPO = Path(os.environ.get("EDS_REPO", "/opt/models/eds-pseudo-public/"))
++    # Keep the legacy override while using the same path as the Java bridge.
++    REPO = Path(os.environ.get("EDS_REPO") or PIPE)
+     PKG  = os.environ.get("EDS_PKG", "eds_pseudo")
++    print('[py] PIPELINE_DIR   =', REPO)
++    if not (REPO / "artifacts").is_dir():
++        raise FileNotFoundError(f"EDS pipeline artifacts not found in {REPO}")
++
++    from pseudocare import PseudoCare
+ 
+     # Import EDSNLP manually
+     sys.path.insert(0, str(REPO))
+diff --git a/uv.lock b/uv.lock
+index 4dd3628..8e6f92c 100644
+--- a/uv.lock
++++ b/uv.lock
+@@ -779,7 +779,7 @@ wheels = [
+ 
+ [[package]]
+ name = "maskql"
+-version = "1.1.0"
++version = "1.6.0"
+ source = { virtual = "." }
+ dependencies = [
+     { name = "alembic" },

@@ -26,7 +26,15 @@ npm --prefix frontend run test:unit -- --run
 
 ## Run the examples
 
-Keep the disposable stack after the tests:
+To run just the examples, prepare the dependencies and start a disposable
+stack directly:
+
+```bash
+uv sync --frozen
+uv run --frozen python scripts/test_stack.py start
+```
+
+Alternatively, keep the disposable stack after running the full test suite:
 
 ```bash
 KEEP_TEST_STACK=1 uv run tox
@@ -47,8 +55,9 @@ uv run --frozen python examples/unstructured/run_examples.py --seed fictional-pa
 
 - [Structured data](../examples/structured/README.md): filter 200 patients to three,
   encrypt their names, verify decryption and the before/after preview.
-- [Text and PDF](../examples/unstructured/README.md): pass one fictional English
-  clinical note through the SQL functions, with an explicit seed.
+- [Text and PDF](../examples/unstructured/README.md): verify extraction of a
+  fictional clinical note from PDF, pseudonymization and repeatability with
+  an explicit seed. This is a functional illustration, not an accuracy study.
 
 Outputs are generated in `examples/*/results/`, ignored by Git.
 Finally, remove the test stack:

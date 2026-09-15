@@ -1,0 +1,225 @@
+{
+  "recorded_at_utc": "2026-09-15T09:39:06.314553+00:00",
+  "host_platform": "macOS-15.7.9-x86_64-i386-64bit",
+  "runner_python": "3.10.12 (main, Jul 26 2023, 12:20:06) [Clang 16.0.3 ]",
+  "runner_packages": {
+    "shellingham": "1.5.4",
+    "orjson": "3.11.2",
+    "pydantic_core": "2.33.2",
+    "fastapi-cli": "0.0.8",
+    "tomli": "2.2.1",
+    "async-timeout": "5.0.1",
+    "requests": "2.32.5",
+    "idna": "3.10",
+    "urllib3": "2.5.0",
+    "charset-normalizer": "3.4.3",
+    "ujson": "5.10.0",
+    "SQLAlchemy": "2.0.43",
+    "psycopg-binary": "3.2.9",
+    "pytz": "2025.2",
+    "typing-inspection": "0.4.1",
+    "colorama": "0.4.6",
+    "trino": "0.336.0",
+    "platformdirs": "4.3.8",
+    "dnspython": "2.7.0",
+    "python-dotenv": "1.1.1",
+    "filelock": "3.19.1",
+    "cryptography": "45.0.7",
+    "tox": "4.28.4",
+    "exceptiongroup": "1.3.0",
+    "lz4": "4.4.4",
+    "psycopg": "3.2.9",
+    "typer": "0.16.1",
+    "typing_extensions": "4.14.1",
+    "distlib": "0.4.0",
+    "certifi": "2025.8.3",
+    "uvicorn": "0.30.3",
+    "ecdsa": "0.19.1",
+    "httpcore": "1.0.9",
+    "greenlet": "3.2.4",
+    "rich": "14.1.0",
+    "cffi": "1.17.1",
+    "pyasn1": "0.6.1",
+    "markdown-it-py": "4.0.0",
+    "anyio": "4.10.0",
+    "passlib": "1.7.4",
+    "sqlmodel": "0.0.24",
+    "h11": "0.16.0",
+    "sniffio": "1.3.1",
+    "rsa": "4.9.1",
+    "mdurl": "0.1.2",
+    "python-dateutil": "2.9.0.post0",
+    "tzlocal": "5.3.1",
+    "chardet": "5.2.0",
+    "alembic": "1.16.4",
+    "Mako": "1.3.10",
+    "click": "8.2.1",
+    "packaging": "25.0",
+    "argon2-cffi": "25.1.0",
+    "starlette": "0.37.2",
+    "pycparser": "2.22",
+    "Jinja2": "3.1.6",
+    "argon2-cffi-bindings": "25.1.0",
+    "python-multipart": "0.0.20",
+    "fastapi": "0.111.0",
+    "pydantic": "2.11.7",
+    "cachetools": "6.1.0",
+    "pluggy": "1.6.0",
+    "Pygments": "2.19.2",
+    "python-jose": "3.5.0",
+    "dotenv": "0.9.9",
+    "websockets": "15.0.1",
+    "watchfiles": "1.1.0",
+    "httptools": "0.6.4",
+    "httpx": "0.27.0",
+    "PyYAML": "6.0.2",
+    "email_validator": "2.2.0",
+    "pyproject-api": "1.9.1",
+    "zstandard": "0.24.0",
+    "uvloop": "0.21.0",
+    "annotated-types": "0.7.0",
+    "asyncpg": "0.30.0",
+    "rich-toolkit": "0.15.0",
+    "six": "1.17.0",
+    "virtualenv": "20.34.0",
+    "MarkupSafe": "3.0.2"
+  },
+  "images": [
+    {
+      "Id": "sha256:8810739f8f0a5e88fac24cf2aa0213b1fd971501f295849c434a583fea6db998",
+      "RepoTags": [
+        "rudymerieux/maskql-trino:publication-fixes-20260915"
+      ],
+      "RepoDigests": [
+        "rudymerieux/maskql-trino@sha256:8810739f8f0a5e88fac24cf2aa0213b1fd971501f295849c434a583fea6db998"
+      ],
+      "Created": "2026-09-15T09:36:28.598740811Z",
+      "Architecture": "amd64",
+      "Os": "linux"
+    },
+    {
+      "Id": "sha256:f9bfe155961514e5386f01d71ab3ffa768bdc2a79524f69580b80eaa345a6c4e",
+      "RepoTags": [
+        "rudymerieux/maskql:latest",
+        "rudymerieux/maskql:publication-fixes-20260915"
+      ],
+      "RepoDigests": [
+        "rudymerieux/maskql@sha256:f9bfe155961514e5386f01d71ab3ffa768bdc2a79524f69580b80eaa345a6c4e"
+      ],
+      "Created": "2026-09-12T12:03:32.906588299Z",
+      "Architecture": "amd64",
+      "Os": "linux"
+    }
+  ],
+  "commands": {
+    "docker_version": {
+      "command": [
+        "docker",
+        "version"
+      ],
+      "exit_code": 0,
+      "output": "Client:\n Version:           28.0.1\n API version:       1.48\n Go version:        go1.23.6\n Git commit:        068a01e\n Built:             Wed Feb 26 10:38:16 2025\n OS/Arch:           darwin/amd64\n Context:           desktop-linux\n\nServer: Docker Desktop 4.39.0 (184744)\n Engine:\n  Version:          28.0.1\n  API version:      1.48 (minimum version 1.24)\n  Go version:       go1.23.6\n  Git commit:       bbd0a17\n  Built:            Wed Feb 26 10:41:16 2025\n  OS/Arch:          linux/amd64\n  Experimental:     false\n containerd:\n  Version:          1.7.25\n  GitCommit:        bcc810d6b9066471b0b6fa75f557a15a1cbf31bb\n runc:\n  Version:          1.2.4\n  GitCommit:        v1.2.4-0-g6c52b3f\n docker-init:\n  Version:          0.19.0\n  GitCommit:        de40ad0\n"
+    },
+    "compose_version": {
+      "command": [
+        "docker",
+        "compose",
+        "version"
+      ],
+      "exit_code": 0,
+      "output": "Docker Compose version v2.33.1-desktop.1\n"
+    },
+    "docker_resources": {
+      "command": [
+        "docker",
+        "info",
+        "--format",
+        "{{json .}}"
+      ],
+      "exit_code": 0,
+      "output": "{\"KernelVersion\": \"6.10.14-linuxkit\", \"OperatingSystem\": \"Docker Desktop\", \"OSType\": \"linux\", \"Architecture\": \"x86_64\", \"NCPU\": 8, \"MemTotal\": 8220123136, \"ServerVersion\": \"28.0.1\"}"
+    },
+    "trino_info": {
+      "command": [
+        "docker",
+        "exec",
+        "maskql-tox-fix-validation-trino-1",
+        "curl",
+        "-fsS",
+        "http://localhost:8080/v1/info"
+      ],
+      "exit_code": 0,
+      "output": "{\"nodeVersion\":{\"version\":\"476\"},\"environment\":\"production\",\"coordinator\":true,\"starting\":false,\"uptime\":\"1.73m\"}"
+    },
+    "trino_java": {
+      "command": [
+        "docker",
+        "exec",
+        "maskql-tox-fix-validation-trino-1",
+        "java",
+        "-version"
+      ],
+      "exit_code": 0,
+      "output": "openjdk version \"24.0.1\" 2025-04-15\nOpenJDK Runtime Environment Temurin-24.0.1+9 (build 24.0.1+9)\nOpenJDK 64-Bit Server VM Temurin-24.0.1+9 (build 24.0.1+9, mixed mode, sharing)\n"
+    },
+    "nlp_packages": {
+      "command": [
+        "docker",
+        "exec",
+        "maskql-tox-fix-validation-trino-1",
+        "python",
+        "-c",
+        "import sys,json,importlib.metadata as m; print(json.dumps({\"python\":sys.version,\"packages\":{d.metadata[\"Name\"]:d.version for d in m.distributions()}},sort_keys=True))"
+      ],
+      "exit_code": 0,
+      "output": "{\"packages\": {\"Faker\": \"40.11.1\", \"Jinja2\": \"3.1.6\", \"MarkupSafe\": \"3.0.3\", \"PyYAML\": \"6.0.3\", \"Pygments\": \"2.19.2\", \"Unidecode\": \"1.4.0\", \"accelerate\": \"1.13.0\", \"annotated-doc\": \"0.0.4\", \"annotated-types\": \"0.7.0\", \"anyio\": \"4.12.1\", \"astroid\": \"4.0.4\", \"beautifulsoup4\": \"4.14.3\", \"blis\": \"1.3.3\", \"build\": \"1.4.0\", \"catalogue\": \"2.0.10\", \"certifi\": \"2026.2.25\", \"charset-normalizer\": \"3.4.6\", \"click\": \"8.1.8\", \"cloudpathlib\": \"0.23.0\", \"confection\": \"0.1.5\", \"confit\": \"0.10.2\", \"cymem\": \"2.0.13\", \"dill\": \"0.4.1\", \"edsnlp\": \"0.20.0\", \"filelock\": \"3.25.2\", \"foldedtensor\": \"0.4.0\", \"fsspec\": \"2026.2.0\", \"h11\": \"0.16.0\", \"hf-xet\": \"1.4.2\", \"httpcore\": \"1.0.9\", \"httpx\": \"0.28.1\", \"huggingface_hub\": \"1.7.2\", \"idna\": \"3.11\", \"isort\": \"8.0.1\", \"jep\": \"4.2.2\", \"lark\": \"1.3.1\", \"loguru\": \"0.7.3\", \"markdown-it-py\": \"4.0.0\", \"mccabe\": \"0.7.0\", \"mdurl\": \"0.1.2\", \"more-click\": \"0.1.3\", \"mpmath\": \"1.3.0\", \"murmurhash\": \"1.0.15\", \"networkx\": \"3.6.1\", \"numpy\": \"2.4.3\", \"packaging\": \"26.0\", \"pandas\": \"3.0.1\", \"pip\": \"24.0\", \"platformdirs\": \"4.9.4\", \"preshed\": \"3.0.13\", \"pseudocare\": \"0.1.6\", \"psutil\": \"7.2.2\", \"pyarrow\": \"23.0.1\", \"pydantic\": \"2.12.5\", \"pydantic_core\": \"2.41.5\", \"pylint\": \"4.0.5\", \"pyproject_hooks\": \"1.2.0\", \"pysimstring\": \"1.3.0\", \"pystow\": \"0.7.28\", \"python-dateutil\": \"2.9.0.post0\", \"pytz\": \"2026.1.post1\", \"regex\": \"2026.2.28\", \"requests\": \"2.32.5\", \"rich\": \"14.3.3\", \"rich-logger\": \"0.3.2\", \"safetensors\": \"0.7.0\", \"setuptools\": \"65.5.0\", \"shellingham\": \"1.5.4\", \"six\": \"1.17.0\", \"smart_open\": \"7.5.1\", \"soupsieve\": \"2.8.3\", \"spacy\": \"3.8.12\", \"spacy-legacy\": \"3.0.12\", \"spacy-loggers\": \"1.0.5\", \"srsly\": \"2.5.3\", \"sympy\": \"1.14.0\", \"thinc\": \"8.3.11\", \"tokenizers\": \"0.22.2\", \"toml\": \"0.10.2\", \"tomlkit\": \"0.14.0\", \"torch\": \"2.4.1+cpu\", \"tqdm\": \"4.67.3\", \"transformers\": \"5.3.0\", \"typer\": \"0.23.1\", \"typer-slim\": \"0.23.1\", \"typing-inspection\": \"0.4.2\", \"typing_extensions\": \"4.15.0\", \"umls_downloader\": \"0.1.3\", \"urllib3\": \"2.6.3\", \"wasabi\": \"1.1.3\", \"weasel\": \"0.4.3\", \"wheel\": \"0.46.3\", \"wrapt\": \"2.1.2\", \"xxhash\": \"3.6.0\"}, \"python\": \"3.11.9 (main, Mar 23 2026, 14:07:54) [GCC 8.5.0 20210514 (Red Hat 8.5.0-28)]\"}\n"
+    },
+    "backend_packages": {
+      "command": [
+        "docker",
+        "exec",
+        "maskql-tox-fix-validation-maskql-dev-1",
+        "python",
+        "-c",
+        "import sys,json,importlib.metadata as m; print(json.dumps({\"python\":sys.version,\"packages\":{d.metadata[\"Name\"]:d.version for d in m.distributions()}},sort_keys=True))"
+      ],
+      "exit_code": 0,
+      "output": "{\"packages\": {\"Jinja2\": \"3.1.6\", \"Mako\": \"1.3.10\", \"MarkupSafe\": \"3.0.2\", \"PyYAML\": \"6.0.2\", \"Pygments\": \"2.19.2\", \"SQLAlchemy\": \"2.0.43\", \"alembic\": \"1.16.4\", \"annotated-types\": \"0.7.0\", \"anyio\": \"4.10.0\", \"argon2-cffi\": \"25.1.0\", \"argon2-cffi-bindings\": \"25.1.0\", \"async-timeout\": \"5.0.1\", \"asyncpg\": \"0.30.0\", \"cachetools\": \"6.1.0\", \"certifi\": \"2025.8.3\", \"cffi\": \"1.17.1\", \"chardet\": \"5.2.0\", \"charset-normalizer\": \"3.4.3\", \"click\": \"8.2.1\", \"colorama\": \"0.4.6\", \"cryptography\": \"45.0.7\", \"distlib\": \"0.4.0\", \"dnspython\": \"2.7.0\", \"dotenv\": \"0.9.9\", \"ecdsa\": \"0.19.1\", \"email_validator\": \"2.2.0\", \"exceptiongroup\": \"1.3.0\", \"fastapi\": \"0.111.0\", \"fastapi-cli\": \"0.0.8\", \"filelock\": \"3.19.1\", \"greenlet\": \"3.2.4\", \"h11\": \"0.16.0\", \"httpcore\": \"1.0.9\", \"httptools\": \"0.6.4\", \"httpx\": \"0.27.0\", \"idna\": \"3.10\", \"lz4\": \"4.4.4\", \"markdown-it-py\": \"4.0.0\", \"mdurl\": \"0.1.2\", \"orjson\": \"3.11.2\", \"packaging\": \"25.0\", \"passlib\": \"1.7.4\", \"pip\": \"24.0\", \"platformdirs\": \"4.3.8\", \"pluggy\": \"1.6.0\", \"psycopg\": \"3.2.9\", \"psycopg-binary\": \"3.2.9\", \"pyasn1\": \"0.6.1\", \"pycparser\": \"2.22\", \"pydantic\": \"2.11.7\", \"pydantic_core\": \"2.33.2\", \"pyproject-api\": \"1.9.1\", \"python-dateutil\": \"2.9.0.post0\", \"python-dotenv\": \"1.1.1\", \"python-jose\": \"3.5.0\", \"python-multipart\": \"0.0.20\", \"pytz\": \"2025.2\", \"requests\": \"2.32.5\", \"rich\": \"14.1.0\", \"rich-toolkit\": \"0.15.0\", \"rsa\": \"4.9.1\", \"setuptools\": \"79.0.1\", \"shellingham\": \"1.5.4\", \"six\": \"1.17.0\", \"sniffio\": \"1.3.1\", \"sqlmodel\": \"0.0.24\", \"starlette\": \"0.37.2\", \"tomli\": \"2.2.1\", \"tox\": \"4.28.4\", \"trino\": \"0.336.0\", \"typer\": \"0.16.1\", \"typing-inspection\": \"0.4.1\", \"typing_extensions\": \"4.14.1\", \"tzlocal\": \"5.3.1\", \"ujson\": \"5.10.0\", \"urllib3\": \"2.5.0\", \"uvicorn\": \"0.30.3\", \"uvloop\": \"0.21.0\", \"virtualenv\": \"20.34.0\", \"watchfiles\": \"1.1.0\", \"websockets\": \"15.0.1\", \"wheel\": \"0.46.3\", \"zstandard\": \"0.24.0\"}, \"python\": \"3.11.16 (main, Sep  1 2026, 00:12:26) [GCC 14.2.0]\"}\n"
+    },
+    "postgres": {
+      "command": [
+        "docker",
+        "exec",
+        "maskql-tox-fix-validation-postgres-1",
+        "postgres",
+        "--version"
+      ],
+      "exit_code": 0,
+      "output": "postgres (PostgreSQL) 16.15 (Debian 16.15-1.pgdg13+2)\n"
+    },
+    "mounted_plugin_hashes": {
+      "command": [
+        "docker",
+        "exec",
+        "maskql-tox-fix-validation-trino-1",
+        "sh",
+        "-c",
+        "sha256sum /usr/lib/trino/plugin/maskql-plugin/*.jar /app/load_edspseudo.py"
+      ],
+      "exit_code": 0,
+      "output": "a1dfd38d574683dd582bbaef12c107f74a61b3acee6468eb4fb32e2b331a789f  /usr/lib/trino/plugin/maskql-plugin/maskql-acl-0.1.0-plugin.jar\n3898c315311675e2cdb94c776f31d583b2677e6f543e89d103890269d8fce62e  /usr/lib/trino/plugin/maskql-plugin/maskql-acl-0.1.0.jar\n9526dc49ae51e12c7d0ad6105bf2a932f6d53063b872186ac605c554181e9898  /app/load_edspseudo.py\n"
+    },
+    "nlp_threads": {
+      "command": [
+        "docker",
+        "exec",
+        "maskql-tox-fix-validation-trino-1",
+        "jcmd",
+        "1",
+        "Thread.print"
+      ],
+      "exit_code": 0,
+      "output": "Full thread dump saved to logs/trino-fixed-threads.log"
+    }
+  }
+}

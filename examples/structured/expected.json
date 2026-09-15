@@ -1,0 +1,16 @@
+{
+  "source_row_count": 200,
+  "visible_patient_ids": [1, 2, 3],
+  "masked_column": "last_name",
+  "mask_rule": "encrypt(last_name)",
+  "decrypted_rows": [
+    {"patient_id": 1, "last_name": "Fictional-Martin"},
+    {"patient_id": 2, "last_name": "Fictional-Lefèvre"},
+    {"patient_id": 3, "last_name": "Fictional-O'Connor"}
+  ],
+  "preview": {
+    "limit": 5,
+    "before_row_count": 5,
+    "after_row_count": 3
+  }
+}

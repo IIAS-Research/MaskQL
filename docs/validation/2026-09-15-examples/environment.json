@@ -1,0 +1,144 @@
+{
+  "captured_at_utc": "2026-09-15T10:24:55.560889+00:00",
+  "runner_python": "3.10.12 (main, Jul 26 2023, 12:20:06) [Clang 16.0.3 ]",
+  "runner_platform": "macOS-15.7.9-x86_64-i386-64bit",
+  "runner_packages": {
+    "trino": "0.336.0",
+    "requests": "2.32.5",
+    "tox": "4.28.4"
+  },
+  "commands": {
+    "macos": {
+      "command": [
+        "sw_vers"
+      ],
+      "exit_code": 0,
+      "output": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830\n"
+    },
+    "docker": {
+      "command": [
+        "docker",
+        "version",
+        "--format",
+        "{{json .}}"
+      ],
+      "exit_code": 0,
+      "output": "{\"Client\":{\"Version\":\"28.0.1\",\"ApiVersion\":\"1.48\",\"DefaultAPIVersion\":\"1.48\",\"GitCommit\":\"068a01e\",\"GoVersion\":\"go1.23.6\",\"Os\":\"darwin\",\"Arch\":\"amd64\",\"BuildTime\":\"Wed Feb 26 10:38:16 2025\",\"Context\":\"desktop-linux\"},\"Server\":{\"Platform\":{\"Name\":\"Docker Desktop 4.39.0 (184744)\"},\"Components\":[{\"Name\":\"Engine\",\"Version\":\"28.0.1\",\"Details\":{\"ApiVersion\":\"1.48\",\"Arch\":\"amd64\",\"BuildTime\":\"Wed Feb 26 10:41:16 2025\",\"Experimental\":\"false\",\"GitCommit\":\"bbd0a17\",\"GoVersion\":\"go1.23.6\",\"KernelVersion\":\"6.10.14-linuxkit\",\"MinAPIVersion\":\"1.24\",\"Os\":\"linux\"}},{\"Name\":\"containerd\",\"Version\":\"1.7.25\",\"Details\":{\"GitCommit\":\"bcc810d6b9066471b0b6fa75f557a15a1cbf31bb\"}},{\"Name\":\"runc\",\"Version\":\"1.2.4\",\"Details\":{\"GitCommit\":\"v1.2.4-0-g6c52b3f\"}},{\"Name\":\"docker-init\",\"Version\":\"0.19.0\",\"Details\":{\"GitCommit\":\"de40ad0\"}}],\"Version\":\"28.0.1\",\"ApiVersion\":\"1.48\",\"MinAPIVersion\":\"1.24\",\"GitCommit\":\"bbd0a17\",\"GoVersion\":\"go1.23.6\",\"Os\":\"linux\",\"Arch\":\"amd64\",\"KernelVersion\":\"6.10.14-linuxkit\",\"BuildTime\":\"2025-02-26T10:41:16.000000000+00:00\"}}\n"
+    },
+    "compose": {
+      "command": [
+        "docker",
+        "compose",
+        "version"
+      ],
+      "exit_code": 0,
+      "output": "Docker Compose version v2.33.1-desktop.1\n"
+    },
+    "java_build": {
+      "command": [
+        "java",
+        "-version"
+      ],
+      "exit_code": 0,
+      "output": "openjdk version \"24.0.2\" 2025-07-15\nOpenJDK Runtime Environment Homebrew (build 24.0.2)\nOpenJDK 64-Bit Server VM Homebrew (build 24.0.2, mixed mode, sharing)\n"
+    },
+    "maven": {
+      "command": [
+        "mvn",
+        "--version"
+      ],
+      "exit_code": 0,
+      "output": "Apache Maven 3.9.11 (3e54c93a704957b63ee3494413a2b544fd3d825b)\nMaven home: /usr/local/Cellar/maven/3.9.11/libexec\nJava version: 24.0.2, vendor: Homebrew, runtime: /usr/local/Cellar/openjdk/24.0.2/libexec/openjdk.jdk/Contents/Home\nDefault locale: fr_FR, platform encoding: UTF-8\nOS name: \"mac os x\", version: \"15.7.9\", arch: \"x86_64\", family: \"mac\"\n"
+    },
+    "uv": {
+      "command": [
+        "uv",
+        "--version"
+      ],
+      "exit_code": 0,
+      "output": "uv 0.4.10 (690716484 2024-09-13)\n"
+    },
+    "trino_info": {
+      "command": [
+        "docker",
+        "exec",
+        "maskql-tox-publication-examples-trino-1",
+        "curl",
+        "-fsS",
+        "http://localhost:8080/v1/info"
+      ],
+      "exit_code": 0,
+      "output": "{\"nodeVersion\":{\"version\":\"476\"},\"environment\":\"production\",\"coordinator\":true,\"starting\":false,\"uptime\":\"2.48m\"}"
+    },
+    "trino_java": {
+      "command": [
+        "docker",
+        "exec",
+        "maskql-tox-publication-examples-trino-1",
+        "java",
+        "-version"
+      ],
+      "exit_code": 0,
+      "output": "openjdk version \"24.0.1\" 2025-04-15\nOpenJDK Runtime Environment Temurin-24.0.1+9 (build 24.0.1+9)\nOpenJDK 64-Bit Server VM Temurin-24.0.1+9 (build 24.0.1+9, mixed mode, sharing)\n"
+    },
+    "text_packages": {
+      "command": [
+        "docker",
+        "exec",
+        "maskql-tox-publication-examples-trino-1",
+        "python",
+        "-c",
+        "import sys,json,importlib.metadata as m; print(json.dumps({\"python\":sys.version,\"packages\":{n:m.version(n) for n in (\"pseudocare\",\"edsnlp\",\"torch\",\"jep\")}}))"
+      ],
+      "exit_code": 0,
+      "output": "{\"python\": \"3.11.9 (main, Mar 23 2026, 14:07:54) [GCC 8.5.0 20210514 (Red Hat 8.5.0-28)]\", \"packages\": {\"pseudocare\": \"0.1.6\", \"edsnlp\": \"0.20.0\", \"torch\": \"2.4.1+cpu\", \"jep\": \"4.2.2\"}}\n"
+    },
+    "backend": {
+      "command": [
+        "docker",
+        "exec",
+        "maskql-tox-publication-examples-maskql-dev-1",
+        "python",
+        "--version"
+      ],
+      "exit_code": 0,
+      "output": "Python 3.11.16\n"
+    },
+    "postgres": {
+      "command": [
+        "docker",
+        "exec",
+        "maskql-tox-publication-examples-postgres-1",
+        "postgres",
+        "--version"
+      ],
+      "exit_code": 0,
+      "output": "postgres (PostgreSQL) 16.15 (Debian 16.15-1.pgdg13+2)\n"
+    },
+    "runtime_hashes": {
+      "command": [
+        "docker",
+        "exec",
+        "maskql-tox-publication-examples-trino-1",
+        "sh",
+        "-c",
+        "sha256sum /usr/lib/trino/plugin/maskql-plugin/*.jar /app/load_edspseudo.py"
+      ],
+      "exit_code": 0,
+      "output": "12da02cb7fb399888ca78a29a0046cbe64a5806a6a5087075a5615552edac1b4  /usr/lib/trino/plugin/maskql-plugin/maskql-acl-0.1.0-plugin.jar\n22d851a5940992d1b9ecda38c8669876a906a4d3db8722aae56e9a6149d3b8cb  /usr/lib/trino/plugin/maskql-plugin/maskql-acl-0.1.0.jar\n9526dc49ae51e12c7d0ad6105bf2a932f6d53063b872186ac605c554181e9898  /app/load_edspseudo.py\n"
+    },
+    "images": {
+      "command": [
+        "docker",
+        "image",
+        "inspect",
+        "rudymerieux/maskql-trino:publication-fixes-20260915",
+        "rudymerieux/maskql:publication-fixes-20260915",
+        "--format",
+        "{{.Id}} {{json .RepoTags}}"
+      ],
+      "exit_code": 0,
+      "output": "sha256:8810739f8f0a5e88fac24cf2aa0213b1fd971501f295849c434a583fea6db998 [\"rudymerieux/maskql-trino:publication-fixes-20260915\"]\nsha256:f9bfe155961514e5386f01d71ab3ffa768bdc2a79524f69580b80eaa345a6c4e [\"rudymerieux/maskql:latest\",\"rudymerieux/maskql:publication-fixes-20260915\"]\n"
+    }
+  }
+}

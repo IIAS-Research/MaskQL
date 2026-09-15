@@ -1,0 +1,7 @@
+{
+  "pdf_extraction": "Same whitespace-delimited tokens as clinical-note.txt; line wrapping and blank lines may differ.",
+  "text_pseudonymization": "The text and PDF-derived outputs must be nonempty and differ from their respective input texts beyond whitespace.",
+  "removed_literal_identifiers": ["8000000142"],
+  "repeatability": "Repeating each pseudonymization query with the same input and seed must return exactly the same output in this environment.",
+  "scope": "These checks demonstrate the SQL functions on fictional data. They do not establish complete identifier removal or clinical de-identification accuracy. Pseudonyms can change with model or dependency versions."
+}

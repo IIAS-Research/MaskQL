@@ -1,0 +1,77 @@
+{
+  "ran_at": "2026-09-15T10:27:02.208471+00:00",
+  "endpoint": {
+    "host": "localhost",
+    "port": 38443,
+    "http_scheme": "https",
+    "user": "demo"
+  },
+  "seed": "fictional-patient-142",
+  "inputs": {
+    "clinical-note.txt": {
+      "sha256": "a6cfb3949de59b0b66557ff793d743db571a943220e0c144a909779782872ec5"
+    },
+    "clinical-note.pdf": {
+      "sha256": "cd7e104ec206278289fc1c976f1490aa5380f103387525e3c97f06236209e852"
+    },
+    "expected.json": {
+      "sha256": "868bfb401b04936dd7ff8de340a618e518dbb77ef1cfb3be9a8fa401bf5eea0e"
+    }
+  },
+  "expected": {
+    "pdf_extraction": "Same whitespace-delimited tokens as clinical-note.txt; line wrapping and blank lines may differ.",
+    "text_pseudonymization": "The text and PDF-derived outputs must be nonempty and differ from their respective input texts beyond whitespace.",
+    "removed_literal_identifiers": [
+      "8000000142"
+    ],
+    "repeatability": "Repeating each pseudonymization query with the same input and seed must return exactly the same output in this environment.",
+    "scope": "These checks demonstrate the SQL functions on fictional data. They do not establish complete identifier removal or clinical de-identification accuracy. Pseudonyms can change with model or dependency versions."
+  },
+  "queries": {
+    "text-pseudo": "SELECT text_pseudo(?, ?)",
+    "pdf-extracted": "SELECT from_utf8(pdf_to_text(from_base64(?)))",
+    "pdf-text-pseudo": "SELECT text_pseudo(from_utf8(pdf_to_text(from_base64(?))), ?)",
+    "text-pseudo-repeat": "SELECT text_pseudo(?, ?)",
+    "pdf-text-pseudo-repeat": "SELECT text_pseudo(from_utf8(pdf_to_text(from_base64(?))), ?)"
+  },
+  "results": {
+    "text-pseudo": {
+      "output": "text-pseudo.txt",
+      "sha256": "cc7c24e8e59817243c09a9d183faea23e3fa26d3b040b2533ac534155427d9ab"
+    },
+    "pdf-extracted": {
+      "output": "pdf-extracted.txt",
+      "sha256": "05ba5bcbee3e6653f489b10b1d8af4c023a12a6f28fb676b7c10ad5f8f784a87"
+    },
+    "pdf-text-pseudo": {
+      "output": "pdf-text-pseudo.txt",
+      "sha256": "dd6a83d48e24a65fe1d77acfd58954f11f28e9db5c10d0d266d07e71ec1ad450"
+    },
+    "text-pseudo-repeat": {
+      "output": "text-pseudo-repeat.txt",
+      "sha256": "cc7c24e8e59817243c09a9d183faea23e3fa26d3b040b2533ac534155427d9ab"
+    },
+    "pdf-text-pseudo-repeat": {
+      "output": "pdf-text-pseudo-repeat.txt",
+      "sha256": "dd6a83d48e24a65fe1d77acfd58954f11f28e9db5c10d0d266d07e71ec1ad450"
+    }
+  },
+  "checks": {
+    "pdf-extraction-matches-source": true,
+    "text-pseudo-nonempty": true,
+    "text-pseudo-changed": true,
+    "text-pseudo-identifiers-removed": true,
+    "text-pseudo-repeatable": true,
+    "pdf-text-pseudo-nonempty": true,
+    "pdf-text-pseudo-changed": true,
+    "pdf-text-pseudo-identifiers-removed": true,
+    "pdf-text-pseudo-repeatable": true
+  },
+  "summary": {
+    "queries_passed": 5,
+    "queries_failed": 0,
+    "checks_passed": 9,
+    "checks_failed": 0,
+    "success": true
+  }
+}

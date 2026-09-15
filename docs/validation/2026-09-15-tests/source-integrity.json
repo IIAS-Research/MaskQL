@@ -1,0 +1,12 @@
+{
+  "base_version": "1.6.0",
+  "base_commit": "f7dd60ece3926378d99b90b7c02fcb6d6dde2d48",
+  "status": "local corrected worktree; not a published release",
+  "source_patch_sha256": "a01c1fb7a6700786e4d49e622e74669cc9684505f799b99ea760fb058684e837",
+  "tracked_file_count": 176,
+  "changes_in_executed_copy_after_freeze": [],
+  "root_changes_after_freeze": [
+    "examples/unstructured/README.md"
+  ],
+  "root_change_explanation": "Documentation only: clarify that graceful shutdown waits at most 10 seconds."
+}

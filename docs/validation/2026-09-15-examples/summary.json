@@ -1,0 +1,75 @@
+{
+  "date": "2026-09-15",
+  "source": {
+    "commit": "b58bdb7818592334eed93f38553ece8fd372cdc4",
+    "source_version": "1.6.0",
+    "status": "committed runtime fixes; example enhancements recorded separately",
+    "source_patch_sha256": "6ac2a694de6ce73523140a41e402bccb1baa2961b7e120ae941d7dc8c5561c4f",
+    "frozen_source_files": 178,
+    "source_integrity_verified": true,
+    "root_differences": [
+      "Makefile"
+    ],
+    "root_difference_explanation": "Uncommitted publication-docx target excluded from the example execution snapshot."
+  },
+  "structured": {
+    "source_count": 200,
+    "visible_patient_ids": [
+      1,
+      2,
+      3
+    ],
+    "checks": {
+      "source_has_200_synthetic_patients": true,
+      "only_patient_ids_1_2_3": true,
+      "last_names_are_masked": true,
+      "preview_has_five_raw_rows": true,
+      "preview_matches_three_masked_rows": true,
+      "decryption_matches_source": true
+    },
+    "cleanup": {
+      "catalogs": true,
+      "users": true
+    },
+    "passed": true
+  },
+  "text_pdf": {
+    "queries_passed": 5,
+    "queries_failed": 0,
+    "checks_passed": 9,
+    "checks_failed": 0,
+    "success": true
+  },
+  "cleanup": {
+    "containers": {
+      "command": [
+        "docker",
+        "ps",
+        "-a",
+        "--format",
+        "{{.Names}}"
+      ],
+      "remaining_example_resources": []
+    },
+    "volumes": {
+      "command": [
+        "docker",
+        "volume",
+        "ls",
+        "--format",
+        "{{.Name}}"
+      ],
+      "remaining_example_resources": []
+    },
+    "networks": {
+      "command": [
+        "docker",
+        "network",
+        "ls",
+        "--format",
+        "{{.Name}}"
+      ],
+      "remaining_example_resources": []
+    }
+  }
+}

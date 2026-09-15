@@ -1,0 +1,100 @@
+{
+  "corrected_validation": [
+    {
+      "command": [
+        "docker",
+        "tag",
+        "rudymerieux/maskql@sha256:f9bfe155961514e5386f01d71ab3ffa768bdc2a79524f69580b80eaa345a6c4e",
+        "rudymerieux/maskql:publication-fixes-20260915"
+      ],
+      "shell_command": "docker tag rudymerieux/maskql@sha256:f9bfe155961514e5386f01d71ab3ffa768bdc2a79524f69580b80eaa345a6c4e rudymerieux/maskql:publication-fixes-20260915",
+      "cwd": "/Users/rudy/Documents/CHU/maskql/.tox/publication-fixes-20260915/validation/source",
+      "started_at_utc": "2026-09-15T09:36:42.123791+00:00",
+      "environment_overrides": {
+        "JAVA_HOME": "/usr/local/opt/openjdk/libexec/openjdk.jdk/Contents/Home",
+        "UV_PYTHON": "/Users/rudy/.local/share/uv/python/cpython-3.10.12-macos-x86_64-none/bin/python3.10",
+        "MASKQL_TEST_PROJECT": "maskql-tox-fix-validation",
+        "MASKQL_TEST_PORT": "28443",
+        "MASKQL_TEST_POSTGRES_PORT": "25439",
+        "KEEP_TEST_STACK": "0",
+        "HF_TOKEN": "",
+        "MASKQL_IMAGE_TAG": "publication-fixes-20260915"
+      },
+      "exit_code": 0,
+      "duration_seconds": 0.137,
+      "finished_at_utc": "2026-09-15T09:36:42.261594+00:00"
+    },
+    {
+      "command": [
+        "docker",
+        "build",
+        "--pull=false",
+        "--tag",
+        "rudymerieux/maskql-trino:publication-fixes-20260915",
+        "../image"
+      ],
+      "shell_command": "docker build --pull=false --tag rudymerieux/maskql-trino:publication-fixes-20260915 ../image",
+      "cwd": "/Users/rudy/Documents/CHU/maskql/.tox/publication-fixes-20260915/validation/source",
+      "started_at_utc": "2026-09-15T09:36:26.207769+00:00",
+      "environment_overrides": {
+        "JAVA_HOME": "/usr/local/opt/openjdk/libexec/openjdk.jdk/Contents/Home",
+        "UV_PYTHON": "/Users/rudy/.local/share/uv/python/cpython-3.10.12-macos-x86_64-none/bin/python3.10",
+        "MASKQL_TEST_PROJECT": "maskql-tox-fix-validation",
+        "MASKQL_TEST_PORT": "28443",
+        "MASKQL_TEST_POSTGRES_PORT": "25439",
+        "KEEP_TEST_STACK": "0",
+        "HF_TOKEN": "",
+        "MASKQL_IMAGE_TAG": "publication-fixes-20260915"
+      },
+      "exit_code": 0,
+      "duration_seconds": 3.48,
+      "finished_at_utc": "2026-09-15T09:36:29.687982+00:00"
+    },
+    {
+      "command": [
+        "uv",
+        "sync",
+        "--frozen"
+      ],
+      "shell_command": "uv sync --frozen",
+      "cwd": "/Users/rudy/Documents/CHU/maskql/.tox/publication-fixes-20260915/validation/source",
+      "started_at_utc": "2026-09-15T09:36:25.262481+00:00",
+      "environment_overrides": {
+        "JAVA_HOME": "/usr/local/opt/openjdk/libexec/openjdk.jdk/Contents/Home",
+        "UV_PYTHON": "/Users/rudy/.local/share/uv/python/cpython-3.10.12-macos-x86_64-none/bin/python3.10",
+        "MASKQL_TEST_PROJECT": "maskql-tox-fix-validation",
+        "MASKQL_TEST_PORT": "28443",
+        "MASKQL_TEST_POSTGRES_PORT": "25439",
+        "KEEP_TEST_STACK": "0",
+        "HF_TOKEN": "",
+        "MASKQL_IMAGE_TAG": "publication-fixes-20260915"
+      },
+      "exit_code": 0,
+      "duration_seconds": 0.73,
+      "finished_at_utc": "2026-09-15T09:36:25.993605+00:00"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "tox"
+      ],
+      "shell_command": "uv run tox",
+      "cwd": "/Users/rudy/Documents/CHU/maskql/.tox/publication-fixes-20260915/validation/source",
+      "started_at_utc": "2026-09-15T09:36:57.640033+00:00",
+      "environment_overrides": {
+        "JAVA_HOME": "/usr/local/opt/openjdk/libexec/openjdk.jdk/Contents/Home",
+        "UV_PYTHON": "/Users/rudy/.local/share/uv/python/cpython-3.10.12-macos-x86_64-none/bin/python3.10",
+        "MASKQL_TEST_PROJECT": "maskql-tox-fix-validation",
+        "MASKQL_TEST_PORT": "28443",
+        "MASKQL_TEST_POSTGRES_PORT": "25439",
+        "KEEP_TEST_STACK": "0",
+        "HF_TOKEN": "",
+        "MASKQL_IMAGE_TAG": "publication-fixes-20260915"
+      },
+      "exit_code": 0,
+      "duration_seconds": 174.414,
+      "finished_at_utc": "2026-09-15T09:39:52.054211+00:00"
+    }
+  ]
+}

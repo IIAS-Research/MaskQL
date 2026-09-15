@@ -1,0 +1,442 @@
+diff --git a/docs/QUICKSTART.md b/docs/QUICKSTART.md
+index 0def836..4ea312f 100644
+--- a/docs/QUICKSTART.md
++++ b/docs/QUICKSTART.md
+@@ -239,6 +239,34 @@ The exact encrypted strings depend on `MASKQL_ENCRYPT_PASSWORD`, so they will di
+ 1. only patients 1, 2, and 3 are returned,
+ 2. `last_name` is encrypted.
+ 
++### Save and verify the example
++
++The [structured replay](../examples/structured/README.md) uses the same
++200-patient fixture, filter and encryption rule. From the repository root:
++
++```bash
++export MASKQL_HOST=localhost MASKQL_PORT=443
++export MASKQL_ADMIN_USER=admin MASKQL_ADMIN_PASSWORD=admin
++export API_VERIFY_SSL=certs/server.crt.pem
++export TRINO_VERIFY_SSL="$API_VERIFY_SSL"
++export MASKQL_ENCRYPT_PASSWORD='change-me-16+chars'
++uv run --frozen python examples/structured/run.py
++```
++
++It creates its own temporary user and catalog, saves the source and returned
++rows, checks the before/after preview and decryption, and removes those
++temporary resources. The expected retained names before encryption are
++`Fictional-Martin`, `Fictional-Lefèvre` and `Fictional-O'Connor` (patients 1–3).
++The query has no `WHERE`: the table rule supplies the filter.
++
++For a separate illustration of text processing and PDF extraction, run the
++[fictional clinical note example](../examples/unstructured/README.md):
++
++```bash
++MASKQL_USER=demo MASKQL_PASSWORD=demo \
++uv run --frozen python examples/unstructured/run_examples.py --seed fictional-patient-142
++```
++
+ ## 9. Stop the stack
+ 
+ When you are done:
+diff --git a/docs/VALIDATION.md b/docs/VALIDATION.md
+index abb59cb..2ba8198 100644
+--- a/docs/VALIDATION.md
++++ b/docs/VALIDATION.md
+@@ -26,7 +26,15 @@ npm --prefix frontend run test:unit -- --run
+ 
+ ## Run the examples
+ 
+-Keep the disposable stack after the tests:
++To run just the examples, prepare the dependencies and start a disposable
++stack directly:
++
++```bash
++uv sync --frozen
++uv run --frozen python scripts/test_stack.py start
++```
++
++Alternatively, keep the disposable stack after running the full test suite:
+ 
+ ```bash
+ KEEP_TEST_STACK=1 uv run tox
+@@ -47,8 +55,9 @@ uv run --frozen python examples/unstructured/run_examples.py --seed fictional-pa
+ 
+ - [Structured data](../examples/structured/README.md): filter 200 patients to three,
+   encrypt their names, verify decryption and the before/after preview.
+-- [Text and PDF](../examples/unstructured/README.md): pass one fictional English
+-  clinical note through the SQL functions, with an explicit seed.
++- [Text and PDF](../examples/unstructured/README.md): verify extraction of a
++  fictional clinical note from PDF, pseudonymization and repeatability with
++  an explicit seed. This is a functional illustration, not an accuracy study.
+ 
+ Outputs are generated in `examples/*/results/`, ignored by Git.
+ Finally, remove the test stack:
+diff --git a/examples/structured/README.md b/examples/structured/README.md
+index 02fc56f..b2f0de3 100644
+--- a/examples/structured/README.md
++++ b/examples/structured/README.md
+@@ -1,6 +1,6 @@
+ # Structured-data example
+ 
+-Run this after the Quickstart with the [synthetic healthcare fixture](../../tests/fixtures/healthcare.sql) loaded in `maskqltest`:
++Run this after the [Quickstart](../../docs/QUICKSTART.md) with the [synthetic healthcare fixture](../../tests/fixtures/healthcare.sql) loaded in `maskqltest`:
+ 
+ ```sh
+ export API_VERIFY_SSL=certs/server.crt.pem
+@@ -15,6 +15,45 @@ Set `MASKQL_HOST`, `MASKQL_PORT` and `MASKQL_SCHEME` for your installation (defa
+ 
+ The PostgreSQL connection defaults to `jdbc:postgresql://postgres:5432/maskqltest`, with the local demo credentials. Override `MASKQL_SOURCE_URL`, `MASKQL_SOURCE_USER` and `MASKQL_SOURCE_PASSWORD` when needed. Set `MASKQL_ENCRYPT_PASSWORD` to the running server's **test** encryption key to also verify decryption; it is never written to the artifacts.
+ 
+-The script creates a temporary user and catalog, runs [query.sql](query.sql) before and after applying [rules.json](rules.json), checks the preview API (five raw rows, three masked rows), and removes its temporary resources in `finally`. Existing users, catalogs, rules and source records are preserved.
++## Data, rules and expected result
+ 
+-Each run creates `results/<timestamp>/`: `input.json` records the 200 synthetic source rows; `result.json` records the returned patients, encrypted names, preview, optional decryption, checks and cleanup status. Use `--output /tmp/maskql-structured-results` to choose a new output directory. The SQL query contains no `WHERE`: the `patient_id <= 3` rule supplies the filter. Ciphertext depends on the server's encryption key and context.
++The fixture contains 200 fictional patients in `administrative.patients`. The
++[rules](rules.json) grant access with the row filter `patient_id <= 3` and encrypt
++the `last_name` column with `encrypt(last_name)`. The [query](query.sql) is:
++
++```sql
++SELECT patient_id, last_name
++FROM administrative.patients
++ORDER BY patient_id;
++```
++
++The SQL contains no `WHERE`: the access rule supplies the filter. The expected
++result has exactly these three patient IDs, with encrypted names:
++
++| patient_id | Source last_name | Returned last_name |
++| --- | --- | --- |
++| 1 | Fictional-Martin | Ciphertext of Fictional-Martin |
++| 2 | Fictional-Lefèvre | Ciphertext of Fictional-Lefèvre |
++| 3 | Fictional-O'Connor | Ciphertext of Fictional-O'Connor |
++
++Patients 4 through 200 must be excluded. Ciphertext depends on the server's
++encryption key and context, so these labels are not literal expected SQL values.
++The runner checks that each returned name is nonempty and differs from its source;
++with the configured test key, it also decrypts the result and compares it exactly
++with the three original names in [expected.json](expected.json). The same file
++defines the expected source count, visible IDs and preview counts (five raw rows,
++three masked rows).
++
++## Verification and saved outputs
++
++The script creates a temporary user and catalog, runs the query before and after
++applying the rules, checks all expectations, and removes its temporary resources
++in `finally`. Existing users, catalogs, rules and source records are preserved.
++
++Each run creates `results/<timestamp>/`: `input.json` records the 200 synthetic
++source rows; `expected.json` preserves the expected result; `result.json` records
++the returned patients, actual encrypted names, preview, optional decryption,
++checks and cleanup status. A successful run prints `PASS` and sets `passed` to
++`true`; a failed check or cleanup exits with an error. Without
++`MASKQL_ENCRYPT_PASSWORD`, decryption is explicitly marked as skipped. Use
++`--output /tmp/maskql-structured-results` to choose a new output directory.
+diff --git a/examples/structured/run.py b/examples/structured/run.py
+index 67dabb8..3928b75 100644
+--- a/examples/structured/run.py
++++ b/examples/structured/run.py
+@@ -48,6 +48,8 @@ def run():
+     password = secrets.token_urlsafe(24)
+     query = (HERE / "query.sql").read_text(encoding="utf-8").strip().rstrip(";")
+     rules = json.loads((HERE / "rules.json").read_text(encoding="utf-8"))["rules"]
++    expected = json.loads((HERE / "expected.json").read_text(encoding="utf-8"))
++    write_json(output / "expected.json", expected)
+     fixture = HERE.parents[1] / "tests/fixtures/healthcare.sql"
+     result = {
+         "run_at": datetime.now(timezone.utc).isoformat(),
+@@ -55,6 +57,7 @@ def run():
+         "fixture_sha256": hashlib.sha256(fixture.read_bytes()).hexdigest(),
+         "query": query,
+         "rules": rules,
++        "expected": expected,
+         "checks": {},
+         "cleanup": {},
+         "passed": False,
+@@ -112,9 +115,8 @@ def run():
+ 
+             stage = "reading the synthetic source"
+             source = rows(query)
+-            expected_names = ["Fictional-Martin", "Fictional-Lefèvre", "Fictional-O'Connor"]
+-            assert [row["patient_id"] for row in source] == list(range(1, 201)), "Expected patient IDs 1 through 200."
+-            assert [row["last_name"] for row in source[:3]] == expected_names, "Source names differ from the fixture."
++            assert [row["patient_id"] for row in source] == list(range(1, expected["source_row_count"] + 1)), "Expected patient IDs 1 through 200."
++            assert source[:3] == expected["decrypted_rows"], "Source names differ from the fixture."
+             assert all(row["last_name"].startswith("Fictional-") for row in source), "Source contains unexpected names."
+             write_json(output / "input.json", {"query": query, "row_count": len(source), "rows": source})
+             result["checks"]["source_has_200_synthetic_patients"] = True
+@@ -128,7 +130,7 @@ def run():
+             masked = rows(query)
+             result["rows"] = masked
+             result["checks"]["only_patient_ids_1_2_3"] = (
+-                [row["patient_id"] for row in masked] == [1, 2, 3]
++                [row["patient_id"] for row in masked] == expected["visible_patient_ids"]
+             )
+             source_names = {row["patient_id"]: row["last_name"] for row in source}
+             result["checks"]["last_names_are_masked"] = bool(masked) and all(
+@@ -141,17 +143,18 @@ def run():
+             stage = "checking the before/after preview API"
+             preview = api("POST", f"/catalogs/{catalog['id']}/schema/preview", json={
+                 "user_id": user["id"], "schema_name": "administrative",
+-                "table_name": "patients", "limit": 5,
++                "table_name": "patients", "limit": expected["preview"]["limit"],
+             })
+             result["preview"] = preview
+             before = preview["before_maskql"]
+             after = preview["after_maskql"]
+             result["checks"]["preview_has_five_raw_rows"] = (
+-                before["error"] is None and len(before["rows"]) == 5
++                before["error"] is None and len(before["rows"]) == expected["preview"]["before_row_count"]
+                 and all(row["last_name"] == source_names[row["patient_id"]] for row in before["rows"])
+             )
+             result["checks"]["preview_matches_three_masked_rows"] = (
+                 after["error"] is None
++                and len(after["rows"]) == expected["preview"]["after_row_count"]
+                 and sorted(
+                     ({"patient_id": row["patient_id"], "last_name": row["last_name"]} for row in after["rows"]),
+                     key=lambda row: row["patient_id"],
+@@ -167,7 +170,7 @@ def run():
+                     "FROM administrative.patients ORDER BY patient_id", [secret],
+                 )
+                 result["decrypted_rows"] = decrypted
+-                result["checks"]["decryption_matches_source"] = decrypted == source[:3]
++                result["checks"]["decryption_matches_source"] = decrypted == expected["decrypted_rows"]
+                 assert result["checks"]["decryption_matches_source"], "Decrypted names differ from the source."
+             else:
+                 result["decryption"] = "Skipped: MASKQL_ENCRYPT_PASSWORD was not supplied."
+diff --git a/examples/unstructured/README.md b/examples/unstructured/README.md
+index ac3570a..5353d59 100644
+--- a/examples/unstructured/README.md
++++ b/examples/unstructured/README.md
+@@ -1,20 +1,54 @@
+ # Clinical note example
+ 
+ One fictional English note and its searchable PDF exercise `text_pseudo(text, seed)`
+-and PDF text extraction through MaskQL. All identities are fictional.
++and PDF text extraction through MaskQL. All identities are fictional. The files
++[`clinical-note.txt`](clinical-note.txt) and [`clinical-note.pdf`](clinical-note.pdf)
++are supplied, along with [expected results](expected.json).
+ 
+ Run from the repository root against a running MaskQL instance:
+ 
+ ```bash
+ MASKQL_HOST=localhost MASKQL_PORT=443 \
+-MASKQL_USER=demo MASKQL_PASSWORD=demo TRINO_VERIFY_SSL=certs/ca.crt.pem \
++MASKQL_USER=demo MASKQL_PASSWORD=demo TRINO_VERIFY_SSL=certs/server.crt.pem \
+ uv run --frozen python examples/unstructured/run_examples.py --seed fictional-patient-142
+ ```
+ 
+-Adjust the host, port and CA path to your installation. The runner makes three
+-`SELECT` queries: pseudonymize the note, extract PDF text, and pseudonymize that
+-extracted text. It binds the input and seed as SQL parameters. `pdf_to_text`
+-returns UTF-8 bytes, converted with `from_utf8` before calling `text_pseudo`.
++Start MaskQL using the [quickstart](../../docs/QUICKSTART.md), then adjust the host,
++port and certificate path to your installation. No database import or masking
++policy is required: the example directly calls these SQL functions, binding the
++input and seed as parameters:
++
++```sql
++SELECT text_pseudo(?, ?);
++SELECT from_utf8(pdf_to_text(from_base64(?)));
++SELECT text_pseudo(from_utf8(pdf_to_text(from_base64(?))), ?);
++```
++
++The runner repeats both pseudonymization queries with the same input and seed,
++for five `SELECT` calls in total. `pdf_to_text` returns UTF-8 bytes, converted with
++`from_utf8` before calling `text_pseudo`. The PDF already contains searchable
++text; this example does not exercise OCR of scanned documents.
++
++## Expected results and verification
++
++The runner checks all nine conditions described in [`expected.json`](expected.json):
++
++- Extracted PDF text contains exactly the source note's tokens, in order,
++  ignoring whitespace differences introduced by PDF line wrapping.
++- Each of the two pseudonymized outputs is nonempty, differs from its input
++  beyond whitespace, no longer contains the fictional IPP `8000000142`, and is
++  reproduced exactly by a second call with the same seed (four checks per output).
++
++Expected final counts are `queries_passed: 5`, `queries_failed: 0`,
++`checks_passed: 9`, `checks_failed: 0`, and `success: true` in `report.json`.
++Every check must pass for the runner to exit with status zero. The concrete
++pseudonyms are recorded as actual outputs, rather than hard-coded: a model or
++dependency update can change them.
++
++This English fixture illustrates function composition and explicit IPP removal.
++The EDS model is intended for French clinical text; the checks do not measure
++its performance on English notes, nor establish that every identifier was
++detected or removed. Review the recorded outputs to see what was transformed.
+ 
+ ## Model lifecycle
+ 
+@@ -36,9 +70,11 @@ precedence when set.
+ 
+ ## Outputs
+ 
+-Outputs and `report.json` (seed, SQL and any query errors) go to
++Outputs and `report.json` (input/output SHA-256 hashes, seed, SQL, expected
++conditions, individual checks, counts and query error types) go to
+ `results/<timestamp>/`, ignored by Git. Use `--output /tmp/maskql-note-results`
+-to choose a new directory. A failed query produces a nonzero exit status.
++to choose a new directory. A failed query or check produces a nonzero exit status.
++The connection password is not included in the report.
+ 
+ To regenerate the PDF after editing the note, without extra dependencies:
+ 
+diff --git a/examples/unstructured/run_examples.py b/examples/unstructured/run_examples.py
+index 6d63ff2..33642bf 100644
+--- a/examples/unstructured/run_examples.py
++++ b/examples/unstructured/run_examples.py
+@@ -3,6 +3,7 @@
+ import argparse
+ import base64
+ from datetime import datetime, timezone
++import hashlib
+ import json
+ import os
+ from pathlib import Path
+@@ -14,6 +15,10 @@ from trino.auth import BasicAuthentication
+ HERE = Path(__file__).resolve().parent
+ 
+ 
++def sha256(data):
++    return hashlib.sha256(data).hexdigest()
++
++
+ def query(connection, sql, parameters):
+     cursor = connection.cursor()
+     try:
+@@ -31,7 +36,6 @@ def main():
+     parser.add_argument("--seed", default="fictional-patient-142", help="Pseudonymization context, not a password.")
+     parser.add_argument("--output", type=Path, default=HERE / "results" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ"))
+     args = parser.parse_args()
+-    args.output.mkdir(parents=True, exist_ok=False)
+ 
+     username = os.getenv("MASKQL_USER", "demo")
+     scheme = os.getenv("MASKQL_SCHEME", "https")
+@@ -48,19 +52,32 @@ def main():
+         "http_scheme": scheme,
+         "user": username,
+     }
+-    source = (HERE / "clinical-note.txt").read_text(encoding="utf-8")
+-    pdf = base64.b64encode((HERE / "clinical-note.pdf").read_bytes()).decode("ascii")
++    inputs = {name: (HERE / name).read_bytes() for name in (
++        "clinical-note.txt", "clinical-note.pdf", "expected.json"
++    )}
++    source = inputs["clinical-note.txt"].decode("utf-8")
++    expected = json.loads(inputs["expected.json"])
++    identifiers = expected["removed_literal_identifiers"]
++    if not identifiers or any(not item or item not in source for item in identifiers):
++        raise ValueError("Expected identifiers must be nonempty literals present in the source note")
++    pdf = base64.b64encode(inputs["clinical-note.pdf"]).decode("ascii")
++    args.output.mkdir(parents=True, exist_ok=False)
+     queries = {
+         "text-pseudo": ("SELECT text_pseudo(?, ?)", [source, args.seed]),
+         "pdf-extracted": ("SELECT from_utf8(pdf_to_text(from_base64(?)))", [pdf]),
+         "pdf-text-pseudo": ("SELECT text_pseudo(from_utf8(pdf_to_text(from_base64(?))), ?)", [pdf, args.seed]),
++        "text-pseudo-repeat": ("SELECT text_pseudo(?, ?)", [source, args.seed]),
++        "pdf-text-pseudo-repeat": ("SELECT text_pseudo(from_utf8(pdf_to_text(from_base64(?))), ?)", [pdf, args.seed]),
+     }
+     report = {
+         "ran_at": datetime.now(timezone.utc).isoformat(),
+         "endpoint": endpoint,
+         "seed": args.seed,
++        "inputs": {name: {"sha256": sha256(data)} for name, data in inputs.items()},
++        "expected": expected,
+         "queries": {name: sql for name, (sql, _) in queries.items()},
+         "results": {},
++        "checks": {},
+     }
+     connection = trino.dbapi.connect(
+         **endpoint,
+@@ -70,23 +87,56 @@ def main():
+         max_attempts=1,
+     )
+     failures = 0
++    values = {}
+     try:
+         for name, (sql, parameters) in queries.items():
+             try:
+                 value = query(connection, sql, parameters)
+                 filename = f"{name}.txt"
+                 (args.output / filename).write_text(value, encoding="utf-8")
+-                report["results"][name] = {"output": filename}
++                values[name] = value
++                report["results"][name] = {
++                    "output": filename, "sha256": sha256(value.encode("utf-8"))
++                }
+                 print(f"{name}: OK")
+             except Exception as error:
+-                report["results"][name] = {"error": str(error)}
++                # Client exceptions can include URLs and connection details.
++                report["results"][name] = {"error": {
++                    "type": type(error).__name__,
++                    "message": "Query failed; inspect the MaskQL/Trino service logs.",
++                }}
+                 failures += 1
+                 print(f"{name}: failed; see report.json")
++        extracted = values.get("pdf-extracted")
++        report["checks"]["pdf-extraction-matches-source"] = (
++            extracted is not None and extracted.split() == source.split()
++        )
++        for name, original in (("text-pseudo", source), ("pdf-text-pseudo", extracted)):
++            value = values.get(name)
++            report["checks"][f"{name}-nonempty"] = bool(value and value.strip())
++            report["checks"][f"{name}-changed"] = (
++                value is not None and original is not None and value.split() != original.split()
++            )
++            report["checks"][f"{name}-identifiers-removed"] = (
++                value is not None and all(item not in value for item in identifiers)
++            )
++            report["checks"][f"{name}-repeatable"] = (
++                value is not None and value == values.get(f"{name}-repeat")
++            )
+     finally:
+         connection.close()
++        checks_passed = sum(report["checks"].values())
++        report["summary"] = {
++            "queries_passed": len(values), "queries_failed": failures,
++            "checks_passed": checks_passed,
++            "checks_failed": len(report["checks"]) - checks_passed,
++            "success": failures == 0 and len(report["checks"]) == 9 and checks_passed == 9,
++        }
+         (args.output / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
++    for name, passed in report["checks"].items():
++        print(f"{name}: {'PASS' if passed else 'FAIL'}")
+     print(args.output / "report.json")
+-    return 1 if failures else 0
++    return 0 if report["summary"]["success"] else 1
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/examples/structured/expected.json b/examples/structured/expected.json
+new file mode 100644
+--- /dev/null
++++ b/examples/structured/expected.json
+@@ -0,0 +1,16 @@
++{
++  "source_row_count": 200,
++  "visible_patient_ids": [1, 2, 3],
++  "masked_column": "last_name",
++  "mask_rule": "encrypt(last_name)",
++  "decrypted_rows": [
++    {"patient_id": 1, "last_name": "Fictional-Martin"},
++    {"patient_id": 2, "last_name": "Fictional-Lefèvre"},
++    {"patient_id": 3, "last_name": "Fictional-O'Connor"}
++  ],
++  "preview": {
++    "limit": 5,
++    "before_row_count": 5,
++    "after_row_count": 3
++  }
++}
+diff --git a/examples/unstructured/expected.json b/examples/unstructured/expected.json
+new file mode 100644
+--- /dev/null
++++ b/examples/unstructured/expected.json
+@@ -0,0 +1,7 @@
++{
++  "pdf_extraction": "Same whitespace-delimited tokens as clinical-note.txt; line wrapping and blank lines may differ.",
++  "text_pseudonymization": "The text and PDF-derived outputs must be nonempty and differ from their respective input texts beyond whitespace.",
++  "removed_literal_identifiers": ["8000000142"],
++  "repeatability": "Repeating each pseudonymization query with the same input and seed must return exactly the same output in this environment.",
++  "scope": "These checks demonstrate the SQL functions on fictional data. They do not establish complete identifier removal or clinical de-identification accuracy. Pseudonyms can change with model or dependency versions."
++}

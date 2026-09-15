@@ -1,6 +1,6 @@
 # Structured-data example
 
-Run this after the Quickstart with the [synthetic healthcare fixture](../../tests/fixtures/healthcare.sql) loaded in `maskqltest`:
+Run this after the [Quickstart](../../docs/QUICKSTART.md) with the [synthetic healthcare fixture](../../tests/fixtures/healthcare.sql) loaded in `maskqltest`:
 
 ```sh
 export API_VERIFY_SSL=certs/server.crt.pem
@@ -15,6 +15,45 @@ Set `MASKQL_HOST`, `MASKQL_PORT` and `MASKQL_SCHEME` for your installation (defa
 
 The PostgreSQL connection defaults to `jdbc:postgresql://postgres:5432/maskqltest`, with the local demo credentials. Override `MASKQL_SOURCE_URL`, `MASKQL_SOURCE_USER` and `MASKQL_SOURCE_PASSWORD` when needed. Set `MASKQL_ENCRYPT_PASSWORD` to the running server's **test** encryption key to also verify decryption; it is never written to the artifacts.
 
-The script creates a temporary user and catalog, runs [query.sql](query.sql) before and after applying [rules.json](rules.json), checks the preview API (five raw rows, three masked rows), and removes its temporary resources in `finally`. Existing users, catalogs, rules and source records are preserved.
+## Data, rules and expected result
 
-Each run creates `results/<timestamp>/`: `input.json` records the 200 synthetic source rows; `result.json` records the returned patients, encrypted names, preview, optional decryption, checks and cleanup status. Use `--output /tmp/maskql-structured-results` to choose a new output directory. The SQL query contains no `WHERE`: the `patient_id <= 3` rule supplies the filter. Ciphertext depends on the server's encryption key and context.
+The fixture contains 200 fictional patients in `administrative.patients`. The
+[rules](rules.json) grant access with the row filter `patient_id <= 3` and encrypt
+the `last_name` column with `encrypt(last_name)`. The [query](query.sql) is:
+
+```sql
+SELECT patient_id, last_name
+FROM administrative.patients
+ORDER BY patient_id;
+```
+
+The SQL contains no `WHERE`: the access rule supplies the filter. The expected
+result has exactly these three patient IDs, with encrypted names:
+
+| patient_id | Source last_name | Returned last_name |
+| --- | --- | --- |
+| 1 | Fictional-Martin | Ciphertext of Fictional-Martin |
+| 2 | Fictional-Lefèvre | Ciphertext of Fictional-Lefèvre |
+| 3 | Fictional-O'Connor | Ciphertext of Fictional-O'Connor |
+
+Patients 4 through 200 must be excluded. Ciphertext depends on the server's
+encryption key and context, so these labels are not literal expected SQL values.
+The runner checks that each returned name is nonempty and differs from its source;
+with the configured test key, it also decrypts the result and compares it exactly
+with the three original names in [expected.json](expected.json). The same file
+defines the expected source count, visible IDs and preview counts (five raw rows,
+three masked rows).
+
+## Verification and saved outputs
+
+The script creates a temporary user and catalog, runs the query before and after
+applying the rules, checks all expectations, and removes its temporary resources
+in `finally`. Existing users, catalogs, rules and source records are preserved.
+
+Each run creates `results/<timestamp>/`: `input.json` records the 200 synthetic
+source rows; `expected.json` preserves the expected result; `result.json` records
+the returned patients, actual encrypted names, preview, optional decryption,
+checks and cleanup status. A successful run prints `PASS` and sets `passed` to
+`true`; a failed check or cleanup exits with an error. Without
+`MASKQL_ENCRYPT_PASSWORD`, decryption is explicitly marked as skipped. Use
+`--output /tmp/maskql-structured-results` to choose a new output directory.

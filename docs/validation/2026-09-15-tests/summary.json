@@ -1,0 +1,438 @@
+{
+  "date": "2026-09-15",
+  "source": {
+    "base_version": "1.6.0",
+    "base_commit": "f7dd60ece3926378d99b90b7c02fcb6d6dde2d48",
+    "status": "local corrected worktree; not a published release",
+    "source_patch_sha256": "a01c1fb7a6700786e4d49e622e74669cc9684505f799b99ea760fb058684e837",
+    "tracked_file_count": 176,
+    "changes_in_executed_copy_after_freeze": [],
+    "root_changes_after_freeze": [
+      "examples/unstructured/README.md"
+    ],
+    "root_change_explanation": "Documentation only: clarify that graceful shutdown waits at most 10 seconds."
+  },
+  "python": {
+    "total": 71,
+    "passed": 71,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "unit_catalog": 15,
+    "unit_catalog_using_mocks": 14,
+    "unit_catalog_pure_function": 1,
+    "integration": 56,
+    "unittest_duration_seconds": 91.122,
+    "command_exit_code": 0,
+    "command_duration_seconds": 174.414,
+    "tests": [
+      {
+        "name": "test_acl_default_for_new_user",
+        "class": "test_acl_api.AclAndRulesTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_can_access_catalog",
+        "class": "test_acl_api.AclAndRulesTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_direct_allow_without_parent",
+        "class": "test_acl_api.AclAndRulesTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_parent_allow_and_direct_deny",
+        "class": "test_acl_api.AclAndRulesTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_row_filter_and_mask_via_effect",
+        "class": "test_acl_api.AclAndRulesTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_rules_admin_auth_required",
+        "class": "test_acl_api.AclAndRulesTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_rules_patch_and_delete",
+        "class": "test_acl_api.AclAndRulesTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_table_deny_with_explicit_allowed_column_keeps_table_selectable",
+        "class": "test_acl_api.AclAndRulesTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_gateway_https_available_and_ok",
+        "class": "test_auth_routing.TestAuthRouting",
+        "result": "passed"
+      },
+      {
+        "name": "test_gateway_https_with_auth_ok",
+        "class": "test_auth_routing.TestAuthRouting",
+        "result": "passed"
+      },
+      {
+        "name": "test_gateway_requires_auth",
+        "class": "test_auth_routing.TestAuthRouting",
+        "result": "passed"
+      },
+      {
+        "name": "test_trino_direct_not_routable",
+        "class": "test_auth_routing.TestAuthRouting",
+        "result": "passed"
+      },
+      {
+        "name": "test_admin_auth_needed",
+        "class": "test_catalog_api.CatalogApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_catalog_schema_is_scanned_on_create",
+        "class": "test_catalog_api.CatalogApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_conflict_on_unique_name",
+        "class": "test_catalog_api.CatalogApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_create_and_get_by_id_and_list",
+        "class": "test_catalog_api.CatalogApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_delete_and_404",
+        "class": "test_catalog_api.CatalogApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_list_connection_statuses",
+        "class": "test_catalog_api.CatalogApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_manual_schema_entry_can_be_added_synced_and_removed",
+        "class": "test_catalog_api.CatalogApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_patch_conflict",
+        "class": "test_catalog_api.CatalogApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_patch_partial",
+        "class": "test_catalog_api.CatalogApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_sync_catalog_schema_keeps_valid_rules_and_preserves_manual_ones",
+        "class": "test_catalog_api.CatalogApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_connection_status_queries_existing_catalog_without_temp_catalog",
+        "class": "test_catalog_service.CatalogConnectionStatusTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_duplicate_copies_connection_fields_and_secret",
+        "class": "test_catalog_service.CatalogDuplicateTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_duplicate_returns_none_when_source_catalog_is_missing",
+        "class": "test_catalog_service.CatalogDuplicateTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_preview_table_falls_back_when_focused_column_has_no_rows",
+        "class": "test_catalog_service.CatalogPreviewTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_preview_table_prefers_rows_with_focused_column_values",
+        "class": "test_catalog_service.CatalogPreviewTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_preview_table_returns_error_payload_when_masked_query_fails",
+        "class": "test_catalog_service.CatalogPreviewTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_preview_table_runs_raw_and_masked_queries",
+        "class": "test_catalog_service.CatalogPreviewTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_replace_catalog_creates_new_name_before_dropping_previous_name",
+        "class": "test_catalog_service.CatalogReplacementTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_replace_catalog_restores_previous_catalog_when_same_name_create_fails",
+        "class": "test_catalog_service.CatalogReplacementTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_should_skip_sqlserver_system_schemas_case_insensitively",
+        "class": "test_catalog_service.CatalogSchemaSkipTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_scan_schema_paths_uses_information_schema_and_skips_sqlserver_system_schemas",
+        "class": "test_catalog_service.CatalogServiceScanTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_sync_schema_can_still_force_catalog_registration",
+        "class": "test_catalog_service.CatalogServiceScanTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_sync_schema_does_not_recreate_catalog_by_default",
+        "class": "test_catalog_service.CatalogServiceScanTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_columns_reject_missing_paths_and_do_not_hide_trino_errors",
+        "class": "test_catalog_service.CatalogTableColumnTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_columns_use_quoted_metadata_query_and_preserve_trino_types",
+        "class": "test_catalog_service.CatalogTableColumnTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_encrypt_decrypt_bigint",
+        "class": "test_crypto.TestCryptoFunctions",
+        "result": "passed"
+      },
+      {
+        "name": "test_encrypt_decrypt_char",
+        "class": "test_crypto.TestCryptoFunctions",
+        "result": "passed"
+      },
+      {
+        "name": "test_encrypt_decrypt_date",
+        "class": "test_crypto.TestCryptoFunctions",
+        "result": "passed"
+      },
+      {
+        "name": "test_encrypt_decrypt_date_boundaries",
+        "class": "test_crypto.TestCryptoFunctions",
+        "result": "passed"
+      },
+      {
+        "name": "test_encrypt_decrypt_double",
+        "class": "test_crypto.TestCryptoFunctions",
+        "result": "passed"
+      },
+      {
+        "name": "test_encrypt_decrypt_integer",
+        "class": "test_crypto.TestCryptoFunctions",
+        "result": "passed"
+      },
+      {
+        "name": "test_encrypt_decrypt_real",
+        "class": "test_crypto.TestCryptoFunctions",
+        "result": "passed"
+      },
+      {
+        "name": "test_encrypt_decrypt_smallint",
+        "class": "test_crypto.TestCryptoFunctions",
+        "result": "passed"
+      },
+      {
+        "name": "test_encrypt_decrypt_timestamp",
+        "class": "test_crypto.TestCryptoFunctions",
+        "result": "passed"
+      },
+      {
+        "name": "test_encrypt_decrypt_tinyint",
+        "class": "test_crypto.TestCryptoFunctions",
+        "result": "passed"
+      },
+      {
+        "name": "test_encrypt_decrypt_varbinary",
+        "class": "test_crypto.TestCryptoFunctions",
+        "result": "passed"
+      },
+      {
+        "name": "test_encrypt_decrypt_varchar",
+        "class": "test_crypto.TestCryptoFunctions",
+        "result": "passed"
+      },
+      {
+        "name": "test_deny_mask_returns_null_without_hiding_column",
+        "class": "test_masking.TestMasking",
+        "result": "passed"
+      },
+      {
+        "name": "test_encrypt_mask_keeps_queryable_bounded_varchar",
+        "class": "test_masking.TestMasking",
+        "result": "passed"
+      },
+      {
+        "name": "test_encrypt_mask_supports_char_column",
+        "class": "test_masking.TestMasking",
+        "result": "passed"
+      },
+      {
+        "name": "test_healthcare_patient_identity_is_masked",
+        "class": "test_masking.TestMasking",
+        "result": "passed"
+      },
+      {
+        "name": "test_healthcare_relationships",
+        "class": "test_masking.TestMasking",
+        "result": "passed"
+      },
+      {
+        "name": "test_healthcare_tables_are_readable",
+        "class": "test_masking.TestMasking",
+        "result": "passed"
+      },
+      {
+        "name": "test_maskql_alive",
+        "class": "test_masking.TestMasking",
+        "result": "passed"
+      },
+      {
+        "name": "test_seeded_row_filter",
+        "class": "test_masking.TestMasking",
+        "result": "passed"
+      },
+      {
+        "name": "test_table_deny_with_one_allowed_column_keeps_other_columns_null",
+        "class": "test_masking.TestMasking",
+        "result": "passed"
+      },
+      {
+        "name": "test_admin_auth_needed",
+        "class": "test_rule_api.RuleApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_create_with_invalid_fks",
+        "class": "test_rule_api.RuleApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_full_rule_life",
+        "class": "test_rule_api.RuleApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_incompatible_effect_is_not_saved",
+        "class": "test_rule_api.RuleApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_pdf_to_text",
+        "class": "test_unstructured.TestUnstructuredFunctions",
+        "result": "passed"
+      },
+      {
+        "name": "test_text_pseudo_concurrent_queries_preserve_seed",
+        "class": "test_unstructured.TestUnstructuredFunctions",
+        "result": "passed"
+      },
+      {
+        "name": "test_text_pseudo_uses_sql_seed",
+        "class": "test_unstructured.TestUnstructuredFunctions",
+        "result": "passed"
+      },
+      {
+        "name": "test_admin_auth_needed",
+        "class": "test_user_api.UserApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_conflict_on_unique_username",
+        "class": "test_user_api.UserApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_delete_and_404",
+        "class": "test_user_api.UserApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_patch_not_found",
+        "class": "test_user_api.UserApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_patch_username",
+        "class": "test_user_api.UserApiTests",
+        "result": "passed"
+      },
+      {
+        "name": "test_register_and_list",
+        "class": "test_user_api.UserApiTests",
+        "result": "passed"
+      }
+    ]
+  },
+  "tox_steps": {
+    "1-commands_pre[0].log": 0,
+    "2-commands[0].log": 0,
+    "3-commands_post[0].log": 0
+  },
+  "java": {
+    "maven_test_execution": "disabled by existing build script (-DskipTests)"
+  },
+  "nlp_lifecycle": {
+    "loading": [
+      "trino-1          | 2026-09-15T09:37:28.233595668Z 2026-09-15T09:37:28.233Z\tINFO\teds-pseudo-worker\tstderr\t[EdsPseudoBridge] Loading EDS pipeline"
+    ],
+    "ready": [
+      "trino-1          | 2026-09-15T09:37:38.900271986Z 2026-09-15T09:37:38.899Z\tINFO\teds-pseudo-worker\tstderr\t[EdsPseudoBridge] EDS pipeline ready"
+    ],
+    "server_started": [
+      "trino-1          | 2026-09-15T09:37:43.534740954Z 2026-09-15T09:37:43.534Z\tINFO\tmain\tio.trino.server.Server\t======== SERVER STARTED ========"
+    ],
+    "model_load_count": 1
+  },
+  "cleanup": {
+    "containers": {
+      "command": [
+        "docker",
+        "ps",
+        "-a",
+        "--format",
+        "{{.Names}}"
+      ],
+      "remaining_test_resources": []
+    },
+    "volumes": {
+      "command": [
+        "docker",
+        "volume",
+        "ls",
+        "--format",
+        "{{.Name}}"
+      ],
+      "remaining_test_resources": []
+    },
+    "networks": {
+      "command": [
+        "docker",
+        "network",
+        "ls",
+        "--format",
+        "{{.Name}}"
+      ],
+      "remaining_test_resources": []
+    }
+  }
+}

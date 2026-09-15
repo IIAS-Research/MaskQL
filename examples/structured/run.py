@@ -48,6 +48,8 @@ def run():
     password = secrets.token_urlsafe(24)
     query = (HERE / "query.sql").read_text(encoding="utf-8").strip().rstrip(";")
     rules = json.loads((HERE / "rules.json").read_text(encoding="utf-8"))["rules"]
+    expected = json.loads((HERE / "expected.json").read_text(encoding="utf-8"))
+    write_json(output / "expected.json", expected)
     fixture = HERE.parents[1] / "tests/fixtures/healthcare.sql"
     result = {
         "run_at": datetime.now(timezone.utc).isoformat(),
@@ -55,6 +57,7 @@ def run():
         "fixture_sha256": hashlib.sha256(fixture.read_bytes()).hexdigest(),
         "query": query,
         "rules": rules,
+        "expected": expected,
         "checks": {},
         "cleanup": {},
         "passed": False,
@@ -112,9 +115,8 @@ def run():
 
             stage = "reading the synthetic source"
             source = rows(query)
-            expected_names = ["Fictional-Martin", "Fictional-Lefèvre", "Fictional-O'Connor"]
-            assert [row["patient_id"] for row in source] == list(range(1, 201)), "Expected patient IDs 1 through 200."
-            assert [row["last_name"] for row in source[:3]] == expected_names, "Source names differ from the fixture."
+            assert [row["patient_id"] for row in source] == list(range(1, expected["source_row_count"] + 1)), "Expected patient IDs 1 through 200."
+            assert source[:3] == expected["decrypted_rows"], "Source names differ from the fixture."
             assert all(row["last_name"].startswith("Fictional-") for row in source), "Source contains unexpected names."
             write_json(output / "input.json", {"query": query, "row_count": len(source), "rows": source})
             result["checks"]["source_has_200_synthetic_patients"] = True
@@ -128,7 +130,7 @@ def run():
             masked = rows(query)
             result["rows"] = masked
             result["checks"]["only_patient_ids_1_2_3"] = (
-                [row["patient_id"] for row in masked] == [1, 2, 3]
+                [row["patient_id"] for row in masked] == expected["visible_patient_ids"]
             )
             source_names = {row["patient_id"]: row["last_name"] for row in source}
             result["checks"]["last_names_are_masked"] = bool(masked) and all(
@@ -141,17 +143,18 @@ def run():
             stage = "checking the before/after preview API"
             preview = api("POST", f"/catalogs/{catalog['id']}/schema/preview", json={
                 "user_id": user["id"], "schema_name": "administrative",
-                "table_name": "patients", "limit": 5,
+                "table_name": "patients", "limit": expected["preview"]["limit"],
             })
             result["preview"] = preview
             before = preview["before_maskql"]
             after = preview["after_maskql"]
             result["checks"]["preview_has_five_raw_rows"] = (
-                before["error"] is None and len(before["rows"]) == 5
+                before["error"] is None and len(before["rows"]) == expected["preview"]["before_row_count"]
                 and all(row["last_name"] == source_names[row["patient_id"]] for row in before["rows"])
             )
             result["checks"]["preview_matches_three_masked_rows"] = (
                 after["error"] is None
+                and len(after["rows"]) == expected["preview"]["after_row_count"]
                 and sorted(
                     ({"patient_id": row["patient_id"], "last_name": row["last_name"]} for row in after["rows"]),
                     key=lambda row: row["patient_id"],
@@ -167,7 +170,7 @@ def run():
                     "FROM administrative.patients ORDER BY patient_id", [secret],
                 )
                 result["decrypted_rows"] = decrypted
-                result["checks"]["decryption_matches_source"] = decrypted == source[:3]
+                result["checks"]["decryption_matches_source"] = decrypted == expected["decrypted_rows"]
                 assert result["checks"]["decryption_matches_source"], "Decrypted names differ from the source."
             else:
                 result["decryption"] = "Skipped: MASKQL_ENCRYPT_PASSWORD was not supplied."
